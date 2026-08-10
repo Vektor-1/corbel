@@ -1,0 +1,67 @@
+'use client';
+
+import { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { CanvasEditor } from '@/components/2d/CanvasEditor';
+import { FloorPlanRenderer } from '@/components/3d/FloorPlanRenderer';
+import { useFloorPlanStore, useCurrentFloor } from '@/lib/store/floorPlanStore';
+
+// The editor for the Canonical schema (Draft -> lift -> Canonical), fed by
+// the /upload pipeline. Distinct from the legacy /editor route, which still
+// runs on the older FloorPlan/designStore schema.
+function StudioContent() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const isTraceMode = params.get('mode') === 'trace';
+
+  const floor = useCurrentFloor();
+  const ghostFloor = useFloorPlanStore((s) => s.ghostFloor);
+
+  if (!floor) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f2efe7] text-[#26221a]">
+        <p className="text-sm text-[#6f685b]">No plan loaded yet.</p>
+        <Button onClick={() => router.push('/upload')}>Go to upload</Button>
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex h-screen flex-col bg-[#f2efe7] text-[#26221a]">
+      <div className="flex items-center justify-between border-b border-[#d7d0c2] bg-white/80 px-4 py-2">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => router.push('/upload')}>
+            <ArrowLeft size={14} /> Upload
+          </Button>
+          <span className="text-xs font-medium">
+            {isTraceMode ? 'Trace-to-Learn' : 'Studio'}
+          </span>
+          {isTraceMode && ghostFloor && (
+            <span className="rounded-full bg-[#f3efe7] px-2 py-0.5 text-[10px] text-[#8a6b3f]">
+              Redesign against the frozen baseline (shown ghosted)
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-1/2 overflow-auto border-r border-[#d7d0c2]">
+          <CanvasEditor width={800} height={800} />
+        </div>
+        <div className="w-1/2">
+          <FloorPlanRenderer />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function StudioPage() {
+  return (
+    <Suspense fallback={null}>
+      <StudioContent />
+    </Suspense>
+  );
+}

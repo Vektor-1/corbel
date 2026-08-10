@@ -13,7 +13,7 @@
  * 8. Build canonical Floor
  */
 
-import { Draft, Canonical, LiftConfig, LiftContext, ElementStatus } from "../types/schema";
+import { Draft, Canonical, LiftConfig, LiftContext, ElementStatus } from "../../types/schema";
 
 const DEFAULT_CONFIG: LiftConfig = {
   gridSnapTolerance: 50, // mm
@@ -99,19 +99,28 @@ function closeJunctions(
         const distAStart_BEnd = distance(wallA.start, wallB.end);
         const distAStart_BStart = distance(wallA.start, wallB.start);
 
-        // Case 1: A's end touches B's start → merge into one wall
-        if (distAEnd_BStart < maxGapToClose) {
-          closed[i] = {
-            ...wallA,
-            end: wallB.end, // extend A to B's end
-            confidence: Math.min(wallA.confidence, wallB.confidence),
+        // Case 1: A's end is close to B's start but the two walls run in
+        // different directions — they meet at a corner (e.g. two sides of a
+        // room), not a fragmented straight run. Snap both endpoints to the
+        // same point instead of merging the segments, which would otherwise
+        // destroy the corner by stretching A across B's entire span.
+        if (
+          distAEnd_BStart > 0 &&
+          distAEnd_BStart < maxGapToClose &&
+          !areCollinear(wallA, wallB, maxGapToClose)
+        ) {
+          const mid = {
+            x: (wallA.end.x + wallB.start.x) / 2,
+            y: (wallA.end.y + wallB.start.y) / 2,
           };
-          closed.splice(j, 1);
+          closed[i] = { ...wallA, end: mid };
+          closed[j] = { ...wallB, start: mid };
           changed = true;
           break;
         }
 
-        // Case 2: A and B are collinear, on same line, overlapping → merge
+        // Case 2: A and B are collinear, on same line, overlapping or with a
+        // small gap between them → merge into a single longer wall.
         if (areCollinear(wallA, wallB, maxGapToClose)) {
           const merged = mergeCollinearWalls(wallA, wallB);
           if (merged) {
@@ -280,7 +289,9 @@ function detectClosedLoops(walls: Draft.Wall[]): string[][] {
     const currentWall = walls.find((w) => w.id === currentWallId);
     if (!currentWall) return;
 
-    const nextPoint = isCurrentStart ? currentWall.start : currentWall.end;
+    // isCurrentStart means we arrived at this wall via its start endpoint,
+    // so continue the walk from its other (end) endpoint, and vice versa.
+    const nextPoint = isCurrentStart ? currentWall.end : currentWall.start;
     const nextKey = `${Math.round(nextPoint.x)},${Math.round(nextPoint.y)}`;
 
     const neighbors = graph.get(nextKey) || [];
@@ -295,10 +306,11 @@ function detectClosedLoops(walls: Draft.Wall[]): string[][] {
     }
   }
 
-  // Start DFS from first endpoint of each wall
+  // Start DFS from each wall's start point, walking toward its end (isCurrentStart:
+  // true means "entered via start", so the first hop correctly proceeds to wall.end).
   walls.forEach((wall) => {
     const startKey = `${Math.round(wall.start.x)},${Math.round(wall.start.y)}`;
-    dfs(wall.id, false, startKey, [wall.id]);
+    dfs(wall.id, true, startKey, [wall.id]);
   });
 
   return cycles;
@@ -545,7 +557,9 @@ function extractPolygonVertices(walls: Canonical.Wall[]): { x: number; y: number
 
     if (!nextWall) break;
     currentWall = nextWall;
-    currentPoint = distance(currentWall.start, nextPoint) < 10 ? currentWall.end : currentWall.start;
+    // currentPoint becomes the endpoint of the new wall that coincides with
+    // nextPoint (where we just arrived) — not the far endpoint.
+    currentPoint = distance(currentWall.start, nextPoint) < 10 ? currentWall.start : currentWall.end;
   }
 
   return vertices;

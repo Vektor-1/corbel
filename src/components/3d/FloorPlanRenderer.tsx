@@ -179,12 +179,12 @@ const FloorPlanScene: React.FC<FloorPlanSceneProps> = ({ floorHeight }) => {
   const clearDirty = useFloorPlanStore((state) => state.clearDirty);
 
   // After render, clear dirty flags so 3D only updates on change
-  useFrame(({ gl }) => {
+  useFrame(({ gl, scene, camera }) => {
     // On next frame after render, clear dirty
     if (isDirtyGlobal) {
       clearDirty();
       // Scene will re-render on-demand next time something changes
-      gl.render(gl.scene, gl.camera);
+      gl.render(scene, camera);
     }
   });
 

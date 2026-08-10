@@ -9,7 +9,7 @@
 
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { Canonical } from "../../types/schema";
+import { Canonical, Source } from "../../types/schema";
 
 // ============================================================================
 // STORE STATE
@@ -196,7 +196,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
           typeRef: thickness > 150 ? "ext-200" : "int-100",
           openingIds: [],
           confidence: 1.0,
-          source: "user",
+          source: Source.USER,
         };
 
         newWallId = wall.id;
@@ -205,7 +205,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         state.isDirtyGlobal = true;
 
         // Mark rooms dirty (topology may have changed)
-        state.currentFloor.rooms.forEach((r) => state.dirtyRoomIds.add(r.id));
+        state.currentFloor.rooms.forEach((r: Canonical.Room) => state.dirtyRoomIds.add(r.id));
       });
       return newWallId;
     },
@@ -214,7 +214,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       set((state) => {
         if (!state.currentFloor) return;
 
-        const wall = state.currentFloor.walls.find((w) => w.id === wallId);
+        const wall = state.currentFloor.walls.find((w: Canonical.Wall) => w.id === wallId);
         if (!wall) return;
 
         wall.start.x += delta.x;
@@ -226,10 +226,10 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         state.isDirtyGlobal = true;
 
         // Mark rooms dirty (may have changed shape)
-        const affectedRooms = state.currentFloor.rooms.filter((r) =>
+        const affectedRooms = state.currentFloor.rooms.filter((r: Canonical.Room) =>
           r.boundingWallIds.includes(wallId)
         );
-        affectedRooms.forEach((r) => state.dirtyRoomIds.add(r.id));
+        affectedRooms.forEach((r: Canonical.Room) => state.dirtyRoomIds.add(r.id));
       });
     },
 
@@ -237,7 +237,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       set((state) => {
         if (!state.currentFloor) return;
 
-        const wall = state.currentFloor.walls.find((w) => w.id === wallId);
+        const wall = state.currentFloor.walls.find((w: Canonical.Wall) => w.id === wallId);
         if (!wall) return;
 
         wall.start = newStart;
@@ -246,10 +246,10 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         state.dirtyWallIds.add(wallId);
         state.isDirtyGlobal = true;
 
-        const affectedRooms = state.currentFloor.rooms.filter((r) =>
+        const affectedRooms = state.currentFloor.rooms.filter((r: Canonical.Room) =>
           r.boundingWallIds.includes(wallId)
         );
-        affectedRooms.forEach((r) => state.dirtyRoomIds.add(r.id));
+        affectedRooms.forEach((r: Canonical.Room) => state.dirtyRoomIds.add(r.id));
       });
     },
 
@@ -258,18 +258,18 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         if (!state.currentFloor) return;
 
         // Remove wall
-        state.currentFloor.walls = state.currentFloor.walls.filter((w) => w.id !== wallId);
+        state.currentFloor.walls = state.currentFloor.walls.filter((w: Canonical.Wall) => w.id !== wallId);
 
         // Remove openings on that wall
-        const openingsToDelete = state.currentFloor.openings.filter((o) => o.hostWallId === wallId);
-        openingsToDelete.forEach((o) => {
-          state.currentFloor!.openings = state.currentFloor!.openings.filter((x) => x.id !== o.id);
+        const openingsToDelete = state.currentFloor.openings.filter((o: Canonical.Opening) => o.hostWallId === wallId);
+        openingsToDelete.forEach((o: Canonical.Opening) => {
+          state.currentFloor!.openings = state.currentFloor!.openings.filter((x: Canonical.Opening) => x.id !== o.id);
           state.dirtyOpeningIds.delete(o.id);
         });
 
         // Remove rooms that referenced this wall
         state.currentFloor.rooms = state.currentFloor.rooms.filter(
-          (r) => !r.boundingWallIds.includes(wallId)
+          (r: Canonical.Room) => !r.boundingWallIds.includes(wallId)
         );
 
         state.dirtyWallIds.delete(wallId);
@@ -286,7 +286,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       set((state) => {
         if (!state.currentFloor) return;
 
-        const wall = state.currentFloor.walls.find((w) => w.id === wallId);
+        const wall = state.currentFloor.walls.find((w: Canonical.Wall) => w.id === wallId);
         if (!wall) return;
 
         const opening: Canonical.Opening = {
@@ -296,7 +296,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
           hostWallId: wallId,
           positionAlongWall,
           confidence: 1.0,
-          source: "user",
+          source: Source.USER,
         };
 
         newOpeningId = opening.id;
@@ -314,7 +314,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       set((state) => {
         if (!state.currentFloor) return;
 
-        const opening = state.currentFloor.openings.find((o) => o.id === openingId);
+        const opening = state.currentFloor.openings.find((o: Canonical.Opening) => o.id === openingId);
         if (!opening) return;
 
         opening.positionAlongWall = positionAlongWall;
@@ -327,16 +327,16 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       set((state) => {
         if (!state.currentFloor) return;
 
-        const opening = state.currentFloor.openings.find((o) => o.id === openingId);
+        const opening = state.currentFloor.openings.find((o: Canonical.Opening) => o.id === openingId);
         if (!opening) return;
 
-        const wall = state.currentFloor.walls.find((w) => w.id === opening.hostWallId);
+        const wall = state.currentFloor.walls.find((w: Canonical.Wall) => w.id === opening.hostWallId);
         if (wall) {
-          wall.openingIds = wall.openingIds.filter((id) => id !== openingId);
+          wall.openingIds = wall.openingIds.filter((id: string) => id !== openingId);
           state.dirtyWallIds.add(wall.id);
         }
 
-        state.currentFloor.openings = state.currentFloor.openings.filter((o) => o.id !== openingId);
+        state.currentFloor.openings = state.currentFloor.openings.filter((o: Canonical.Opening) => o.id !== openingId);
         state.dirtyOpeningIds.delete(openingId);
         state.isDirtyGlobal = true;
       });
@@ -350,7 +350,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       set((state) => {
         if (!state.currentFloor) return;
 
-        const room = state.currentFloor.rooms.find((r) => r.id === roomId);
+        const room = state.currentFloor.rooms.find((r: Canonical.Room) => r.id === roomId);
         if (room) {
           room.label = label;
           state.dirtyRoomIds.add(roomId);
@@ -390,7 +390,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         const issues: Canonical.ValidationResult[] = [];
 
         // Example rules (would be a full rule engine in practice)
-        state.currentFloor.rooms.forEach((room) => {
+        state.currentFloor.rooms.forEach((room: Canonical.Room) => {
           // Rule: minimum room area 12 m² (12e6 mm²)
           if (room.area < 12e6) {
             issues.push({
