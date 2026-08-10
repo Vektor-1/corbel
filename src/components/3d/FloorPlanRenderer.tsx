@@ -14,7 +14,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { PerspectiveCamera, OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
 import { useFloorPlanStore, useDirtyFlags } from "../../lib/store/floorPlanStore";
-import { Canonical } from "../../lib/types/schema";
+import { Canonical } from "../../types/schema";
 
 // ============================================================================
 // WALL MESH COMPONENT

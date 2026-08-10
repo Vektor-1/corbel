@@ -14,7 +14,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Stage, Layer, Line, Rect, Text, Circle, Group } from "react-konva";
 import Konva from "konva";
 import { useFloorPlanStore, useCurrentFloor, useSelection } from "../../lib/store/floorPlanStore";
-import { Canonical } from "../../lib/types/schema";
+import { Canonical } from "../../types/schema";
 
 // ============================================================================
 // CONSTANTS

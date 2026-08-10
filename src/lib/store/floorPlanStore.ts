@@ -9,7 +9,7 @@
 
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import { Canonical } from "../types/schema";
+import { Canonical } from "../../types/schema";
 
 // ============================================================================
 // STORE STATE

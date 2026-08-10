@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Corbel: Educational Architecture Design Tool for Ghana
 
-## Getting Started
+A browser-based 2D/3D architectural design tool built for Ghanaian students, with **real-time validation against Ghana Building Code (GS 1207:2018)**.
 
-First, run the development server:
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000/editor](http://localhost:3000/editor)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📚 Documentation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**All project documentation is in `/docs`** — structured by category:
 
-## Learn More
+- **[Overview](../docs/overview/)** — What is Corbel, value proposition, attribution
+- **[Architecture](../docs/architecture/)** — Technical design, project setup
+- **[Guides](../docs/guides/)** — How-to guides, best practices
+- **[FAQ](../docs/faq/)** — Common questions (coming soon)
+- **[Research](../docs/research/)** — FYP study design, methodology (coming soon)
 
-To learn more about Next.js, take a look at the following resources:
+**→ [Full Documentation Index](../docs/README.md)**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What is Corbel?
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Corbel teaches architectural students to design buildings that comply with **local building standards**:
 
-## Deploy on Vercel
+- 🎨 **2D Floor Plan Drawing** (Konva.js)
+- 🏗️ **Real-Time 3D Visualization** (React Three Fiber)
+- ✓ **Ghana Building Code Validation** (GS 1207:2018)
+- 📍 **Local Materials** (Sandcrete, laterite with real-world data)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Tech Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Framework**: Next.js 14 + TypeScript
+- **2D Canvas**: Konva.js + React-Konva
+- **3D Viewer**: React Three Fiber + Three.js
+- **State**: Zustand
+- **Styling**: Tailwind CSS
+
+## Licensing
+
+**MIT Licensed**. See [Attribution](../docs/overview/ATTRIBUTION.md) for third-party credits.
+
+## Development
+
+```bash
+# Development server
+npm run dev
+
+# Production build
+npm run build
+npm start
+
+# Deploy to Vercel
+vercel
+```
+
+---
+
+**[📖 Read Full Documentation](../docs/README.md)**

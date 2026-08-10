@@ -1,0 +1,67 @@
+[
+  {
+    "file": "clean-modern-degraded-derived.jpg",
+    "status": "ok",
+    "confidence": 0.579,
+    "detections": {
+      "wall": 25,
+      "label": 5,
+      "dimension": 1
+    }
+  },
+  {
+    "file": "clean-modern-public-domain.jpg",
+    "status": "ok",
+    "confidence": 0.558,
+    "detections": {
+      "wall": 21,
+      "label": 5
+    }
+  },
+  {
+    "file": "clean-modern-public-domain.pdf",
+    "status": "ok",
+    "confidence": 0.517,
+    "detections": {
+      "wall": 21,
+      "dimension": 5,
+      "label": 5
+    }
+  },
+  {
+    "file": "complex-historic-public-domain.jpg",
+    "status": "ok",
+    "confidence": 0.643,
+    "detections": {
+      "wall": 51,
+      "dimension": 17
+    }
+  },
+  {
+    "file": "historic-home-public-domain.jpg",
+    "status": "ok",
+    "confidence": 0.62,
+    "detections": {
+      "wall": 40,
+      "dimension": 5,
+      "label": 1
+    }
+  },
+  {
+    "file": "historic-library-public-domain.jpg",
+    "status": "ok",
+    "confidence": 0.601,
+    "detections": {
+      "wall": 56
+    }
+  },
+  {
+    "file": "kitchen-remodel-cc-by-sa.png",
+    "status": "ok",
+    "confidence": 0.563,
+    "detections": {
+      "wall": 8,
+      "label": 1
+    }
+  }
+]

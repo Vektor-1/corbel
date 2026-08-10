@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "kind": "image",
+    "fileName": "kitchen-remodel-cc-by-sa.png",
+    "url": "https://local.invalid/kitchen-remodel-cc-by-sa.png",
+    "page": 1,
+    "width": 2354,
+    "height": 2600
+  },
+  "scale": {
+    "pixelsPerMeter": 100,
+    "confidence": 0.15,
+    "method": "manual"
+  },
+  "detections": [
+    {
+      "id": "wall-0",
+      "kind": "wall",
+      "confidence": 0.403,
+      "start": {
+        "x": 165,
+        "y": 1912
+      },
+      "end": {
+        "x": 2213,
+        "y": 1912
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-1",
+      "kind": "wall",
+      "confidence": 0.392,
+      "start": {
+        "x": 389,
+        "y": 1662
+      },
+      "end": {
+        "x": 2076,
+        "y": 1662
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-2",
+      "kind": "wall",
+      "confidence": 0.351,
+      "start": {
+        "x": 742,
+        "y": 1683
+      },
+      "end": {
+        "x": 742,
+        "y": 2049
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-3",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 1402,
+        "y": 739
+      },
+      "end": {
+        "x": 1402,
+        "y": 822
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-4",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 1364,
+        "y": 1099
+      },
+      "end": {
+        "x": 1364,
+        "y": 1178
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-5",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 1388,
+        "y": 1099
+      },
+      "end": {
+        "x": 1388,
+        "y": 1178
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-6",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 1331,
+        "y": 1099
+      },
+      "end": {
+        "x": 1331,
+        "y": 1177
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-7",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 170,
+        "y": 1902
+      },
+      "end": {
+        "x": 237,
+        "y": 1902
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "label-25",
+      "kind": "label",
+      "confidence": 0.96,
+      "text": "Kitchen",
+      "position": {
+        "x": 1241.5,
+        "y": 1277.5
+      },
+      "role": "room-name"
+    }
+  ],
+  "overallConfidence": 0.563,
+  "warnings": [
+    "Local classical-baseline evaluation."
+  ]
+}

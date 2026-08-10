@@ -1,0 +1,467 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "kind": "pdf",
+    "fileName": "clean-modern-public-domain.pdf",
+    "url": "https://local.invalid/clean-modern-public-domain.pdf",
+    "page": 1,
+    "width": 809,
+    "height": 547
+  },
+  "scale": {
+    "pixelsPerMeter": 100,
+    "confidence": 0.15,
+    "method": "manual"
+  },
+  "detections": [
+    {
+      "id": "wall-0",
+      "kind": "wall",
+      "confidence": 0.741,
+      "start": {
+        "x": 28,
+        "y": 526
+      },
+      "end": {
+        "x": 748,
+        "y": 526
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-1",
+      "kind": "wall",
+      "confidence": 0.41,
+      "start": {
+        "x": 30,
+        "y": 118
+      },
+      "end": {
+        "x": 748,
+        "y": 118
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-2",
+      "kind": "wall",
+      "confidence": 0.381,
+      "start": {
+        "x": 748,
+        "y": 118
+      },
+      "end": {
+        "x": 748,
+        "y": 526
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-3",
+      "kind": "wall",
+      "confidence": 0.38,
+      "start": {
+        "x": 513,
+        "y": 118
+      },
+      "end": {
+        "x": 513,
+        "y": 526
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-4",
+      "kind": "wall",
+      "confidence": 0.377,
+      "start": {
+        "x": 284,
+        "y": 155
+      },
+      "end": {
+        "x": 284,
+        "y": 526
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-5",
+      "kind": "wall",
+      "confidence": 0.365,
+      "start": {
+        "x": 38,
+        "y": 298
+      },
+      "end": {
+        "x": 284,
+        "y": 298
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-6",
+      "kind": "wall",
+      "confidence": 0.694,
+      "start": {
+        "x": 284,
+        "y": 155
+      },
+      "end": {
+        "x": 513,
+        "y": 155
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-7",
+      "kind": "wall",
+      "confidence": 0.354,
+      "start": {
+        "x": 150,
+        "y": 432
+      },
+      "end": {
+        "x": 284,
+        "y": 432
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-8",
+      "kind": "wall",
+      "confidence": 0.354,
+      "start": {
+        "x": 170,
+        "y": 298
+      },
+      "end": {
+        "x": 170,
+        "y": 432
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-9",
+      "kind": "wall",
+      "confidence": 0.353,
+      "start": {
+        "x": 38,
+        "y": 334
+      },
+      "end": {
+        "x": 170,
+        "y": 334
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-10",
+      "kind": "wall",
+      "confidence": 0.35,
+      "start": {
+        "x": 414,
+        "y": 387
+      },
+      "end": {
+        "x": 513,
+        "y": 387
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-11",
+      "kind": "wall",
+      "confidence": 0.35,
+      "start": {
+        "x": 150,
+        "y": 432
+      },
+      "end": {
+        "x": 150,
+        "y": 526
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-12",
+      "kind": "wall",
+      "confidence": 0.349,
+      "start": {
+        "x": 475,
+        "y": 352
+      },
+      "end": {
+        "x": 475,
+        "y": 446
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-13",
+      "kind": "wall",
+      "confidence": 0.679,
+      "start": {
+        "x": 133,
+        "y": 30
+      },
+      "end": {
+        "x": 225,
+        "y": 30
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-14",
+      "kind": "wall",
+      "confidence": 0.676,
+      "start": {
+        "x": 302,
+        "y": 351
+      },
+      "end": {
+        "x": 367,
+        "y": 351
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-15",
+      "kind": "wall",
+      "confidence": 0.667,
+      "start": {
+        "x": 270,
+        "y": 87
+      },
+      "end": {
+        "x": 270,
+        "y": 151
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-16",
+      "kind": "wall",
+      "confidence": 0.674,
+      "start": {
+        "x": 34,
+        "y": 238
+      },
+      "end": {
+        "x": 34,
+        "y": 277
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-17",
+      "kind": "wall",
+      "confidence": 0.674,
+      "start": {
+        "x": 29,
+        "y": 169
+      },
+      "end": {
+        "x": 29,
+        "y": 206
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-18",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 589,
+        "y": 122
+      },
+      "end": {
+        "x": 622,
+        "y": 122
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-19",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 347,
+        "y": 430
+      },
+      "end": {
+        "x": 377,
+        "y": 430
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-20",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 738,
+        "y": 143
+      },
+      "end": {
+        "x": 738,
+        "y": 173
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "dimension-5",
+      "kind": "dimension",
+      "confidence": 0.62,
+      "start": {
+        "x": 156.0,
+        "y": 13.0
+      },
+      "end": {
+        "x": 165.0,
+        "y": 13.0
+      },
+      "valueMm": 87.0,
+      "text": "87"
+    },
+    {
+      "id": "dimension-16",
+      "kind": "dimension",
+      "confidence": 0.0,
+      "start": {
+        "x": 562.0,
+        "y": 107.0
+      },
+      "end": {
+        "x": 575.0,
+        "y": 107.0
+      },
+      "valueMm": 60.0,
+      "text": "60"
+    },
+    {
+      "id": "dimension-28",
+      "kind": "dimension",
+      "confidence": 0.33,
+      "start": {
+        "x": 709.0,
+        "y": 108.5
+      },
+      "end": {
+        "x": 731.0,
+        "y": 108.5
+      },
+      "valueMm": 8750.0,
+      "text": "8750"
+    },
+    {
+      "id": "label-44",
+      "kind": "label",
+      "confidence": 0.95,
+      "text": "Kitchen",
+      "position": {
+        "x": 228.0,
+        "y": 207.5
+      },
+      "role": "room-name"
+    },
+    {
+      "id": "label-49",
+      "kind": "label",
+      "confidence": 0.96,
+      "text": "Living",
+      "position": {
+        "x": 537.0,
+        "y": 285.5
+      },
+      "role": "room-name"
+    },
+    {
+      "id": "label-62",
+      "kind": "label",
+      "confidence": 0.91,
+      "text": "Dining",
+      "position": {
+        "x": 539.0,
+        "y": 303.0
+      },
+      "role": "room-name"
+    },
+    {
+      "id": "dimension-70",
+      "kind": "dimension",
+      "confidence": 0.48,
+      "start": {
+        "x": 432.0,
+        "y": 390.0
+      },
+      "end": {
+        "x": 436.0,
+        "y": 390.0
+      },
+      "valueMm": 4.0,
+      "text": "4"
+    },
+    {
+      "id": "label-94",
+      "kind": "label",
+      "confidence": 0.96,
+      "text": "Storage",
+      "position": {
+        "x": 99.5,
+        "y": 433.5
+      },
+      "role": "room-name"
+    },
+    {
+      "id": "label-115",
+      "kind": "label",
+      "confidence": 0.95,
+      "text": "Bath",
+      "position": {
+        "x": 226.5,
+        "y": 474.5
+      },
+      "role": "room-name"
+    },
+    {
+      "id": "dimension-144",
+      "kind": "dimension",
+      "confidence": 0.54,
+      "start": {
+        "x": 346.0,
+        "y": 538.5
+      },
+      "end": {
+        "x": 354.0,
+        "y": 538.5
+      },
+      "valueMm": 20.0,
+      "text": "20"
+    }
+  ],
+  "overallConfidence": 0.517,
+  "warnings": [
+    "Local classical-baseline evaluation."
+  ]
+}

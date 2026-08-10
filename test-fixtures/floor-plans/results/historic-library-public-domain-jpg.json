@@ -1,0 +1,862 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "kind": "image",
+    "fileName": "historic-library-public-domain.jpg",
+    "url": "https://local.invalid/historic-library-public-domain.jpg",
+    "page": 1,
+    "width": 2312,
+    "height": 2600
+  },
+  "scale": {
+    "pixelsPerMeter": 100,
+    "confidence": 0.15,
+    "method": "manual"
+  },
+  "detections": [
+    {
+      "id": "wall-0",
+      "kind": "wall",
+      "confidence": 0.401,
+      "start": {
+        "x": 66,
+        "y": 1581
+      },
+      "end": {
+        "x": 2052,
+        "y": 1581
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-1",
+      "kind": "wall",
+      "confidence": 0.72,
+      "start": {
+        "x": 562,
+        "y": 59
+      },
+      "end": {
+        "x": 562,
+        "y": 1683
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-2",
+      "kind": "wall",
+      "confidence": 0.72,
+      "start": {
+        "x": 1558,
+        "y": 62
+      },
+      "end": {
+        "x": 1558,
+        "y": 1684
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-3",
+      "kind": "wall",
+      "confidence": 0.38,
+      "start": {
+        "x": 1866,
+        "y": 294
+      },
+      "end": {
+        "x": 1866,
+        "y": 1581
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-4",
+      "kind": "wall",
+      "confidence": 0.702,
+      "start": {
+        "x": 542,
+        "y": 90
+      },
+      "end": {
+        "x": 1558,
+        "y": 90
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-5",
+      "kind": "wall",
+      "confidence": 0.372,
+      "start": {
+        "x": 542,
+        "y": 113
+      },
+      "end": {
+        "x": 1558,
+        "y": 113
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-6",
+      "kind": "wall",
+      "confidence": 0.372,
+      "start": {
+        "x": 120,
+        "y": 568
+      },
+      "end": {
+        "x": 120,
+        "y": 1581
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-7",
+      "kind": "wall",
+      "confidence": 0.372,
+      "start": {
+        "x": 533,
+        "y": 2537
+      },
+      "end": {
+        "x": 1561,
+        "y": 2537
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-8",
+      "kind": "wall",
+      "confidence": 0.37,
+      "start": {
+        "x": 562,
+        "y": 1303
+      },
+      "end": {
+        "x": 1558,
+        "y": 1303
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-9",
+      "kind": "wall",
+      "confidence": 0.368,
+      "start": {
+        "x": 1472,
+        "y": 1533
+      },
+      "end": {
+        "x": 1472,
+        "y": 2455
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-10",
+      "kind": "wall",
+      "confidence": 0.361,
+      "start": {
+        "x": 702,
+        "y": 1713
+      },
+      "end": {
+        "x": 1388,
+        "y": 1713
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-11",
+      "kind": "wall",
+      "confidence": 0.361,
+      "start": {
+        "x": 702,
+        "y": 2105
+      },
+      "end": {
+        "x": 1388,
+        "y": 2105
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-12",
+      "kind": "wall",
+      "confidence": 0.361,
+      "start": {
+        "x": 703,
+        "y": 1842
+      },
+      "end": {
+        "x": 1388,
+        "y": 1842
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-13",
+      "kind": "wall",
+      "confidence": 0.691,
+      "start": {
+        "x": 702,
+        "y": 2214
+      },
+      "end": {
+        "x": 1385,
+        "y": 2214
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-14",
+      "kind": "wall",
+      "confidence": 0.691,
+      "start": {
+        "x": 702,
+        "y": 2346
+      },
+      "end": {
+        "x": 1385,
+        "y": 2346
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-15",
+      "kind": "wall",
+      "confidence": 0.357,
+      "start": {
+        "x": 69,
+        "y": 568
+      },
+      "end": {
+        "x": 69,
+        "y": 1112
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-16",
+      "kind": "wall",
+      "confidence": 0.687,
+      "start": {
+        "x": 617,
+        "y": 1531
+      },
+      "end": {
+        "x": 617,
+        "y": 2077
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-17",
+      "kind": "wall",
+      "confidence": 0.687,
+      "start": {
+        "x": 542,
+        "y": 58
+      },
+      "end": {
+        "x": 542,
+        "y": 592
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-18",
+      "kind": "wall",
+      "confidence": 0.686,
+      "start": {
+        "x": 69,
+        "y": 592
+      },
+      "end": {
+        "x": 580,
+        "y": 592
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-19",
+      "kind": "wall",
+      "confidence": 0.356,
+      "start": {
+        "x": 69,
+        "y": 957
+      },
+      "end": {
+        "x": 562,
+        "y": 957
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-20",
+      "kind": "wall",
+      "confidence": 0.355,
+      "start": {
+        "x": 790,
+        "y": 742
+      },
+      "end": {
+        "x": 1290,
+        "y": 742
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-21",
+      "kind": "wall",
+      "confidence": 0.684,
+      "start": {
+        "x": 541,
+        "y": 1358
+      },
+      "end": {
+        "x": 983,
+        "y": 1358
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-22",
+      "kind": "wall",
+      "confidence": 0.683,
+      "start": {
+        "x": 1552,
+        "y": 62
+      },
+      "end": {
+        "x": 1552,
+        "y": 472
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-23",
+      "kind": "wall",
+      "confidence": 0.682,
+      "start": {
+        "x": 1844,
+        "y": 295
+      },
+      "end": {
+        "x": 1844,
+        "y": 692
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-24",
+      "kind": "wall",
+      "confidence": 0.681,
+      "start": {
+        "x": 2078,
+        "y": 821
+      },
+      "end": {
+        "x": 2078,
+        "y": 1191
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-25",
+      "kind": "wall",
+      "confidence": 0.35,
+      "start": {
+        "x": 2193,
+        "y": 866
+      },
+      "end": {
+        "x": 2193,
+        "y": 1183
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-26",
+      "kind": "wall",
+      "confidence": 0.679,
+      "start": {
+        "x": 2088,
+        "y": 872
+      },
+      "end": {
+        "x": 2088,
+        "y": 1179
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-27",
+      "kind": "wall",
+      "confidence": 0.679,
+      "start": {
+        "x": 702,
+        "y": 1974
+      },
+      "end": {
+        "x": 999,
+        "y": 1974
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-28",
+      "kind": "wall",
+      "confidence": 0.679,
+      "start": {
+        "x": 703,
+        "y": 1688
+      },
+      "end": {
+        "x": 999,
+        "y": 1688
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-29",
+      "kind": "wall",
+      "confidence": 0.679,
+      "start": {
+        "x": 2148,
+        "y": 878
+      },
+      "end": {
+        "x": 2148,
+        "y": 1174
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-30",
+      "kind": "wall",
+      "confidence": 0.679,
+      "start": {
+        "x": 703,
+        "y": 1930
+      },
+      "end": {
+        "x": 997,
+        "y": 1930
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-31",
+      "kind": "wall",
+      "confidence": 0.677,
+      "start": {
+        "x": 1515,
+        "y": 1180
+      },
+      "end": {
+        "x": 1748,
+        "y": 1180
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-32",
+      "kind": "wall",
+      "confidence": 0.677,
+      "start": {
+        "x": 704,
+        "y": 2060
+      },
+      "end": {
+        "x": 930,
+        "y": 2060
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-33",
+      "kind": "wall",
+      "confidence": 0.676,
+      "start": {
+        "x": 2222,
+        "y": 400
+      },
+      "end": {
+        "x": 2222,
+        "y": 599
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-34",
+      "kind": "wall",
+      "confidence": 0.676,
+      "start": {
+        "x": 1020,
+        "y": 2472
+      },
+      "end": {
+        "x": 1211,
+        "y": 2472
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-35",
+      "kind": "wall",
+      "confidence": 0.676,
+      "start": {
+        "x": 704,
+        "y": 1668
+      },
+      "end": {
+        "x": 892,
+        "y": 1668
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-36",
+      "kind": "wall",
+      "confidence": 0.675,
+      "start": {
+        "x": 580,
+        "y": 452
+      },
+      "end": {
+        "x": 580,
+        "y": 592
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-37",
+      "kind": "wall",
+      "confidence": 0.675,
+      "start": {
+        "x": 546,
+        "y": 453
+      },
+      "end": {
+        "x": 546,
+        "y": 592
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-38",
+      "kind": "wall",
+      "confidence": 0.674,
+      "start": {
+        "x": 69,
+        "y": 568
+      },
+      "end": {
+        "x": 215,
+        "y": 568
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-39",
+      "kind": "wall",
+      "confidence": 0.674,
+      "start": {
+        "x": 1515,
+        "y": 871
+      },
+      "end": {
+        "x": 1657,
+        "y": 871
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-40",
+      "kind": "wall",
+      "confidence": 0.674,
+      "start": {
+        "x": 534,
+        "y": 2516
+      },
+      "end": {
+        "x": 670,
+        "y": 2516
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-41",
+      "kind": "wall",
+      "confidence": 0.674,
+      "start": {
+        "x": 534,
+        "y": 2506
+      },
+      "end": {
+        "x": 668,
+        "y": 2506
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-42",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 478,
+        "y": 1554
+      },
+      "end": {
+        "x": 587,
+        "y": 1554
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-43",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 1558,
+        "y": 356
+      },
+      "end": {
+        "x": 1667,
+        "y": 356
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-44",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 69,
+        "y": 1568
+      },
+      "end": {
+        "x": 166,
+        "y": 1568
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-45",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 69,
+        "y": 1545
+      },
+      "end": {
+        "x": 161,
+        "y": 1545
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-46",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 2068,
+        "y": 669
+      },
+      "end": {
+        "x": 2146,
+        "y": 669
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-47",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 1514,
+        "y": 1550
+      },
+      "end": {
+        "x": 1602,
+        "y": 1550
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-48",
+      "kind": "wall",
+      "confidence": 0.673,
+      "start": {
+        "x": 2246,
+        "y": 469
+      },
+      "end": {
+        "x": 2246,
+        "y": 553
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-49",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 1586,
+        "y": 303
+      },
+      "end": {
+        "x": 1586,
+        "y": 384
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-50",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 920,
+        "y": 1819
+      },
+      "end": {
+        "x": 1000,
+        "y": 1819
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-51",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 2068,
+        "y": 669
+      },
+      "end": {
+        "x": 2068,
+        "y": 737
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-52",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 2175,
+        "y": 498
+      },
+      "end": {
+        "x": 2246,
+        "y": 498
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-53",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 2039,
+        "y": 694
+      },
+      "end": {
+        "x": 2113,
+        "y": 694
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-54",
+      "kind": "wall",
+      "confidence": 0.672,
+      "start": {
+        "x": 1670,
+        "y": 1161
+      },
+      "end": {
+        "x": 1740,
+        "y": 1161
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    },
+    {
+      "id": "wall-55",
+      "kind": "wall",
+      "confidence": 0.625,
+      "start": {
+        "x": 562,
+        "y": 730
+      },
+      "end": {
+        "x": 616,
+        "y": 730
+      },
+      "thicknessMm": 225,
+      "role": "loadBearing"
+    }
+  ],
+  "overallConfidence": 0.601,
+  "warnings": [
+    "Local classical-baseline evaluation."
+  ]
+}
