@@ -9,7 +9,9 @@
 
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { useShallow } from "zustand/react/shallow";
 import { Canonical, Source } from "../../types/schema";
+import { cloneFloorAsGhost, compareFloorToGhost } from "../utils/ghostClone";
 
 // ============================================================================
 // STORE STATE
@@ -21,7 +23,7 @@ export interface FloorPlanStoreState {
   library: Canonical.Library;
 
   // Trace-to-Learn state
-  ghostFloor: Canonical.Floor | null; // frozen baseline (immutable)
+  ghostFloor: Canonical.Floor | null; // frozen baseline (immutable by convention)
   ghostOpacity: number; // 0.0–1.0, for rendering
 
   // Dirty tracking (what changed since last render)
@@ -45,6 +47,12 @@ export interface FloorPlanStoreState {
 
   /** Freeze current floor as ghost (for Trace-to-Learn). */
   freezeAsGhost: () => void;
+
+  /** Set the visibility of the read-only ghost baseline. */
+  setGhostOpacity: (opacity: number) => void;
+
+  /** Compare the live floor to the frozen ghost baseline, if one exists. */
+  getTraceComparison: () => ReturnType<typeof compareFloorToGhost> | null;
 
   /** Draw a new wall from start to end. Auto-detects/updates rooms. */
   drawWall: (start: { x: number; y: number }, end: { x: number; y: number }, thickness?: number) => string; // returns wall ID
@@ -174,9 +182,14 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
     freezeAsGhost: () => {
       set((state) => {
         if (state.currentFloor) {
-          // Deep copy current floor as ghost
-          state.ghostFloor = JSON.parse(JSON.stringify(state.currentFloor));
+          state.ghostFloor = cloneFloorAsGhost(state.currentFloor);
         }
+      });
+    },
+
+    setGhostOpacity: (opacity) => {
+      set((state) => {
+        state.ghostOpacity = Math.max(0, Math.min(1, opacity));
       });
     },
 
@@ -452,6 +465,12 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
 
       return state.currentFloor.openings.filter((o) => o.hostWallId === wallId);
     },
+
+    getTraceComparison: () => {
+      const state = get();
+      if (!state.currentFloor || !state.ghostFloor) return null;
+      return compareFloorToGhost(state.currentFloor, state.ghostFloor);
+    },
   }))
 );
 
@@ -464,19 +483,27 @@ export const useCurrentFloor = () => useFloorPlanStore((state) => state.currentF
 
 /** Subscribe to dirty flags (for 3D renderer to know what to re-render). */
 export const useDirtyFlags = () =>
-  useFloorPlanStore((state) => ({
+  useFloorPlanStore(useShallow((state) => ({
     dirtyWallIds: state.dirtyWallIds,
     dirtyRoomIds: state.dirtyRoomIds,
     dirtyOpeningIds: state.dirtyOpeningIds,
     isDirtyGlobal: state.isDirtyGlobal,
-  }));
+  })));
 
 /** Subscribe to validation issues (for inspector panel). */
 export const useValidationIssues = () => useFloorPlanStore((state) => state.validationIssues);
 
 /** Subscribe to selection (for UI highlight). */
 export const useSelection = () =>
-  useFloorPlanStore((state) => ({
+  useFloorPlanStore(useShallow((state) => ({
     selectedElementId: state.selectedElementId,
     selectedElementKind: state.selectedElementKind,
-  }));
+  })));
+
+/** Subscribe to Trace-to-Learn state without creating an unstable selector. */
+export const useTraceMode = () =>
+  useFloorPlanStore(useShallow((state) => ({
+    ghostFloor: state.ghostFloor,
+    ghostOpacity: state.ghostOpacity,
+    isTraceMode: state.ghostFloor !== null,
+  })));

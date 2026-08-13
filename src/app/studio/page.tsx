@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button';
 import { CanvasEditor } from '@/components/2d/CanvasEditor';
 import { FloorPlanRenderer } from '@/components/3d/FloorPlanRenderer';
 import { useFloorPlanStore, useCurrentFloor } from '@/lib/store/floorPlanStore';
+import { StudioToolbar } from '@/components/studio/StudioToolbar';
+import { TraceStatus } from '@/components/studio/TraceStatus';
+import { ValidationFeedback } from '@/components/studio/ValidationFeedback';
+import { createTraceFixtureFloor, traceFixtureLibrary } from '@/lib/testing/traceFixture';
 
 // The editor for the Canonical schema (Draft -> lift -> Canonical), fed by
 // the /upload pipeline. Distinct from the legacy /editor route, which still
@@ -19,6 +23,16 @@ function StudioContent() {
 
   const floor = useCurrentFloor();
   const ghostFloor = useFloorPlanStore((s) => s.ghostFloor);
+  const loadFloor = useFloorPlanStore((s) => s.loadFloor);
+  const freezeAsGhost = useFloorPlanStore((s) => s.freezeAsGhost);
+  const setGhostOpacity = useFloorPlanStore((s) => s.setGhostOpacity);
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== '1' || params.get('fixture') !== 'trace-4' || floor) return;
+    loadFloor(createTraceFixtureFloor(), traceFixtureLibrary);
+    freezeAsGhost();
+    setGhostOpacity(0.5);
+  }, [floor, freezeAsGhost, loadFloor, params, setGhostOpacity]);
 
   if (!floor) {
     return (
@@ -45,12 +59,15 @@ function StudioContent() {
             </span>
           )}
         </div>
+        <StudioToolbar isTraceMode={isTraceMode && Boolean(ghostFloor)} />
       </div>
+      <TraceStatus />
+      <ValidationFeedback />
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 overflow-auto border-r border-[#d7d0c2]">
           <CanvasEditor width={800} height={800} />
         </div>
-        <div className="w-1/2">
+        <div data-testid="floor-plan-3d" className="w-1/2">
           <FloorPlanRenderer />
         </div>
       </div>
