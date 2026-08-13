@@ -1,0 +1,9 @@
+{
+  "n": 20,
+  "seed": 13,
+  "conf": 0.25,
+  "nms_iou": 0.45,
+  "match_iou": 0.5,
+  "pipelines": "yolo,vlm",
+  "vlm_model": "gemini-2.0-flash-lite"
+}
