@@ -14,6 +14,7 @@ import { ValidationFeedback } from '@/components/studio/ValidationFeedback';
 import { ExportGuidanceModal, type ExportPayload } from '@/components/studio/ExportGuidanceModal';
 import { createTraceFixtureFloor, traceFixtureLibrary } from '@/lib/testing/traceFixture';
 import { createFloorPlanJsonExport, createReconstructionPrompt, downloadFloorPlanJsonExport, exportFileName } from '@/lib/export/floorPlanJson';
+import { createEmptyTraceFloor, parseImageBaseline } from '@/lib/trace/imageBaseline';
 
 // The editor for the Canonical schema (Draft -> lift -> Canonical), fed by
 // the /upload pipeline. Distinct from the legacy /editor route, which still
@@ -38,6 +39,11 @@ function StudioContent() {
     freezeAsGhost();
     setGhostOpacity(0.5);
   }, [floor, freezeAsGhost, loadFloor, params, setGhostOpacity]);
+
+  useEffect(() => {
+    if (floor || !parseImageBaseline(params)) return;
+    loadFloor(createEmptyTraceFloor(), library);
+  }, [floor, library, loadFloor, params]);
 
   const createExportPayload = useCallback((): ExportPayload => {
     if (!floor) throw new Error('Cannot export without a loaded floor.');

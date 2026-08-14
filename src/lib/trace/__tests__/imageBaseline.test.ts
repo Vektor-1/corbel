@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseImageBaseline } from '../imageBaseline';
+import { createEmptyTraceFloor, parseImageBaseline } from '../imageBaseline';
 
 describe('parseImageBaseline', () => {
   it('parses a ghost image URL and blur flag', () => {
@@ -13,5 +13,16 @@ describe('parseImageBaseline', () => {
 
   it('returns null when no ghost image URL is present', () => {
     expect(parseImageBaseline(new URLSearchParams('blur=true'))).toBeNull();
+  });
+
+  it('creates an editable empty canonical floor for an image baseline', () => {
+    expect(createEmptyTraceFloor()).toEqual({
+      id: 'trace-workspace',
+      elevation: 0,
+      floorHeight: 2800,
+      walls: [],
+      openings: [],
+      rooms: [],
+    });
   });
 });
