@@ -15,6 +15,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   Check,
@@ -40,6 +41,15 @@ import {
   type StageProgress,
 } from '@/lib/services/importPipeline';
 import { liftFloorPlan } from '@/lib/refinement/lift';
+import { validateUploadFile } from '@/lib/uploads/uploadPolicy';
+import {
+  notifyAcceptance,
+  notifyCorrectionFailure,
+  notifyImageUploadFallback,
+  notifyReconstructionFailure,
+  notifyReconstructionReady,
+  notifyUploadRejected,
+} from './uploadNotifications';
 
 type Mode = 'reconstruct' | 'trace';
 type Phase = 'idle' | 'uploading' | 'processing' | 'review' | 'failed';
@@ -108,6 +118,17 @@ export default function UploadPage() {
 
   const pickFile = useCallback((picked: File | null) => {
     if (!picked) return;
+
+    const result = validateUploadFile(picked);
+    if (!result.ok) {
+      setFile(null);
+      setPreviewUrl(null);
+      setPhase('idle');
+      setError(result.message);
+      notifyUploadRejected(toast, result.message);
+      return;
+    }
+
     setFile(picked);
     setPreviewUrl(URL.createObjectURL(picked));
     setPhase('idle');
@@ -127,6 +148,7 @@ export default function UploadPage() {
       } catch {
         // Non-fatal: pipeline degrades to a default scale without OCR.
         imageUrl = undefined;
+        notifyImageUploadFallback(toast);
       }
 
       setPhase('processing');
@@ -138,9 +160,11 @@ export default function UploadPage() {
       setDraft(result.draft);
       setWarnings(result.warnings);
       setPhase('review');
+      notifyReconstructionReady(toast);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Reconstruction failed.');
       setPhase('failed');
+      notifyReconstructionFailure(toast);
     }
   }, [file]);
 
@@ -212,8 +236,10 @@ export default function UploadPage() {
         freezeAsGhost();
       }
       setAccepted(true);
+      notifyAcceptance(toast, mode);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to apply corrections.');
+      notifyCorrectionFailure(toast);
     }
   }, [draft, library, loadFloor, freezeAsGhost, mode]);
 
@@ -277,9 +303,25 @@ export default function UploadPage() {
               </p>
             </div>
             <div className="flex min-h-[520px] items-center justify-center bg-[#e9e4d9] p-5">
-              {previewUrl ? (
+              {previewUrl && file?.type !== 'application/pdf' ? (
                 <div className="relative max-h-[480px] max-w-full">
                   <img src={previewUrl} alt="Uploaded floor plan" className="max-h-[480px] max-w-full rounded-lg object-contain shadow-sm" />
+                  {phase === 'idle' && (
+                    <button
+                      type="button"
+                      onClick={reset}
+                      className="absolute -right-2 -top-2 rounded-full bg-white p-1 shadow"
+                      aria-label="Remove file"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : file?.type === 'application/pdf' ? (
+                <div className="relative flex max-w-lg flex-col items-center rounded-xl border border-[#d7d0c2] bg-white px-8 py-16 text-center shadow-sm">
+                  <FileImage className="h-8 w-8 text-[#8a6b3f]" />
+                  <span className="mt-4 text-sm font-medium">PDF plan ready to reconstruct</span>
+                  <span className="mt-1 text-xs text-[#817969]">{file.name}</span>
                   {phase === 'idle' && (
                     <button
                       type="button"
@@ -299,10 +341,10 @@ export default function UploadPage() {
                 >
                   <FileImage className="h-8 w-8 text-[#8a6b3f]" />
                   <span className="mt-4 text-sm font-medium">Drag and drop, or click to choose a file</span>
-                  <span className="mt-1 text-xs text-[#817969]">PNG, JPEG, or WebP</span>
+                  <span className="mt-1 text-xs text-[#817969]">PNG, JPEG, WebP, or PDF — up to 25 MB</span>
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/webp"
+                    accept="image/png,image/jpeg,image/webp,application/pdf"
                     className="sr-only"
                     onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
                   />
