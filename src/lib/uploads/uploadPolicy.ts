@@ -22,6 +22,28 @@ const ALLOWED_EXTENSIONS_BY_TYPE: Record<string, readonly string[]> = {
 const ALLOWED_UPLOAD_EXTENSIONS = new Set(
   Object.values(ALLOWED_EXTENSIONS_BY_TYPE).flat(),
 );
+const EXECUTABLE_EXTENSIONS = new Set([
+  'app',
+  'bat',
+  'bash',
+  'cmd',
+  'command',
+  'com',
+  'csh',
+  'dmg',
+  'exe',
+  'jar',
+  'js',
+  'jsx',
+  'msi',
+  'mjs',
+  'ps1',
+  'py',
+  'rb',
+  'sh',
+  'vbs',
+  'wsf',
+]);
 
 const SAFE_UPLOAD_NAME_MESSAGE = 'Unsafe upload filename.';
 const INVALID_UPLOAD_MESSAGE = 'Upload a PNG, JPEG, WebP, or PDF up to 25 MB.';
@@ -41,7 +63,11 @@ function isSafeUploadName(name: string): boolean {
     return false;
   }
 
-  return true;
+  const suffixes = name.toLowerCase().split('.');
+  const intermediateSuffixes = suffixes.slice(1, -1);
+  return !intermediateSuffixes.some((suffix) =>
+    EXECUTABLE_EXTENSIONS.has(suffix),
+  );
 }
 
 function getFinalExtension(name: string): string | undefined {

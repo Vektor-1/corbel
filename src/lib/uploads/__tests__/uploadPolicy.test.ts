@@ -43,6 +43,8 @@ describe('upload policy', () => {
   it.each([
     '../plan.pdf',
     'plan.pdf.exe',
+    'plan.exe.pdf',
+    'plan.sh.png',
     '.hidden.pdf',
     `plan\u0000.pdf`,
     'a'.repeat(181) + '.pdf',
@@ -63,5 +65,7 @@ describe('upload policy', () => {
     expect(isSafeUploadPathname('../plan.pdf')).toBe(false);
     expect(isSafeUploadPathname('/uploads/.hidden.pdf')).toBe(false);
     expect(isSafeUploadPathname('/uploads/plan.pdf.exe')).toBe(false);
+    expect(isSafeUploadPathname('/uploads/plan.exe.pdf')).toBe(false);
+    expect(isSafeUploadPathname('/uploads/plan.sh.png')).toBe(false);
   });
 });
