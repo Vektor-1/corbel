@@ -3,6 +3,7 @@ import { isAllowedImportUrl, submitRunpodImport } from '@/lib/plan-import/runpod
 import { submitGeminiJob } from '@/lib/plan-import/gemini';
 import { submitClaudeAgentJob } from '@/lib/plan-import/claude-agent';
 import { submitClaudeApiJob } from '@/lib/plan-import/claude-api';
+import { submitClaudeHolisticJob } from '@/lib/plan-import/claude-holistic';
 import { resolveProvider } from '@/lib/plan-import/provider';
 import { parseImportSource } from '@/lib/plan-import/validate';
 
@@ -22,9 +23,11 @@ export async function POST(request: Request) {
 
     const provider = resolveProvider();
 
-    if (provider === 'claude-api' || provider === 'claude-agent' || provider === 'gemini') {
+    if (provider === 'claude-holistic' || provider === 'claude-api' || provider === 'claude-agent' || provider === 'gemini') {
       let id: string;
-      if (provider === 'claude-api') {
+      if (provider === 'claude-holistic') {
+        id = submitClaudeHolisticJob(source);
+      } else if (provider === 'claude-api') {
         id = submitClaudeApiJob(source);
       } else if (provider === 'claude-agent') {
         id = submitClaudeAgentJob(source);
