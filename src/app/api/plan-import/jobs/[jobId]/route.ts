@@ -15,7 +15,7 @@ export async function GET(_: Request, context: { params: Promise<{ jobId: string
     const { jobId } = await context.params;
     const provider = resolveProvider();
 
-    if (provider === 'claude-agent' || provider === 'gemini') {
+    if (provider === 'claude-api' || provider === 'claude-agent' || provider === 'gemini') {
       const job = getPipelineJob(jobId);
       if (!job) return NextResponse.json({ error: 'Job not found.' }, { status: 404 });
       return NextResponse.json({ id: jobId, providerJobId: jobId, ...job, updatedAt: new Date().toISOString() });

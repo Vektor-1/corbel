@@ -1,9 +1,10 @@
 import { query, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ImportSource, ReconstructionResultV1 } from './types';
-import { extractJson, runDetectionPipeline, submitPipelineJob, getPipelineJob, type AskFn } from './pipeline';
+import { extractJson, runOcrAndScale, submitPipelineJob, getPipelineJob, type AskFn } from './pipeline';
 
-// Vision provider backed by the user's local Claude Code installation via the
-// Agent SDK. No API key required — uses the individual's own Claude auth.
+// Claude Agent SDK provider for OCR + scale calibration only.
+// Geometry detection runs client-side via YOLO (browser ONNX Runtime).
+// No API key required — uses the individual's own Claude auth.
 // Dev/local only: the deployed app has no local binary.
 
 type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
@@ -57,7 +58,7 @@ function makeAsk(image: ImageData): AskFn {
         maxTurns: 1,
         allowedTools: [],
         systemPrompt:
-          'You are a floor plan analysis engine. Respond with pure JSON only — no prose, no markdown fences.',
+          'You are a floor plan analysis engine. Respond with pure JSON only — no prose, no markdown fences, no markdown code blocks.',
       },
     })) {
       if (message.type === 'result') {
@@ -73,13 +74,17 @@ function makeAsk(image: ImageData): AskFn {
   };
 }
 
-export async function runClaudeAgentDetection(source: ImportSource): Promise<ReconstructionResultV1> {
+export async function runClaudeAgentOcrAndScale(source: ImportSource) {
   const image = await fetchImage(source.url);
-  return runDetectionPipeline(makeAsk(image), source, 'claude-agent');
+  return runOcrAndScale(makeAsk(image), source, 'claude-agent');
 }
 
 export function submitClaudeAgentJob(source: ImportSource): string {
-  return submitPipelineJob(source, 'claude-agent', async (src) => makeAsk(await fetchImage(src.url)));
+  return submitPipelineJob(
+    source,
+    'claude-agent',
+    async (src) => makeAsk(await fetchImage(src.url))
+  );
 }
 
 export function getClaudeAgentJob(id: string) {

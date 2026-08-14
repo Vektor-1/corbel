@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAllowedImportUrl, submitRunpodImport } from '@/lib/plan-import/runpod';
 import { submitGeminiJob } from '@/lib/plan-import/gemini';
 import { submitClaudeAgentJob } from '@/lib/plan-import/claude-agent';
+import { submitClaudeApiJob } from '@/lib/plan-import/claude-api';
 import { resolveProvider } from '@/lib/plan-import/provider';
 import { parseImportSource } from '@/lib/plan-import/validate';
 
@@ -21,8 +22,15 @@ export async function POST(request: Request) {
 
     const provider = resolveProvider();
 
-    if (provider === 'claude-agent' || provider === 'gemini') {
-      const id = provider === 'claude-agent' ? submitClaudeAgentJob(source) : submitGeminiJob(source);
+    if (provider === 'claude-api' || provider === 'claude-agent' || provider === 'gemini') {
+      let id: string;
+      if (provider === 'claude-api') {
+        id = submitClaudeApiJob(source);
+      } else if (provider === 'claude-agent') {
+        id = submitClaudeAgentJob(source);
+      } else {
+        id = submitGeminiJob(source);
+      }
       return NextResponse.json(
         { id, providerJobId: id, status: 'processing', source, progress: 20,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
