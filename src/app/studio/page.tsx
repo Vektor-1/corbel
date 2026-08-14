@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { CanvasEditor } from '@/components/2d/CanvasEditor';
@@ -11,7 +11,9 @@ import { useFloorPlanStore, useCurrentFloor } from '@/lib/store/floorPlanStore';
 import { StudioToolbar } from '@/components/studio/StudioToolbar';
 import { TraceStatus } from '@/components/studio/TraceStatus';
 import { ValidationFeedback } from '@/components/studio/ValidationFeedback';
+import { ExportGuidanceModal, type ExportPayload } from '@/components/studio/ExportGuidanceModal';
 import { createTraceFixtureFloor, traceFixtureLibrary } from '@/lib/testing/traceFixture';
+import { createFloorPlanJsonExport, createReconstructionPrompt, downloadFloorPlanJsonExport, exportFileName } from '@/lib/export/floorPlanJson';
 
 // The editor for the Canonical schema (Draft -> lift -> Canonical), fed by
 // the /upload pipeline. Distinct from the legacy /editor route, which still
@@ -26,6 +28,9 @@ function StudioContent() {
   const loadFloor = useFloorPlanStore((s) => s.loadFloor);
   const freezeAsGhost = useFloorPlanStore((s) => s.freezeAsGhost);
   const setGhostOpacity = useFloorPlanStore((s) => s.setGhostOpacity);
+  const library = useFloorPlanStore((s) => s.library);
+  const validationIssues = useFloorPlanStore((s) => s.validationIssues);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== '1' || params.get('fixture') !== 'trace-4' || floor) return;
@@ -33,6 +38,16 @@ function StudioContent() {
     freezeAsGhost();
     setGhostOpacity(0.5);
   }, [floor, freezeAsGhost, loadFloor, params, setGhostOpacity]);
+
+  const createExportPayload = useCallback((): ExportPayload => {
+    if (!floor) throw new Error('Cannot export without a loaded floor.');
+    const exported = createFloorPlanJsonExport({ floor, library, validationIssues });
+    return {
+      exported,
+      filename: exportFileName(floor.id),
+      prompt: createReconstructionPrompt(exported),
+    };
+  }, [floor, library, validationIssues]);
 
   if (!floor) {
     return (
@@ -50,6 +65,9 @@ function StudioContent() {
           <Button variant="outline" size="sm" onClick={() => router.push('/upload')}>
             <ArrowLeft size={14} /> Upload
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
+            <Download size={14} /> Export
+          </Button>
           <span className="text-xs font-medium">
             {isTraceMode ? 'Trace-to-Learn' : 'Studio'}
           </span>
@@ -63,6 +81,12 @@ function StudioContent() {
       </div>
       <TraceStatus />
       <ValidationFeedback />
+      <ExportGuidanceModal
+        createPayload={createExportPayload}
+        download={downloadFloorPlanJsonExport}
+        onOpenChange={setIsExportModalOpen}
+        open={isExportModalOpen}
+      />
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 overflow-auto border-r border-[#d7d0c2]">
           <CanvasEditor width={800} height={800} />
