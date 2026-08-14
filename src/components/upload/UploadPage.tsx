@@ -137,7 +137,7 @@ export default function UploadPage() {
     setAccepted(false);
   }, []);
 
-  const run = useCallback(async () => {
+  const runReconstruct = useCallback(async () => {
     if (!file) return;
     setError(null);
     setPhase('uploading');
@@ -146,7 +146,6 @@ export default function UploadPage() {
       try {
         imageUrl = await uploadImage(file);
       } catch {
-        // Non-fatal: pipeline degrades to a default scale without OCR.
         imageUrl = undefined;
         notifyImageUploadFallback(toast);
       }
@@ -167,6 +166,22 @@ export default function UploadPage() {
       notifyReconstructionFailure(toast);
     }
   }, [file]);
+
+  const runTrace = useCallback(async () => {
+    if (!file) return;
+    setError(null);
+    setPhase('uploading');
+    try {
+      const imageUrl = await uploadImage(file);
+      // For trace mode: skip reconstruction, just use image as ghost layer
+      freezeAsGhost();
+      setAccepted(true);
+      router.push('/studio?mode=trace');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Upload failed.');
+      setPhase('failed');
+    }
+  }, [file, freezeAsGhost, router]);
 
   const lowConfidenceWalls = useMemo(
     () => (draft ? draft.walls.filter((w) => w.confidence < WALL_CONFIDENCE_THRESHOLD) : []),
@@ -353,7 +368,8 @@ export default function UploadPage() {
             </div>
           </section>
 
-          {/* Pipeline / review / correction */}
+          {/* Pipeline / review / correction (reconstruct mode only) */}
+          {mode === 'reconstruct' && (
           <aside className="space-y-4">
             <section className="rounded-2xl border border-[#d7d0c2] bg-white/80 p-5 shadow-sm">
               <h2 className="text-sm font-semibold">Reconstruction pipeline</h2>
@@ -363,9 +379,15 @@ export default function UploadPage() {
                   <div className="rounded-lg bg-[#f3efe7] px-3 py-3 text-xs text-[#6f685b]">
                     {file ? file.name : 'Select a source file to begin.'}
                   </div>
-                  <Button className="w-full" disabled={!file} onClick={run}>
-                    <UploadIcon /> Upload and reconstruct
-                  </Button>
+                  {mode === 'reconstruct' ? (
+                    <Button className="w-full" disabled={!file} onClick={runReconstruct}>
+                      <UploadIcon /> Reconstruct with YOLO+VLM
+                    </Button>
+                  ) : (
+                    <Button className="w-full" disabled={!file} onClick={runTrace}>
+                      <TraceIcon /> Freeze as baseline (no reconstruction)
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -560,6 +582,7 @@ export default function UploadPage() {
               </section>
             )}
           </aside>
+          )}
         </div>
       </div>
     </main>
