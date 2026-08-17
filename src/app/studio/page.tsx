@@ -17,6 +17,8 @@ import { createTraceFixtureFloor, traceFixtureLibrary } from '@/lib/testing/trac
 import { createFloorPlanJsonExport, createReconstructionPrompt, downloadFloorPlanJsonExport, exportFileName } from '@/lib/export/floorPlanJson';
 import { createEmptyTraceFloor, parseImageBaseline, type ImageBaseline } from '@/lib/trace/imageBaseline';
 
+type ViewMode = '2d' | '3d' | 'split';
+
 // The editor for the Canonical schema (Draft -> lift -> Canonical), fed by
 // the /upload pipeline. Distinct from the legacy /editor route, which still
 // runs on the older FloorPlan/designStore schema.
@@ -35,6 +37,7 @@ function StudioContent() {
   const validationIssues = useFloorPlanStore((s) => s.validationIssues);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [imageBaseline, setImageBaseline] = useState<ImageBaseline | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== '1' || params.get('fixture') !== 'trace-4' || floor) return;
@@ -79,6 +82,20 @@ function StudioContent() {
           <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
             <Download size={14} /> Export
           </Button>
+          <div className="flex items-center rounded-md border border-[#d7d0c2] p-0.5" aria-label="Viewport mode">
+            {(['2d', '3d', 'split'] as const).map((mode) => (
+              <Button
+                aria-pressed={viewMode === mode}
+                className="h-7 px-2 text-xs"
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                size="sm"
+                variant={viewMode === mode ? 'secondary' : 'ghost'}
+              >
+                {mode === 'split' ? 'Split' : mode.toUpperCase()}
+              </Button>
+            ))}
+          </div>
           <span className="text-xs font-medium">
             {isTraceMode ? 'Trace-to-Learn' : 'Studio'}
           </span>
@@ -99,23 +116,27 @@ function StudioContent() {
         open={isExportModalOpen}
       />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 overflow-hidden border-r border-[#d7d0c2]">
-          <div className="min-w-0 flex-1 overflow-hidden">
-            <CanvasEditor
-              width={800}
-              height={720}
-              ghostImageUrl={imageBaseline?.url}
-              ghostImageBlur={imageBaseline?.blur}
+        {viewMode !== '3d' && (
+          <div className="flex min-w-0 flex-1 overflow-hidden border-r border-[#d7d0c2]">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <CanvasEditor
+                width={800}
+                height={720}
+                ghostImageUrl={imageBaseline?.url}
+                ghostImageBlur={imageBaseline?.blur}
+              />
+            </div>
+            <RightPanel
+              selectedElementId={selection.selectedElementId}
+              selectedElementKind={selection.selectedElementKind}
             />
           </div>
-          <RightPanel
-            selectedElementId={selection.selectedElementId}
-            selectedElementKind={selection.selectedElementKind}
-          />
-        </div>
-        <div data-testid="floor-plan-3d" className="w-1/2 min-w-0">
-          <FloorPlanRenderer />
-        </div>
+        )}
+        {viewMode !== '2d' && (
+          <div data-testid="floor-plan-3d" className="flex-1 min-w-0">
+            <FloorPlanRenderer />
+          </div>
+        )}
       </div>
     </main>
   );
