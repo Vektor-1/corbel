@@ -198,6 +198,7 @@ export namespace Canonical {
   export interface Room {
     id: string;
     label?: string; // "Living Room", "Bedroom 1", etc.
+    type?: string; // "bedroom" | "kitchen" | "bathroom" | "living" | "dining" | "office" | "hallway" | "stairs" | "other"
     boundingWallIds: string[]; // must form a closed loop
     vertices: Point2D[]; // polygon vertices, derived from walls
     area: number; // mm²

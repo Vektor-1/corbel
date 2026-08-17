@@ -7,11 +7,14 @@
  * Dirty tracking marks which elements changed since last render.
  */
 
+import { enableMapSet } from "immer";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { useShallow } from "zustand/react/shallow";
 import { Canonical, Source } from "../../types/schema";
 import { cloneFloorAsGhost, compareFloorToGhost } from "../utils/ghostClone";
+
+enableMapSet();
 
 // ============================================================================
 // STORE STATE
@@ -86,6 +89,9 @@ export interface FloorPlanStoreState {
   /** Label or rename a room. */
   setRoomLabel: (roomId: string, label: string) => void;
 
+  /** Set room type (bedroom, kitchen, bathroom, etc.). */
+  setRoomType: (roomId: string, type: string) => void;
+
   /** Add a room to the floor plan. */
   addRoom: (room: Canonical.Room) => void;
 
@@ -135,6 +141,22 @@ export interface FloorPlanStoreState {
 
   /** Get all openings on a wall. */
   getWallOpenings: (wallId: string) => Canonical.Opening[];
+
+  /** Get properties of selected room, or null if no room selected. */
+  getSelectedRoomProperties: () => {
+    id: string;
+    label: string | null;
+    type: string | null;
+    areaMm2: number;
+    areaM2: number;
+  } | null;
+
+  /** Get properties of selected wall, or null if no wall selected. */
+  getSelectedWallProperties: () => {
+    id: string;
+    lengthMm: number;
+    lengthM: number;
+  } | null;
 }
 
 // ============================================================================
@@ -388,6 +410,19 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       });
     },
 
+    setRoomType: (roomId, type) => {
+      set((state) => {
+        if (!state.currentFloor) return;
+
+        const room = state.currentFloor.rooms.find((r: Canonical.Room) => r.id === roomId);
+        if (room) {
+          room.type = type;
+          state.dirtyRoomIds.add(roomId);
+          state.isDirtyGlobal = true;
+        }
+      });
+    },
+
     addRoom: (room) => {
       set((state) => {
         if (!state.currentFloor) return;
@@ -516,6 +551,44 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
       const state = get();
       if (!state.currentFloor || !state.ghostFloor) return null;
       return compareFloorToGhost(state.currentFloor, state.ghostFloor);
+    },
+
+    getSelectedRoomProperties: () => {
+      const state = get();
+      if (!state.currentFloor || state.selectedElementKind !== "room" || !state.selectedElementId) {
+        return null;
+      }
+
+      const room = state.currentFloor.rooms.find((r) => r.id === state.selectedElementId);
+      if (!room) return null;
+
+      return {
+        id: room.id,
+        label: room.label ?? null,
+        type: room.type ?? null,
+        areaMm2: room.area,
+        areaM2: room.area / 1_000_000,
+      };
+    },
+
+    getSelectedWallProperties: () => {
+      const state = get();
+      if (!state.currentFloor || state.selectedElementKind !== "wall" || !state.selectedElementId) {
+        return null;
+      }
+
+      const wall = state.currentFloor.walls.find((w) => w.id === state.selectedElementId);
+      if (!wall) return null;
+
+      const dx = wall.end.x - wall.start.x;
+      const dy = wall.end.y - wall.start.y;
+      const lengthMm = Math.hypot(dx, dy);
+
+      return {
+        id: wall.id,
+        lengthMm,
+        lengthM: lengthMm / 1000,
+      };
     },
   }))
 );

@@ -174,14 +174,18 @@ export default function UploadPage() {
     try {
       const imageUrl = await uploadImage(file);
       // For trace mode: skip reconstruction, just use image as ghost layer
-      freezeAsGhost();
       setAccepted(true);
-      router.push('/studio?mode=trace');
+      const params = new URLSearchParams({
+        mode: 'trace',
+        ghostUrl: imageUrl,
+        blur: 'true',
+      });
+      router.push(`/studio?${params.toString()}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Upload failed.');
       setPhase('failed');
     }
-  }, [file, freezeAsGhost, router]);
+  }, [file, router]);
 
   const lowConfidenceWalls = useMemo(
     () => (draft ? draft.walls.filter((w) => w.confidence < WALL_CONFIDENCE_THRESHOLD) : []),

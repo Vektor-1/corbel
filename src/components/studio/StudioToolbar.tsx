@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useFloorPlanStore, useValidationIssues } from "@/lib/store/floorPlanStore";
 import { AlertCircle, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { getValidationNotification } from "./validationNotifications";
 
 interface StudioToolbarProps {
   isTraceMode: boolean;
@@ -16,6 +18,15 @@ export function StudioToolbar({ isTraceMode }: StudioToolbarProps) {
   const validationIssues = useValidationIssues();
   const hasIssues = validationIssues.length > 0;
 
+  const handleValidate = () => {
+    validateFloor();
+
+    const notification = getValidationNotification(
+      useFloorPlanStore.getState().validationIssues.length,
+    );
+    toast[notification.level](notification.message);
+  };
+
   return (
     <TooltipProvider delay={200}>
       <div className="flex items-center gap-2">
@@ -25,7 +36,7 @@ export function StudioToolbar({ isTraceMode }: StudioToolbarProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={validateFloor}
+              onClick={handleValidate}
               className={hasIssues ? "bg-red-50 border-red-200" : ""}
             >
               {hasIssues ? <AlertCircle size={14} className="text-red-600" /> : <CheckCircle size={14} className="text-green-600" />}

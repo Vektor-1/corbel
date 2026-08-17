@@ -9,10 +9,11 @@
  * - This saves battery on student devices
  */
 
-import React, { useMemo, useEffect, useRef } from "react";
+import React, { useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { PerspectiveCamera, OrbitControls, Grid } from "@react-three/drei";
+import { Edges, PerspectiveCamera, OrbitControls, Grid } from "@react-three/drei";
 import * as THREE from "three";
+import { useShallow } from "zustand/react/shallow";
 import { useFloorPlanStore, useDirtyFlags } from "../../lib/store/floorPlanStore";
 import { Canonical } from "../../types/schema";
 
@@ -35,23 +36,24 @@ const WallMesh: React.FC<WallMeshProps> = ({ wall, thickness, height, color = "#
     const dy = wall.end.y - wall.start.y;
     const length = Math.hypot(dx, dy);
 
-    const box = new THREE.BoxGeometry(length, thickness, height);
+    // Canonical 2D coordinates map to the 3D X/Z ground plane; Y is vertical.
+    const box = new THREE.BoxGeometry(length, height, thickness);
     return box;
   }, [wall, thickness, height]);
 
   const position = useMemo(() => {
     const midX = (wall.start.x + wall.end.x) / 2;
     const midY = (wall.start.y + wall.end.y) / 2;
-    return [midX, thickness / 2, height / 2];
+    return [midX, height / 2, midY];
   }, [wall, thickness, height]);
 
   const rotation = useMemo(() => {
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
-    return Math.atan2(dy, dx);
+    return -Math.atan2(dy, dx);
   }, [wall]);
 
-  const materialColor = isSelected ? "#00ff00" : color;
+  const materialColor = isSelected ? "#16a34a" : color;
 
   return (
     <mesh
@@ -60,7 +62,8 @@ const WallMesh: React.FC<WallMeshProps> = ({ wall, thickness, height, color = "#
       position={position as [number, number, number]}
       rotation={[0, rotation, 0]}
     >
-      <meshStandardMaterial color={materialColor} roughness={0.7} metalness={0.1} />
+      <meshStandardMaterial color={materialColor} roughness={0.86} metalness={0} />
+      <Edges color="#3f3a32" threshold={15} />
     </mesh>
   );
 };
@@ -99,10 +102,10 @@ const OpeningMesh: React.FC<OpeningMeshProps> = ({
   const posZ = sillHeight + libraryType.height / 2;
 
   const geometry = useMemo(() => {
-    return new THREE.BoxGeometry(libraryType.width, wallThickness, libraryType.height);
+    return new THREE.BoxGeometry(libraryType.width, libraryType.height, wallThickness + 8);
   }, [libraryType, wallThickness]);
 
-  const rotation = Math.atan2(dy, dx);
+  const rotation = -Math.atan2(dy, dx);
 
   const materialColor = isSelected ? "#00ff00" : opening.kind === "door" ? "#8B4513" : "#87CEEB";
 
@@ -110,10 +113,11 @@ const OpeningMesh: React.FC<OpeningMeshProps> = ({
     <mesh
       key={`opening_${opening.id}`}
       geometry={geometry}
-      position={[posX, wallThickness / 2, posZ]}
+      position={[posX, posZ, posY]}
       rotation={[0, rotation, 0]}
     >
-      <meshStandardMaterial color={materialColor} roughness={0.6} metalness={0.2} />
+      <meshStandardMaterial color={materialColor} roughness={0.55} metalness={0.05} />
+      <Edges color="#43332a" threshold={15} />
     </mesh>
   );
 };
@@ -151,10 +155,10 @@ const RoomMesh: React.FC<RoomMeshProps> = ({ room, height, isSelected = false })
     <mesh
       key={`room_${room.id}`}
       geometry={geometry}
-      position={[0, 0, height]}
-      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, height, 0]}
+      rotation={[Math.PI / 2, 0, 0]}
     >
-      <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} roughness={0.8} />
+      <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} roughness={0.92} transparent opacity={0.55} />
     </mesh>
   );
 };
@@ -171,10 +175,10 @@ const FloorPlanScene: React.FC<FloorPlanSceneProps> = ({ floorHeight }) => {
   const floor = useFloorPlanStore((state) => state.currentFloor);
   const library = useFloorPlanStore((state) => state.library);
   const { dirtyWallIds, dirtyRoomIds, dirtyOpeningIds, isDirtyGlobal } = useDirtyFlags();
-  const selectedElement = useFloorPlanStore((state) => ({
+  const selectedElement = useFloorPlanStore(useShallow((state) => ({
     id: state.selectedElementId,
     kind: state.selectedElementKind,
-  }));
+  })));
 
   const clearDirty = useFloorPlanStore((state) => state.clearDirty);
 
@@ -212,7 +216,15 @@ const FloorPlanScene: React.FC<FloorPlanSceneProps> = ({ floorHeight }) => {
 
         if (!isDirty && !isSelected) {
           // Use cached mesh (not re-creating geometry)
-          return <WallMesh key={`wall_${wall.id}`} wall={wall} thickness={wallType.thickness} height={floorHeight} />;
+          return (
+            <WallMesh
+              key={`wall_${wall.id}`}
+              wall={wall}
+              thickness={wallType.thickness}
+              height={floorHeight}
+              color={wall.typeRef === "ext-200" ? "#b8a68d" : "#8fa4aa"}
+            />
+          );
         }
 
         return (
@@ -221,7 +233,7 @@ const FloorPlanScene: React.FC<FloorPlanSceneProps> = ({ floorHeight }) => {
             wall={wall}
             thickness={wallType.thickness}
             height={floorHeight}
-            color="#888"
+            color={wall.typeRef === "ext-200" ? "#b8a68d" : "#8fa4aa"}
             isSelected={isSelected}
           />
         );
@@ -282,8 +294,8 @@ const FloorPlanScene: React.FC<FloorPlanSceneProps> = ({ floorHeight }) => {
       })}
 
       {/* Lighting */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5000, 5000, 5000]} intensity={0.8} castShadow />
+      <hemisphereLight args={["#e8f0ff", "#5b4b3a", 1.4]} />
+      <directionalLight position={[4000, 6500, 2500]} intensity={1.8} castShadow />
     </group>
   );
 };
@@ -298,8 +310,10 @@ export const FloorPlanRenderer: React.FC<{ floorHeight?: number }> = ({ floorHei
       frameloop="demand" // Only render on state change, not every frame
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, alpha: true }}
+      camera={{ position: [3500, 4500, 3500], fov: 45, near: 10, far: 50000 }}
     >
-      <PerspectiveCamera makeDefault position={[0, 3000, 3000]} fov={50} />
+      <color attach="background" args={["#f5f1e8"]} />
+      <PerspectiveCamera makeDefault position={[3500, 4500, 3500]} fov={45} />
       <OrbitControls />
       <FloorPlanScene floorHeight={floorHeight} />
     </Canvas>

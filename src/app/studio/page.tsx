@@ -14,7 +14,7 @@ import { ValidationFeedback } from '@/components/studio/ValidationFeedback';
 import { ExportGuidanceModal, type ExportPayload } from '@/components/studio/ExportGuidanceModal';
 import { createTraceFixtureFloor, traceFixtureLibrary } from '@/lib/testing/traceFixture';
 import { createFloorPlanJsonExport, createReconstructionPrompt, downloadFloorPlanJsonExport, exportFileName } from '@/lib/export/floorPlanJson';
-import { createEmptyTraceFloor, parseImageBaseline } from '@/lib/trace/imageBaseline';
+import { createEmptyTraceFloor, parseImageBaseline, type ImageBaseline } from '@/lib/trace/imageBaseline';
 
 // The editor for the Canonical schema (Draft -> lift -> Canonical), fed by
 // the /upload pipeline. Distinct from the legacy /editor route, which still
@@ -32,6 +32,7 @@ function StudioContent() {
   const library = useFloorPlanStore((s) => s.library);
   const validationIssues = useFloorPlanStore((s) => s.validationIssues);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [imageBaseline, setImageBaseline] = useState<ImageBaseline | null>(null);
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_E2E_TEST_MODE !== '1' || params.get('fixture') !== 'trace-4' || floor) return;
@@ -41,7 +42,9 @@ function StudioContent() {
   }, [floor, freezeAsGhost, loadFloor, params, setGhostOpacity]);
 
   useEffect(() => {
-    if (floor || !parseImageBaseline(params)) return;
+    const baseline = parseImageBaseline(params);
+    setImageBaseline(baseline);
+    if (floor || !baseline) return;
     loadFloor(createEmptyTraceFloor(), library);
   }, [floor, library, loadFloor, params]);
 
@@ -95,7 +98,12 @@ function StudioContent() {
       />
       <div className="flex flex-1 overflow-hidden">
         <div className="w-1/2 overflow-auto border-r border-[#d7d0c2]">
-          <CanvasEditor width={800} height={800} />
+          <CanvasEditor
+            width={800}
+            height={800}
+            ghostImageUrl={imageBaseline?.url}
+            ghostImageBlur={imageBaseline?.blur}
+          />
         </div>
         <div data-testid="floor-plan-3d" className="w-1/2">
           <FloorPlanRenderer />
