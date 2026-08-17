@@ -53,6 +53,11 @@ function StudioContent() {
     loadFloor(createEmptyTraceFloor(), library);
   }, [floor, library, loadFloor, params]);
 
+  useEffect(() => {
+    if (floor) return;
+    loadFloor(createTraceFixtureFloor(), traceFixtureLibrary);
+  }, [floor, loadFloor]);
+
   const createExportPayload = useCallback((): ExportPayload => {
     if (!floor) throw new Error('Cannot export without a loaded floor.');
     const exported = createFloorPlanJsonExport({ floor, library, validationIssues });
@@ -63,14 +68,6 @@ function StudioContent() {
     };
   }, [floor, library, validationIssues]);
 
-  if (!floor) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f2efe7] text-[#26221a]">
-        <p className="text-sm text-[#6f685b]">No plan loaded yet.</p>
-        <Button onClick={() => router.push('/upload')}>Go to upload</Button>
-      </main>
-    );
-  }
 
   return (
     <main className="flex h-screen flex-col bg-[#f2efe7] text-[#26221a]">
