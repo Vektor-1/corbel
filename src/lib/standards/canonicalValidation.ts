@@ -60,16 +60,15 @@ export function validateWallThickness(
  * Validate span-to-thickness ratio (basic structural check).
  * High ratios (>30:1) may indicate insufficient structural capacity.
  */
-export function validateSpanThickness(wall: Canonical.Wall): Canonical.ValidationResult | null {
+export function validateSpanThickness(
+  wall: Canonical.Wall,
+  wallType: Canonical.WallType
+): Canonical.ValidationResult | null {
   const dx = wall.end.x - wall.start.x;
   const dy = wall.end.y - wall.start.y;
   const wallLength = Math.hypot(dx, dy);
 
-  // Assume we have access to wall thickness via library lookup later
-  // For now, estimate from typical patterns in the store (e.g., ext walls ~200mm, int walls ~100mm)
-  // This is a placeholder — proper implementation needs thickness passed in
-  const estimatedThickness = 200; // mm, conservative estimate
-  const ratio = wallLength / estimatedThickness;
+  const ratio = wallLength / wallType.thickness;
 
   if (ratio > 30) {
     return {
@@ -203,7 +202,7 @@ export function validateCanonicalFloor(
     const thicknessResult = validateWallThickness(wall, wallType, 1); // Assume 1-story for now
     if (thicknessResult) results.push(thicknessResult);
 
-    const spanResult = validateSpanThickness(wall);
+    const spanResult = validateSpanThickness(wall, wallType);
     if (spanResult) results.push(spanResult);
   });
 
