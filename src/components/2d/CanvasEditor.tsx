@@ -55,7 +55,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   ghostImageUrl,
   ghostImageBlur = false,
 }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
+  const [containerSize, setContainerSize] = useState({ width, height });
   const [tool, setTool] = useState<EditorTool>("wall");
   const [drawing, setDrawing] = useState<DrawingState>({
     isDrawing: false,
@@ -107,6 +109,20 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     img.onerror = () => console.error(`Failed to load ghost image: ${ghostImageUrl}`);
     img.src = ghostImageUrl;
   }, [ghostImageUrl]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setContainerSize({ width: rect.width, height: rect.height });
+      }
+    });
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -287,6 +303,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   return (
     <div
+      ref={containerRef}
       data-testid="floor-plan-2d"
       style={{
         border: "1px solid #ccc",
@@ -299,8 +316,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     >
       <Stage
         ref={stageRef}
-        width={width}
-        height={height}
+        width={containerSize.width}
+        height={containerSize.height}
         x={view.panX}
         y={view.panY}
         scaleX={view.scale}
@@ -318,8 +335,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
               image={ghostImage}
               x={0}
               y={0}
-              width={width}
-              height={height}
+              width={containerSize.width}
+              height={containerSize.height}
               opacity={0.5}
               filters={ghostImageBlur ? [Konva.Filters.Blur] : []}
               blurRadius={ghostImageBlur ? 8 : 0}
@@ -327,7 +344,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             />
           )}
 
-          <Grid cellSize={GRID_SIZE} width={Math.max(width, 4000)} height={Math.max(height, 4000)} />
+          <Grid cellSize={GRID_SIZE} width={Math.max(containerSize.width, 4000)} height={Math.max(containerSize.height, 4000)} />
 
           {ghostFloor &&
             ghostOpacity > 0 &&
