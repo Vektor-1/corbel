@@ -23,6 +23,8 @@ import { liftFloorPlan } from '@/lib/refinement/lift';
 import { detectLocalMl, type RawBox } from '@/lib/plan-import/local-ml';
 import { refineWalls, reattachOpenings } from '@/lib/plan-import/refine';
 import type { RawWall, RawOpening } from '@/lib/plan-import/pipeline';
+import { OPENING_CONFIDENCE_THRESHOLD, WALL_CONFIDENCE_THRESHOLD } from '@/lib/trace/confidence';
+export { WALL_CONFIDENCE_THRESHOLD, OPENING_CONFIDENCE_THRESHOLD } from '@/lib/trace/confidence';
 
 // ── Stage metadata ────────────────────────────────────────────────────────────
 
@@ -44,9 +46,6 @@ export const STAGE_DEFS: readonly StageProgress[] = [
 ];
 
 // ── Confidence thresholds (shared with UploadPage highlighting) ──────────────
-
-export const WALL_CONFIDENCE_THRESHOLD = 0.7;
-export const OPENING_CONFIDENCE_THRESHOLD = 0.6;
 
 export const DEFAULT_PIXELS_PER_METRE = 100;
 

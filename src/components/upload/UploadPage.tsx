@@ -95,6 +95,7 @@ export default function UploadPage() {
   const [mode, setMode] = useState<Mode>('reconstruct');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [stage, setStage] = useState<StageProgress>(STAGE_DEFS[0]);
   const [draft, setDraft] = useState<Draft.FloorPlan | null>(null);
@@ -107,6 +108,7 @@ export default function UploadPage() {
   const reset = useCallback(() => {
     setFile(null);
     setPreviewUrl(null);
+    setSourceImageUrl(null);
     setPhase('idle');
     setDraft(null);
     setWarnings([]);
@@ -130,7 +132,9 @@ export default function UploadPage() {
     }
 
     setFile(picked);
-    setPreviewUrl(URL.createObjectURL(picked));
+    const localUrl = URL.createObjectURL(picked);
+    setPreviewUrl(localUrl);
+    setSourceImageUrl(localUrl);
     setPhase('idle');
     setDraft(null);
     setError(null);
@@ -156,6 +160,7 @@ export default function UploadPage() {
         { imageUrl, useOcr: true },
         (progress) => setStage(progress)
       );
+      setSourceImageUrl(imageUrl ?? previewUrl);
       setDraft(result.draft);
       setWarnings(result.warnings);
       setPhase('review');
@@ -165,7 +170,7 @@ export default function UploadPage() {
       setPhase('failed');
       notifyReconstructionFailure(toast);
     }
-  }, [file]);
+  }, [file, previewUrl]);
 
   const runTrace = useCallback(async () => {
     if (!file) return;
@@ -263,8 +268,14 @@ export default function UploadPage() {
   }, [draft, library, loadFloor, freezeAsGhost, mode]);
 
   const openEditor = useCallback(() => {
-    router.push(mode === 'trace' ? '/studio?mode=trace' : '/studio');
-  }, [router, mode]);
+    const params = new URLSearchParams();
+    if (mode === 'trace') params.set('mode', 'trace');
+    if (sourceImageUrl) {
+      params.set('ghostUrl', sourceImageUrl);
+      params.set('blur', 'false');
+    }
+    router.push(params.size > 0 ? `/studio?${params.toString()}` : '/studio');
+  }, [router, mode, sourceImageUrl]);
 
   return (
     <main className="min-h-screen bg-[#f2efe7] px-6 py-8 text-[#26221a]">
