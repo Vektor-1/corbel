@@ -10,7 +10,7 @@
  * - Escape cancels in-progress room draw
  */
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { Stage, Layer, Line, Rect, Text, Circle, Group } from "react-konva";
 import Konva from "konva";
 import { useShallow } from "zustand/react/shallow";
@@ -23,6 +23,8 @@ import {
   cancelRoomDraw,
 } from "../../lib/trace/roomTool";
 import { Canonical } from "../../types/schema";
+import { GridComponent } from "./GridComponent";
+import { StatusBar } from "./StatusBar";
 
 // ============================================================================
 // CONSTANTS
@@ -56,6 +58,9 @@ interface DrawingState {
 interface CanvasEditorProps {
   width?: number;
   height?: number;
+  /** Reserved for the Trace image baseline integration. */
+  ghostImageUrl?: string;
+  ghostImageBlur?: boolean;
 }
 
 export const CanvasEditor: React.FC<CanvasEditorProps> = ({
@@ -258,6 +263,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       : drawing.isDrawing
         ? "Drawing wall… (click to end)"
         : "Wall tool — press R for rooms";
+  const totalAreaMm2 = floor.rooms.reduce((total, room) => total + room.area, 0);
 
   // ========================================================================
   // RENDER
@@ -274,7 +280,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         onContextMenu={(e) => e.evt.preventDefault()}
       >
         <Layer>
-          <Grid cellSize={GRID_SIZE} width={width} height={height} />
+          <GridComponent width={width} height={height} />
 
           {ghostFloor &&
             ghostOpacity > 0 &&
@@ -381,17 +387,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         </Layer>
       </Stage>
 
-      <div style={{ padding: "10px", fontSize: "12px", backgroundColor: "#f5f5f5" }}>
-        <div>
-          Walls: {floor.walls.length} | Rooms: {floor.rooms.length} | Openings: {floor.openings.length}
-        </div>
-        <div>Status: {statusLabel}</div>
-        {selection.selectedElementId && (
-          <div>
-            Selected: {selection.selectedElementKind} {selection.selectedElementId}
-          </div>
-        )}
-      </div>
+      <StatusBar
+        wallCount={floor.walls.length}
+        roomCount={floor.rooms.length}
+        totalAreaMm2={totalAreaMm2}
+        statusLabel={statusLabel}
+      />
     </div>
   );
 };
@@ -399,30 +400,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
-
-interface GridProps {
-  cellSize: number;
-  width: number;
-  height: number;
-}
-
-const Grid: React.FC<GridProps> = ({ cellSize, width, height }) => {
-  const lines = [];
-
-  for (let x = 0; x < width; x += cellSize) {
-    lines.push(
-      <Line key={`v_${x}`} points={[x, 0, x, height]} stroke="#ddd" strokeWidth={0.5} opacity={0.3} />
-    );
-  }
-
-  for (let y = 0; y < height; y += cellSize) {
-    lines.push(
-      <Line key={`h_${y}`} points={[0, y, width, y]} stroke="#ddd" strokeWidth={0.5} opacity={0.3} />
-    );
-  }
-
-  return <Group>{lines}</Group>;
-};
 
 interface RoomPolygonProps {
   room: Canonical.Room;
