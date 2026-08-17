@@ -8,6 +8,7 @@ import { useFloorPlanStore, useValidationIssues } from "@/lib/store/floorPlanSto
 import { AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getValidationNotification } from "./validationNotifications";
+import { ReviewBadge } from "./ReviewBadge";
 
 interface StudioToolbarProps {
   isTraceMode: boolean;
@@ -47,6 +48,8 @@ export function StudioToolbar({ isTraceMode }: StudioToolbarProps) {
             Check floor plan against building code and spatial rules.
           </TooltipContent>
         </Tooltip>
+
+        <ReviewBadge />
 
         {/* Drawing mode help */}
         <Tooltip>

@@ -24,10 +24,12 @@ import {
 } from "../../lib/trace/roomTool";
 import { StatusBar } from "./StatusBar";
 import { Canonical } from "../../types/schema";
+import { OPENING_CONFIDENCE_THRESHOLD, WALL_CONFIDENCE_THRESHOLD } from "../../lib/trace/confidence";
 
 const WALL_STROKE_WIDTH = 3;
 const WALL_COLOR = "#333";
 const WALL_SELECTED_COLOR = "#00ff00";
+const LOW_CONFIDENCE_COLOR = "#d97706";
 const OPENING_RADIUS = 8;
 const ROOM_STROKE_WIDTH = 1;
 const ROOM_HOVER_FILL = "#22c55e55";
@@ -281,6 +283,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     selectElement(roomId, "room");
   };
 
+  const handleOpeningClick = (openingId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
+    e.cancelBubble = true;
+    if (spaceDown) return;
+    selectElement(openingId, "opening");
+  };
+
   const handleEndpointDrag = (wallId: string, isStart: boolean, pos: { x: number; y: number }) => {
     const wall = floor.walls.find((w) => w.id === wallId);
     if (!wall) return;
@@ -390,8 +398,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             <Group key={`wall_${wall.id}`}>
               <Line
                 points={[wall.start.x, wall.start.y, wall.end.x, wall.end.y]}
-                stroke={selection.selectedElementId === wall.id ? WALL_SELECTED_COLOR : WALL_COLOR}
+                stroke={selection.selectedElementId === wall.id ? WALL_SELECTED_COLOR : wall.confidence < WALL_CONFIDENCE_THRESHOLD ? LOW_CONFIDENCE_COLOR : WALL_COLOR}
                 strokeWidth={WALL_STROKE_WIDTH}
+                dash={wall.confidence < WALL_CONFIDENCE_THRESHOLD ? [8, 4] : undefined}
                 onClick={(ev) => handleWallClick(wall.id, ev)}
                 onMouseEnter={() => setHoveredElement(wall.id)}
                 onMouseLeave={() => setHoveredElement(null)}
@@ -414,14 +423,22 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   const dy = wall.end.y - wall.start.y;
                   const len = Math.hypot(dx, dy) || 1;
                   const t = opening.positionAlongWall / len;
+                  const needsReview = opening.confidence < OPENING_CONFIDENCE_THRESHOLD;
+                  const isSelected = selection.selectedElementId === opening.id;
                   return (
                     <Circle
                       key={`opening_${opening.id}`}
                       x={wall.start.x + t * dx}
                       y={wall.start.y + t * dy}
                       radius={OPENING_RADIUS}
-                      fill={opening.kind === "door" ? "#8B4513" : "#87CEEB"}
+                      fill={needsReview ? "#fbbf24" : opening.kind === "door" ? "#8B4513" : "#87CEEB"}
+                      stroke={isSelected ? WALL_SELECTED_COLOR : needsReview ? LOW_CONFIDENCE_COLOR : undefined}
+                      strokeWidth={isSelected || needsReview ? 2 : 0}
+                      dash={needsReview ? [4, 2] : undefined}
                       opacity={0.7}
+                      onClick={(event) => handleOpeningClick(opening.id, event)}
+                      onMouseEnter={() => setHoveredElement(opening.id)}
+                      onMouseLeave={() => setHoveredElement(null)}
                     />
                   );
                 })}
