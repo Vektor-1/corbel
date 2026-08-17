@@ -33,6 +33,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   const getWallOpenings = useFloorPlanStore((s) => s.getWallOpenings);
   const library = useFloorPlanStore((s) => s.library);
   const setRoomLabel = useFloorPlanStore((s) => s.setRoomLabel);
+  const setRoomTypeStore = useFloorPlanStore((s) => s.setRoomType);
 
   const room = selectedElementKind === "room" && selectedElementId ? getRoom(selectedElementId) : undefined;
   const wall = selectedElementKind === "wall" && selectedElementId ? getWall(selectedElementId) : undefined;
@@ -104,8 +105,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               onChange={(e) => {
                 const next = e.target.value;
                 setRoomType(next);
-                setName(next);
-                setRoomLabel(selectedElementId, next);
+                if (selectedElementId) {
+                  setRoomTypeStore(selectedElementId, next);
+                }
               }}
               style={{ padding: "6px 8px", border: "1px solid #d7d0c2", borderRadius: 4 }}
             >

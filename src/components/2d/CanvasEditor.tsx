@@ -45,11 +45,15 @@ interface DrawingState {
 interface CanvasEditorProps {
   width?: number;
   height?: number;
+  ghostImageUrl?: string;
+  ghostImageBlur?: boolean;
 }
 
 export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   width = 800,
   height = 600,
+  ghostImageUrl,
+  ghostImageBlur = false,
 }) => {
   const stageRef = useRef<Konva.Stage | null>(null);
   const [tool, setTool] = useState<EditorTool>("wall");
