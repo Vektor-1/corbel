@@ -26,6 +26,7 @@ function StudioContent() {
   const isTraceMode = params.get('mode') === 'trace';
 
   const floor = useCurrentFloor();
+  const selection = useSelection();
   const ghostFloor = useFloorPlanStore((s) => s.ghostFloor);
   const loadFloor = useFloorPlanStore((s) => s.loadFloor);
   const freezeAsGhost = useFloorPlanStore((s) => s.freezeAsGhost);
@@ -98,15 +99,21 @@ function StudioContent() {
         open={isExportModalOpen}
       />
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-1/2 overflow-auto border-r border-[#d7d0c2]">
-          <CanvasEditor
-            width={800}
-            height={800}
-            ghostImageUrl={imageBaseline?.url}
-            ghostImageBlur={imageBaseline?.blur}
+        <div className="flex min-w-0 flex-1 overflow-hidden border-r border-[#d7d0c2]">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <CanvasEditor
+              width={800}
+              height={720}
+              ghostImageUrl={imageBaseline?.url}
+              ghostImageBlur={imageBaseline?.blur}
+            />
+          </div>
+          <RightPanel
+            selectedElementId={selection.selectedElementId}
+            selectedElementKind={selection.selectedElementKind}
           />
         </div>
-        <div data-testid="floor-plan-3d" className="w-1/2">
+        <div data-testid="floor-plan-3d" className="w-1/2 min-w-0">
           <FloorPlanRenderer />
         </div>
       </div>
