@@ -38,6 +38,9 @@ export interface FloorPlanStoreState {
   hoveredElementId: string | null;
   validationIssues: Canonical.ValidationResult[];
 
+  // Room drawing state (for R key tool)
+  drawingRoom: { x: number; y: number; width: number; height: number } | null;
+
   // ========================================================================
   // ACTIONS: 2D EDITOR
   // ========================================================================
@@ -82,6 +85,18 @@ export interface FloorPlanStoreState {
 
   /** Label or rename a room. */
   setRoomLabel: (roomId: string, label: string) => void;
+
+  /** Add a room to the floor plan. */
+  addRoom: (room: Canonical.Room) => void;
+
+  /** Delete a room from the floor plan. */
+  deleteRoom: (roomId: string) => void;
+
+  /** Set the room currently being drawn (preview state). */
+  setDrawingRoom: (rect: { x: number; y: number; width: number; height: number } | null) => void;
+
+  /** Clear the drawing room state. */
+  clearDrawingRoom: () => void;
 
   // ========================================================================
   // ACTIONS: SELECTION & VALIDATION
@@ -153,6 +168,7 @@ const INITIAL_STATE: Omit<
   selectedElementKind: null,
   hoveredElementId: null,
   validationIssues: [],
+  drawingRoom: null,
 };
 
 // ============================================================================
@@ -369,6 +385,36 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
           state.dirtyRoomIds.add(roomId);
           state.isDirtyGlobal = true;
         }
+      });
+    },
+
+    addRoom: (room) => {
+      set((state) => {
+        if (!state.currentFloor) return;
+        state.currentFloor.rooms.push(room);
+        state.dirtyRoomIds.add(room.id);
+        state.isDirtyGlobal = true;
+      });
+    },
+
+    deleteRoom: (roomId) => {
+      set((state) => {
+        if (!state.currentFloor) return;
+        state.currentFloor.rooms = state.currentFloor.rooms.filter((r: Canonical.Room) => r.id !== roomId);
+        state.dirtyRoomIds.delete(roomId);
+        state.isDirtyGlobal = true;
+      });
+    },
+
+    setDrawingRoom: (rect) => {
+      set((state) => {
+        state.drawingRoom = rect;
+      });
+    },
+
+    clearDrawingRoom: () => {
+      set((state) => {
+        state.drawingRoom = null;
       });
     },
 
