@@ -3,30 +3,41 @@
  * Subscribes to Zustand store for read, pushes edits back to store.
  *
  * User interactions:
- * - Click and drag to draw walls
- * - Click wall to select (highlights green in 3D)
+ * - Click once to start and again to place walls (default tool)
+ * - R key: room draw tool (click → drag preview → click to place)
+ * - Click wall/room to select; right-click to delete
  * - Drag wall endpoint to resize
- * - Right-click wall to delete
- * - Double-click room to label
+ * - Escape cancels in-progress room draw
  */
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { Stage, Layer, Line, Rect, Text, Circle, Group } from "react-konva";
 import Konva from "konva";
+import { useShallow } from "zustand/react/shallow";
 import { useFloorPlanStore, useCurrentFloor, useSelection } from "../../lib/store/floorPlanStore";
+import { GRID_SIZE, snapToGrid, ENDPOINT_SNAP_DISTANCE } from "../../lib/geometry/snap";
+import {
+  startRoomDraw,
+  updateRoomDraw,
+  finishRoomDraw,
+  cancelRoomDraw,
+} from "../../lib/trace/roomTool";
 import { Canonical } from "../../types/schema";
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const GRID_SIZE = 100; // mm
 const WALL_STROKE_WIDTH = 3;
 const WALL_COLOR = "#333";
 const WALL_SELECTED_COLOR = "#00ff00";
 const OPENING_RADIUS = 8;
-const ROOM_FILL_OPACITY = 0.1;
 const ROOM_STROKE_WIDTH = 1;
+const ROOM_HOVER_FILL = "#22c55e55";
+const ROOM_SELECTED_FILL = "#ffff0055";
+const ROOM_DEFAULT_FILL = "#cccccc55";
+
+type EditorTool = "wall" | "room";
 
 // ============================================================================
 // WALL DRAWING STATE
@@ -47,31 +58,86 @@ interface CanvasEditorProps {
   height?: number;
 }
 
-export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height = 600 }) => {
+export const CanvasEditor: React.FC<CanvasEditorProps> = ({
+  width = 800,
+  height = 600,
+}) => {
   const stageRef = useRef<Konva.Stage | null>(null);
-  const [drawing, setDrawing] = useState<DrawingState>({ isDrawing: false, startPoint: null, currentPoint: null });
+  const [tool, setTool] = useState<EditorTool>("wall");
+  const [drawing, setDrawing] = useState<DrawingState>({
+    isDrawing: false,
+    startPoint: null,
+    currentPoint: null,
+  });
 
   const floor = useCurrentFloor();
   const selection = useSelection();
+  const drawingRoom = useFloorPlanStore((state) => state.drawingRoom);
+  const hoveredElementId = useFloorPlanStore((state) => state.hoveredElementId);
+  const ghostFloor = useFloorPlanStore((state) => state.ghostFloor);
+  const ghostOpacity = useFloorPlanStore((state) => state.ghostOpacity);
   const {
     drawWall,
-    moveWall,
+    resizeWall,
     deleteWall,
+    deleteRoom,
     selectElement,
     deselectElement,
     setHoveredElement,
     validateFloor,
-    placeOpening,
-  } = useFloorPlanStore((state) => ({
-    drawWall: state.drawWall,
-    moveWall: state.moveWall,
-    deleteWall: state.deleteWall,
-    selectElement: state.selectElement,
-    deselectElement: state.deselectElement,
-    setHoveredElement: state.setHoveredElement,
-    validateFloor: state.validateFloor,
-    placeOpening: state.placeOpening,
-  }));
+  } = useFloorPlanStore(
+    useShallow((state) => ({
+      drawWall: state.drawWall,
+      resizeWall: state.resizeWall,
+      deleteWall: state.deleteWall,
+      deleteRoom: state.deleteRoom,
+      selectElement: state.selectElement,
+      deselectElement: state.deselectElement,
+      setHoveredElement: state.setHoveredElement,
+      validateFloor: state.validateFloor,
+    }))
+  );
+
+  // R → room tool; Escape → cancel room draw / return to wall tool
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        setDrawing({ isDrawing: false, startPoint: null, currentPoint: null });
+        setTool("room");
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancelRoomDraw();
+        setDrawing({ isDrawing: false, startPoint: null, currentPoint: null });
+        setTool("wall");
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const getSnappedPointer = useCallback(() => {
+    const pos = stageRef.current?.getPointerPosition();
+    if (!pos) return null;
+    return { x: snapToGrid(pos.x), y: snapToGrid(pos.y) };
+  }, []);
+
+  const snapPoint = (point: { x: number; y: number }) => {
+    if (!floor) return point;
+    const endpoint = floor.walls
+      .flatMap((wall) => [wall.start, wall.end])
+      .find((candidate) => Math.hypot(candidate.x - point.x, candidate.y - point.y) <= ENDPOINT_SNAP_DISTANCE);
+    return endpoint ? { ...endpoint } : point;
+  };
 
   if (!floor) {
     return <div>No floor loaded</div>;
@@ -82,37 +148,48 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
   // ========================================================================
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const pos = stageRef.current?.getPointerPosition();
-    if (!pos) return;
+    const gridPoint = getSnappedPointer();
+    if (!gridPoint) return;
 
-    // Snap to grid
-    const snappedX = Math.round(pos.x / GRID_SIZE) * GRID_SIZE;
-    const snappedY = Math.round(pos.y / GRID_SIZE) * GRID_SIZE;
+    if (tool === "room") {
+      if (!drawingRoom) {
+        startRoomDraw(gridPoint.x, gridPoint.y);
+        deselectElement();
+      } else {
+        finishRoomDraw();
+        validateFloor();
+      }
+      return;
+    }
+
+    const snappedPoint = snapPoint(gridPoint);
 
     if (!drawing.isDrawing) {
-      // Start new wall
       setDrawing({
         isDrawing: true,
-        startPoint: { x: snappedX, y: snappedY },
-        currentPoint: { x: snappedX, y: snappedY },
+        startPoint: snappedPoint,
+        currentPoint: snappedPoint,
       });
       deselectElement();
     } else {
-      // End wall
       if (drawing.startPoint) {
-        drawWall(drawing.startPoint, { x: snappedX, y: snappedY });
+        drawWall(drawing.startPoint, snappedPoint);
         validateFloor();
       }
       setDrawing({ isDrawing: false, startPoint: null, currentPoint: null });
     }
   };
 
-  const handleStageMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleStageMouseMove = () => {
     const pos = stageRef.current?.getPointerPosition();
     if (!pos) return;
 
+    if (tool === "room" && drawingRoom) {
+      updateRoomDraw(pos.x, pos.y);
+      return;
+    }
+
     if (drawing.isDrawing) {
-      // Update preview line as user drags
       setDrawing((prev) => ({
         ...prev,
         currentPoint: { x: pos.x, y: pos.y },
@@ -124,11 +201,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
     e.cancelBubble = true;
 
     if (e.evt.button === 2) {
-      // Right-click: delete
       deleteWall(wallId);
       validateFloor();
     } else {
-      // Left-click: select
       selectElement(wallId, "wall");
     }
   };
@@ -143,7 +218,20 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
 
   const handleRoomClick = (roomId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
+    if (e.evt.button === 2) {
+      deleteRoom(roomId);
+      validateFloor();
+      return;
+    }
     selectElement(roomId, "room");
+  };
+
+  const handleRoomMouseEnter = (roomId: string) => {
+    setHoveredElement(roomId);
+  };
+
+  const handleRoomMouseLeave = () => {
+    setHoveredElement(null);
   };
 
   const handleEndpointDrag = (wallId: string, isStart: boolean, pos: { x: number; y: number }) => {
@@ -151,23 +239,32 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
     if (!wall) return;
 
     const snappedPos = {
-      x: Math.round(pos.x / GRID_SIZE) * GRID_SIZE,
-      y: Math.round(pos.y / GRID_SIZE) * GRID_SIZE,
+      x: snapToGrid(pos.x),
+      y: snapToGrid(pos.y),
     };
 
     const newStart = isStart ? snappedPos : wall.start;
     const newEnd = isStart ? wall.end : snappedPos;
 
-    moveWall(wallId, { x: newStart.x - wall.start.x, y: newStart.y - wall.start.y });
+    resizeWall(wallId, newStart, newEnd);
     validateFloor();
   };
+
+  const statusLabel =
+    tool === "room"
+      ? drawingRoom
+        ? "Drawing room… (click to place, Esc to cancel)"
+        : "Room tool (click to start, Esc for wall tool)"
+      : drawing.isDrawing
+        ? "Drawing wall… (click to end)"
+        : "Wall tool — press R for rooms";
 
   // ========================================================================
   // RENDER
   // ========================================================================
 
   return (
-    <div style={{ border: "1px solid #ccc", overflow: "hidden" }}>
+    <div data-testid="floor-plan-2d" style={{ border: "1px solid #ccc", overflow: "hidden" }}>
       <Stage
         ref={stageRef}
         width={width}
@@ -177,60 +274,81 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
         onContextMenu={(e) => e.evt.preventDefault()}
       >
         <Layer>
-          {/* Grid background */}
           <Grid cellSize={GRID_SIZE} width={width} height={height} />
 
-          {/* Render room polygons */}
+          {ghostFloor &&
+            ghostOpacity > 0 &&
+            ghostFloor.walls.map((wall) => (
+              <Line
+                key={`ghost-wall_${wall.id}`}
+                points={[wall.start.x, wall.start.y, wall.end.x, wall.end.y]}
+                stroke="#2563eb"
+                strokeWidth={WALL_STROKE_WIDTH + 1}
+                opacity={ghostOpacity}
+                dash={[8, 5]}
+                listening={false}
+              />
+            ))}
+
+          {/* Room draw preview — behind finished room polygons */}
+          {drawingRoom && drawingRoom.width > 0 && drawingRoom.height > 0 && (
+            <Rect
+              x={drawingRoom.x}
+              y={drawingRoom.y}
+              width={drawingRoom.width}
+              height={drawingRoom.height}
+              stroke="#22c55e"
+              strokeWidth={2}
+              dash={[8, 4]}
+              fill="rgba(34, 197, 94, 0.3)"
+              listening={false}
+            />
+          )}
+
           {floor.rooms.map((room) => (
             <RoomPolygon
               key={`room_${room.id}`}
               room={room}
               isSelected={selection.selectedElementId === room.id}
-              onClick={() => handleRoomClick(room.id, {} as any)}
+              isHovered={hoveredElementId === room.id}
+              onClick={(e) => handleRoomClick(room.id, e)}
+              onMouseEnter={() => handleRoomMouseEnter(room.id)}
+              onMouseLeave={handleRoomMouseLeave}
             />
           ))}
 
-          {/* Render walls */}
           {floor.walls.map((wall) => (
             <Group key={`wall_${wall.id}`}>
-              {/* Wall line */}
               <Line
                 points={[wall.start.x, wall.start.y, wall.end.x, wall.end.y]}
                 stroke={selection.selectedElementId === wall.id ? WALL_SELECTED_COLOR : WALL_COLOR}
                 strokeWidth={WALL_STROKE_WIDTH}
-                onClick={() => handleWallClick(wall.id, {} as any)}
+                onClick={(e) => handleWallClick(wall.id, e)}
                 onMouseEnter={() => handleWallMouseEnter(wall.id)}
                 onMouseLeave={handleWallMouseLeave}
-                hitStrokeWidth={10} // Wider hit area
+                hitStrokeWidth={10}
               />
 
-              {/* Wall endpoints (draggable to resize) */}
               <DraggableEndpoint
                 x={wall.start.x}
                 y={wall.start.y}
-                wallId={wall.id}
-                isStart={true}
                 onDrag={(pos) => handleEndpointDrag(wall.id, true, pos)}
               />
               <DraggableEndpoint
                 x={wall.end.x}
                 y={wall.end.y}
-                wallId={wall.id}
-                isStart={false}
                 onDrag={(pos) => handleEndpointDrag(wall.id, false, pos)}
               />
 
-              {/* Openings on this wall */}
               {floor.openings
                 .filter((o) => o.hostWallId === wall.id)
                 .map((opening) => {
                   const dx = wall.end.x - wall.start.x;
                   const dy = wall.end.y - wall.start.y;
-                  const len = Math.hypot(dx, dy);
+                  const len = Math.hypot(dx, dy) || 1;
                   const t = opening.positionAlongWall / len;
                   const x = wall.start.x + t * dx;
                   const y = wall.start.y + t * dy;
-
                   const color = opening.kind === "door" ? "#8B4513" : "#87CEEB";
 
                   return (
@@ -247,10 +365,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
             </Group>
           ))}
 
-          {/* Preview line while drawing */}
           {drawing.isDrawing && drawing.startPoint && drawing.currentPoint && (
             <Line
-              points={[drawing.startPoint.x, drawing.startPoint.y, drawing.currentPoint.x, drawing.currentPoint.y]}
+              points={[
+                drawing.startPoint.x,
+                drawing.startPoint.y,
+                drawing.currentPoint.x,
+                drawing.currentPoint.y,
+              ]}
               stroke="#ff6600"
               strokeWidth={2}
               dash={[5, 5]}
@@ -259,11 +381,16 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({ width = 800, height 
         </Layer>
       </Stage>
 
-      {/* Info panel */}
       <div style={{ padding: "10px", fontSize: "12px", backgroundColor: "#f5f5f5" }}>
-        <div>Walls: {floor.walls.length} | Rooms: {floor.rooms.length} | Openings: {floor.openings.length}</div>
-        <div>Status: {drawing.isDrawing ? "Drawing wall... (click to end)" : "Click to start drawing wall"}</div>
-        {selection.selectedElementId && <div>Selected: {selection.selectedElementKind} {selection.selectedElementId}</div>}
+        <div>
+          Walls: {floor.walls.length} | Rooms: {floor.rooms.length} | Openings: {floor.openings.length}
+        </div>
+        <div>Status: {statusLabel}</div>
+        {selection.selectedElementId && (
+          <div>
+            Selected: {selection.selectedElementKind} {selection.selectedElementId}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -300,19 +427,35 @@ const Grid: React.FC<GridProps> = ({ cellSize, width, height }) => {
 interface RoomPolygonProps {
   room: Canonical.Room;
   isSelected: boolean;
-  onClick: () => void;
+  isHovered: boolean;
+  onClick: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }
 
-const RoomPolygon: React.FC<RoomPolygonProps> = ({ room, isSelected, onClick }) => {
+const RoomPolygon: React.FC<RoomPolygonProps> = ({
+  room,
+  isSelected,
+  isHovered,
+  onClick,
+  onMouseEnter,
+  onMouseLeave,
+}) => {
   const points = room.vertices.flatMap((v) => [v.x, v.y]);
+  const fill = isSelected ? ROOM_SELECTED_FILL : isHovered ? ROOM_HOVER_FILL : ROOM_DEFAULT_FILL;
+  const stroke = isSelected ? "#ffff00" : isHovered ? "#22c55e" : "#999";
 
   return (
-    <Group onClick={onClick}>
+    <Group
+      onMouseDown={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <Line
         points={points}
         closed
-        fill={isSelected ? "#ffff0055" : "#cccccc55"}
-        stroke={isSelected ? "#ffff00" : "#999"}
+        fill={fill}
+        stroke={stroke}
         strokeWidth={ROOM_STROKE_WIDTH}
       />
       {room.label && (
@@ -331,12 +474,10 @@ const RoomPolygon: React.FC<RoomPolygonProps> = ({ room, isSelected, onClick }) 
 interface DraggableEndpointProps {
   x: number;
   y: number;
-  wallId: string;
-  isStart: boolean;
   onDrag: (pos: { x: number; y: number }) => void;
 }
 
-const DraggableEndpoint: React.FC<DraggableEndpointProps> = ({ x, y, wallId, isStart, onDrag }) => {
+const DraggableEndpoint: React.FC<DraggableEndpointProps> = ({ x, y, onDrag }) => {
   return (
     <Circle
       x={x}
