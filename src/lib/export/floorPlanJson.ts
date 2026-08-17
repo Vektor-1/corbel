@@ -29,8 +29,34 @@ export interface CorbelFloorPlanJsonExport {
     scaleMethod: null;
     scaleConfidence: null;
   };
+  library: {
+    wallTypes: Array<{
+      id: string;
+      thicknessMm: number;
+      material: string;
+      loadBearing: boolean;
+      fireRating?: string;
+      uValue?: number;
+    }>;
+    doorTypes: Array<{
+      id: string;
+      widthMm: number;
+      heightMm: number;
+      swing: "inward" | "outward" | "double" | "sliding";
+      material?: string;
+      fireRating?: string;
+    }>;
+    windowTypes: Array<{
+      id: string;
+      widthMm: number;
+      heightMm: number;
+      sillHeightMm: number;
+      glazing?: string;
+    }>;
+  };
   walls: Array<{
     id: string;
+    typeRef: string;
     startMm: Point2D;
     endMm: Point2D;
     thicknessMm: Nullable<number>;
@@ -38,27 +64,45 @@ export interface CorbelFloorPlanJsonExport {
     isExternal: boolean;
     material: Nullable<string>;
     type: "loadBearing" | "partition";
+    openingIds: string[];
+    provenance: {
+      confidence: number;
+      source: string;
+      draftSourceId?: string;
+    };
   }>;
   rooms: Array<{
     id: string;
     name: Nullable<string>;
-    roomType: "other";
+    roomType: string;
     verticesMm: Point2D[];
+    boundingWallIds: string[];
     ceilingHeightMm: null;
     computed: { areaSqM: number; centroidMm: Point2D | null };
+    provenance: {
+      confidence: number;
+      source: string;
+      draftSourceId?: string;
+    };
   }>;
   openings: Array<{
     id: string;
     type: "door" | "window";
+    typeRef: string;
     wallId: string;
     positionAlongWallMm: number;
     centerPointMm: Point2D | null;
     widthMm: number | null;
     heightMm: number | null;
     sillHeightMm: number | null;
-    swing: null;
-    doorType: null;
+    swing: Nullable<"inward" | "outward" | "double" | "sliding">;
+    doorType: Nullable<string>;
     connectsRooms: string[];
+    provenance: {
+      confidence: number;
+      source: string;
+      draftSourceId?: string;
+    };
   }>;
   compliance: {
     standard: "GS 1207:2018 / L.I. 1630";
@@ -160,11 +204,17 @@ export function createFloorPlanJsonExport(
       scaleMethod: null,
       scaleConfidence: null,
     },
+    library: {
+      wallTypes: Array.from(library.wallTypes.values()),
+      doorTypes: Array.from(library.doorTypes.values()),
+      windowTypes: Array.from(library.windowTypes.values()),
+    },
     walls: floor.walls.map((wall) => {
       const wallType = library.wallTypes.get(wall.typeRef);
       const isExternal = wallType?.loadBearing ?? false;
       return {
         id: wall.id,
+        typeRef: wall.typeRef,
         startMm: copyPoint(wall.start),
         endMm: copyPoint(wall.end),
         thicknessMm: wallType?.thickness ?? null,
@@ -172,15 +222,27 @@ export function createFloorPlanJsonExport(
         isExternal,
         material: wallType?.material ?? null,
         type: isExternal ? "loadBearing" : "partition",
+        openingIds: wall.openingIds,
+        provenance: {
+          confidence: wall.confidence,
+          source: wall.source,
+          draftSourceId: wall.draftSourceId,
+        },
       };
     }),
     rooms: floor.rooms.map((room) => ({
       id: room.id,
       name: room.label ?? null,
-      roomType: "other",
+      roomType: room.type ?? "other",
       verticesMm: room.vertices.map(copyPoint),
+      boundingWallIds: room.boundingWallIds,
       ceilingHeightMm: null,
       computed: { areaSqM: rounded(room.area / 1_000_000), centroidMm: polygonCentroid(room.vertices) },
+      provenance: {
+        confidence: room.confidence,
+        source: room.source,
+        draftSourceId: room.draftSourceId,
+      },
     })),
     openings: floor.openings.map((opening) => {
       const doorType = opening.kind === "door" ? library.doorTypes.get(opening.typeRef) : undefined;
@@ -188,15 +250,21 @@ export function createFloorPlanJsonExport(
       return {
         id: opening.id,
         type: opening.kind,
+        typeRef: opening.typeRef,
         wallId: opening.hostWallId,
         positionAlongWallMm: opening.positionAlongWall,
         centerPointMm: openingCenter(opening, floor),
         widthMm: doorType?.width ?? windowType?.width ?? null,
         heightMm: doorType?.height ?? windowType?.height ?? null,
         sillHeightMm: windowType?.sillHeight ?? (opening.kind === "door" ? 0 : null),
-        swing: null,
-        doorType: null,
-        connectsRooms: [],
+        swing: doorType?.swing ?? null,
+        doorType: opening.kind === "door" ? opening.typeRef : null,
+        connectsRooms: [], // Requires room-wall adjacency computation, deferred
+        provenance: {
+          confidence: opening.confidence,
+          source: opening.source,
+          draftSourceId: opening.draftSourceId,
+        },
       };
     }),
     compliance: {
@@ -211,8 +279,8 @@ export function createFloorPlanJsonExport(
     },
     aiContext: {
       coordinateSystem: "Origin is top-left; X increases right and Y increases down; all values are millimeters.",
-      reconstructionNote: "This is a single-floor structural export. Null source fields indicate unavailable import provenance.",
-      suggestedPrompt: "Use this Corbel JSON as a millimetre-accurate single-floor plan. Preserve IDs and hosted openings when proposing changes.",
+      reconstructionNote: "This is a single-floor structural export. The library catalog (wallTypes/doorTypes/windowTypes) contains shared type definitions; elements reference them by typeRef. Topology (boundingWallIds/openingIds) is explicit.",
+      suggestedPrompt: "Use this Corbel JSON as a millimetre-accurate single-floor plan. Use library.wallTypes/doorTypes/windowTypes (via typeRef) for shared dimensions and materials. Preserve IDs and hosted openings. Use door swing when drawing leaves.",
     },
   };
 }
@@ -228,7 +296,9 @@ export function createReconstructionPrompt(exported: CorbelFloorPlanJsonExport):
 
 Treat the JSON as the source of truth. It contains one floor. All coordinates and dimensions are in millimeters; the origin is top-left, X increases right, and Y increases down.
 
-Reconstruct every wall from walls[].startMm to walls[].endMm using thicknessMm, heightMm, material, and type. Reconstruct rooms from rooms[].verticesMm and preserve their labels. Create every door/window hosted on openings[].wallId: positionAlongWallMm is authoritative and centerPointMm is a verification point. Preserve every Corbel object ID.
+The library object contains shared type definitions (wallTypes, doorTypes, windowTypes). Use these via typeRef to find authoritative dimensions and materials. For example, a wall with typeRef "ext-200" should reference library.wallTypes.find(t => t.id === "ext-200") to get its thickness.
+
+Reconstruct every wall from walls[].startMm to walls[].endMm using thicknessMm, heightMm, material, and type. Reconstruct rooms from rooms[].verticesMm and preserve their labels. Create every door/window hosted on openings[].wallId: positionAlongWallMm is authoritative and centerPointMm is a verification point. Use door swing (e.g., "inward", "outward") when drawing door leaves. Preserve every Corbel object ID.
 
 Treat null source/provenance fields as unknown and do not invent them. Surface compliance.issues as warnings without changing geometry automatically. Do not add furniture, extra walls, floors, doors, or windows unless you list them separately as optional suggestions.
 

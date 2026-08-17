@@ -214,8 +214,8 @@ export namespace Canonical {
    */
   export interface Floor {
     id: string;
-    elevation: number; // meters above ground
-    floorHeight: number; // meters, height of this floor (for 3D extrusion)
+    elevation: number; // mm above ground
+    floorHeight: number; // mm, height of this floor (for 3D extrusion)
     walls: Wall[];
     openings: Opening[];
     rooms: Room[];
