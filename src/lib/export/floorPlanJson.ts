@@ -205,9 +205,29 @@ export function createFloorPlanJsonExport(
       scaleConfidence: null,
     },
     library: {
-      wallTypes: Array.from(library.wallTypes.values()),
-      doorTypes: Array.from(library.doorTypes.values()),
-      windowTypes: Array.from(library.windowTypes.values()),
+      wallTypes: Array.from(library.wallTypes.values()).map((t) => ({
+        id: t.id,
+        thicknessMm: t.thickness,
+        material: t.material,
+        loadBearing: t.loadBearing,
+        fireRating: t.fireRating,
+        uValue: t.uValue,
+      })),
+      doorTypes: Array.from(library.doorTypes.values()).map((t) => ({
+        id: t.id,
+        widthMm: t.width,
+        heightMm: t.height,
+        swing: t.swing,
+        material: t.material,
+        fireRating: t.fireRating,
+      })),
+      windowTypes: Array.from(library.windowTypes.values()).map((t) => ({
+        id: t.id,
+        widthMm: t.width,
+        heightMm: t.height,
+        sillHeightMm: t.sillHeight,
+        glazing: t.glazing,
+      })),
     },
     walls: floor.walls.map((wall) => {
       const wallType = library.wallTypes.get(wall.typeRef);

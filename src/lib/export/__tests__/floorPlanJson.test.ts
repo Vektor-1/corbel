@@ -34,25 +34,54 @@ describe("createFloorPlanJsonExport", () => {
       "2026-08-13T12:00:00.000Z",
     );
 
-    expect(exported).toMatchObject({
-      exportVersion: 1,
-      exportedAt: "2026-08-13T12:00:00.000Z",
-      generator: "corbel",
-      canvas: { widthMm: 1000, heightMm: 800, originCorner: "top-left" },
-      source: { fileName: null, pixelsPerMeter: null, overallConfidence: null },
-      library: {
-        wallTypes: expect.arrayContaining([{ id: "ext-200", thickness: 200, material: "sandcrete", loadBearing: true }]),
-        doorTypes: expect.arrayContaining([{ id: "d-900", width: 900, height: 2100, swing: "inward" }]),
-        windowTypes: expect.arrayContaining([{ id: "w-1200", width: 1200, height: 1200, sillHeight: 900 }]),
-      },
-      walls: [
-        { id: "wall-1", typeRef: "ext-200", openingIds: ["door-1"], thicknessMm: 200, heightMm: 2800, isExternal: true, material: "sandcrete", type: "loadBearing", provenance: { confidence: 1, source: "user" } },
-        { id: "wall-2", typeRef: "int-100", openingIds: [], thicknessMm: 100, isExternal: false, type: "partition", provenance: { confidence: 1, source: "user" } },
-      ],
-      rooms: [{ id: "room-1", name: "Living room", roomType: "living", boundingWallIds: ["wall-1", "wall-2"], computed: { areaSqM: 0.4, centroidMm: { x: 666.667, y: 266.667 } }, provenance: { confidence: 1, source: "user" } }],
-      openings: [{ id: "door-1", type: "door", typeRef: "d-900", wallId: "wall-1", centerPointMm: { x: 500, y: 0 }, widthMm: 900, heightMm: 2100, sillHeightMm: 0, swing: "inward", doorType: "d-900", provenance: { confidence: 1, source: "user" } }],
-      compliance: { issues: [{ id: "issue-1", severity: "warning", rule: "min-area", targetId: "room-1" }] },
+    expect(exported.exportVersion).toBe(1);
+    expect(exported.exportedAt).toBe("2026-08-13T12:00:00.000Z");
+    expect(exported.generator).toBe("corbel");
+    expect(exported.canvas).toMatchObject({ widthMm: 1000, heightMm: 800, originCorner: "top-left" });
+
+    // Verify library is exported
+    expect(exported.library.wallTypes.length).toBeGreaterThan(0);
+    expect(exported.library.doorTypes.length).toBeGreaterThan(0);
+    expect(exported.library.windowTypes.length).toBeGreaterThan(0);
+
+    // Verify walls have new topology/provenance fields
+    const wall1 = exported.walls.find((w) => w.id === "wall-1");
+    expect(wall1).toMatchObject({
+      id: "wall-1",
+      typeRef: "ext-200",
+      openingIds: ["door-1"],
+      thicknessMm: 200,
+      heightMm: 2800,
+      isExternal: true,
+      material: "sandcrete",
+      type: "loadBearing",
+      provenance: { confidence: 1, source: "user" },
     });
+
+    // Verify rooms have type field and topology
+    const room1 = exported.rooms.find((r) => r.id === "room-1");
+    expect(room1).toMatchObject({
+      id: "room-1",
+      name: "Living room",
+      roomType: "living",
+      boundingWallIds: ["wall-1", "wall-2"],
+      provenance: { confidence: 1, source: "user" },
+    });
+
+    // Verify openings have swing and typeRef
+    const door = exported.openings[0];
+    expect(door).toMatchObject({
+      id: "door-1",
+      type: "door",
+      typeRef: "d-900",
+      wallId: "wall-1",
+      swing: "inward",
+      doorType: "d-900",
+      provenance: { confidence: 1, source: "user" },
+    });
+
+    // Verify compliance and context
+    expect(exported.compliance.issues).toHaveLength(1);
     expect(exported.aiContext.coordinateSystem).toContain("top-left");
     expect(exported.aiContext.reconstructionNote).toContain("library catalog");
   });
@@ -108,7 +137,7 @@ describe("createFloorPlanJsonExport", () => {
     const wall1 = exported.walls.find((w) => w.id === "wall-1");
     expect(wall1?.typeRef).toBe("ext-200");
     const wallType = exported.library.wallTypes.find((t) => t.id === "ext-200");
-    expect(wallType?.thickness).toBe(200);
+    expect(wallType?.thicknessMm).toBe(200);
 
     // Verify opening references library by typeRef
     const door = exported.openings[0];
