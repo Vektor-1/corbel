@@ -47,11 +47,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       setRoomType("Other");
       return;
     }
-    const label = room.label ?? "";
-    setName(label);
-    const matched = ROOM_TYPES.find((t) => t.toLowerCase() === label.toLowerCase());
-    setRoomType(matched ?? (label ? "Other" : "Other"));
-  }, [room?.id, room?.label]);
+    setName(room.label ?? "");
+    const storedType = room.type ?? "";
+    const matched = ROOM_TYPES.find((t) => t.toLowerCase() === storedType.toLowerCase());
+    setRoomType(matched ?? "Other");
+  }, [room?.id, room?.label, room?.type]);
 
   return (
     <aside
@@ -105,9 +105,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               onChange={(e) => {
                 const next = e.target.value;
                 setRoomType(next);
-                if (selectedElementId) {
-                  setRoomTypeStore(selectedElementId, next);
-                }
+                // Type only — leave room.label untouched.
+                setRoomTypeStore(selectedElementId, next);
               }}
               style={{ padding: "6px 8px", border: "1px solid #d7d0c2", borderRadius: 4 }}
             >

@@ -13,6 +13,7 @@ import { immer } from "zustand/middleware/immer";
 import { useShallow } from "zustand/react/shallow";
 import { Canonical, Source } from "../../types/schema";
 import { cloneFloorAsGhost, compareFloorToGhost } from "../utils/ghostClone";
+import { validateCanonicalFloor } from "../standards/canonicalValidation";
 
 enableMapSet();
 
@@ -479,27 +480,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
 
     validateFloor: () => {
       set((state) => {
-        if (!state.currentFloor) return;
-
-        const issues: Canonical.ValidationResult[] = [];
-
-        // Example rules (would be a full rule engine in practice)
-        state.currentFloor.rooms.forEach((room: Canonical.Room) => {
-          // Rule: minimum room area 12 m² (12e6 mm²)
-          if (room.area < 12e6) {
-            issues.push({
-              id: `issue_${room.id}`,
-              ruleId: "min_room_area",
-              severity: "warning",
-              message: `Room ${room.label || room.id} is ${(room.area / 1e6).toFixed(1)} m², below minimum 12 m².`,
-              standard: "GS 1207:2018, §3.2",
-              elementIds: [room.id],
-              remediation: "Expand room or merge with adjacent space.",
-            });
-          }
-        });
-
-        state.validationIssues = issues;
+        state.validationIssues = validateCanonicalFloor(state.currentFloor, state.library);
       });
     },
 
