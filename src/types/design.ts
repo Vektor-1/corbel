@@ -32,6 +32,8 @@ export interface Wall {
   material: MaterialType;
   type: WallType;
   height: number; // mm
+  confidence?: number; // 0-1, from AI extraction; 1 = manual
+  source?: 'ai' | 'user'; // where this came from
 }
 
 export interface Room {
@@ -48,6 +50,8 @@ export interface Door {
   width: number; // mm
   type: 'entry' | 'internal';
   swing: 'left' | 'right';
+  confidence?: number; // 0-1, from AI extraction
+  source?: 'ai' | 'user';
 }
 
 export interface Window {
@@ -57,6 +61,8 @@ export interface Window {
   width: number; // mm
   height: number; // mm
   sillHeight: number; // mm above floor
+  confidence?: number; // 0-1, from AI extraction
+  source?: 'ai' | 'user';
 }
 
 export interface DesignObject {
@@ -80,6 +86,7 @@ export interface FloorPlan {
   objects: DesignObject[];
   createdAt: Date;
   updatedAt: Date;
+  ghostImageBase64?: string; // base64 data:image URL for AI-extracted plans
 }
 
 export interface ValidationResult {
