@@ -36,6 +36,7 @@ import { useDesignStore } from '@/store/designStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { Canvas2D } from './Canvas2D';
 import { ComparisonPanel } from './ComparisonPanel';
+import { EditorReviewBadge } from './EditorReviewBadge';
 import { Canvas3DContainer } from '../viewer/Canvas3D';
 import {
   ComplianceScore,
@@ -78,13 +79,41 @@ export function EditorWithCanvas() {
   }
 
   function handleExport() {
-    const stage = canvasStageRef.current;
-    if (!stage) return;
-    const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+    const { floorPlan } = useDesignStore.getState();
+    if (!floorPlan) return;
+    const json = JSON.stringify(floorPlan, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `${useDesignStore.getState().floorPlan?.name ?? 'corbel-plan'}.png`;
+    a.href = url;
+    a.download = `${floorPlan.name ?? 'corbel-plan'}.corbel.json`;
     a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.corbel.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const { importDesignFloorJson, validateDesignFloorJson } = await import('@/lib/import/designFloorJson');
+        if (!validateDesignFloorJson(data)) {
+          alert('Invalid Corbel JSON format');
+          return;
+        }
+        const floorPlan = importDesignFloorJson(data);
+        useDesignStore.getState().setFloorPlan(floorPlan);
+        alert('Plan imported successfully');
+      } catch {
+        alert('Failed to import plan. Check file format.');
+      }
+    };
+    input.click();
   }
 
   const [defaultWallMaterial, setDefaultWallMaterial] = useState<MaterialType>('sandcrete');
@@ -415,10 +444,15 @@ export function EditorWithCanvas() {
             <Save />
             Save
           </Button>
+          <Button size="sm" onClick={handleImport}>
+            <Download style={{ transform: 'rotate(180deg)' }} />
+            Import
+          </Button>
           <Button size="sm" onClick={handleExport}>
             <Download />
             Export
           </Button>
+          <EditorReviewBadge />
         </div>
 
         {/* ── Left · floating tool dock ── */}
