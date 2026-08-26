@@ -14,11 +14,10 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
-import { useDesignStore } from '@/store/designStore';
 import { useFloorPlanStore } from '@/store/floorPlanStore';
 import { useValidation } from '@/hooks/useValidation';
 import { useValidationToasts } from '@/hooks/useValidationToasts';
-import { ValidationPanel } from './ValidationPanel';
+import { EditorRightPanel } from './EditorRightPanel';
 
 // Mock compliance visualization component
 const ComplianceScore = ({ score }: { score: number }) => {
@@ -117,25 +116,28 @@ export default function EditorLayout() {
     setCurrentTool,
     viewMode,
     setViewMode,
-    floorPlan,
-    validationResults,
-  } = useDesignStore();
+    currentFloor,
+    library,
+    ghostFloor,
+    selectedElementId,
+    selectElement,
+  } = useFloorPlanStore((state) => ({
+    currentTool: state.currentTool,
+    setCurrentTool: state.setCurrentTool,
+    viewMode: state.viewMode,
+    setViewMode: state.setViewMode,
+    currentFloor: state.currentFloor,
+    library: state.library,
+    ghostFloor: state.ghostFloor,
+    selectedElementId: state.selectedElementId,
+    selectElement: state.selectElement,
+  }));
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
   useValidationToasts(true);
   const validation = useValidation();
-  const { currentFloor, library } = useFloorPlanStore((state) => ({
-    currentFloor: state.currentFloor,
-    library: state.library,
-  }));
-
-  const wallCount = floorPlan?.walls.length || 0;
-  const roomCount = floorPlan?.rooms.length || 0;
-  const doorCount = floorPlan?.doors.length || 0;
-  const windowCount = floorPlan?.windows.length || 0;
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-50">
@@ -253,7 +255,7 @@ export default function EditorLayout() {
             <div className="flex flex-col">
               <span className="text-xs text-slate-400">Project</span>
               <span className="text-sm font-semibold text-white">
-                {floorPlan?.name || 'Untitled Floor Plan'}
+                {currentFloor?.name || 'Untitled Floor Plan'}
               </span>
             </div>
           </div>
@@ -335,39 +337,15 @@ export default function EditorLayout() {
               </button>
             </div>
 
-            {/* Validation Panel */}
-            <div className="p-4 border-b border-slate-700 flex-1 overflow-y-auto">
-              <ValidationPanel
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <EditorRightPanel
                 floor={currentFloor}
                 library={library}
+                ghostFloor={ghostFloor}
                 selectedElementId={selectedElementId}
-                onSelectElement={(elementId) => setSelectedElementId(elementId)}
+                onSelectElement={selectElement}
               />
-            </div>
-
-            {/* Statistics */}
-            <div className="p-4 border-t border-slate-700 space-y-3">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Statistics
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-slate-700/50 p-3 rounded">
-                  <div className="text-slate-400">Walls</div>
-                  <div className="text-lg font-bold text-blue-400">{currentFloor?.walls.length || 0}</div>
-                </div>
-                <div className="bg-slate-700/50 p-3 rounded">
-                  <div className="text-slate-400">Rooms</div>
-                  <div className="text-lg font-bold text-blue-400">{currentFloor?.rooms.length || 0}</div>
-                </div>
-                <div className="bg-slate-700/50 p-3 rounded">
-                  <div className="text-slate-400">Doors</div>
-                  <div className="text-lg font-bold text-blue-400">{currentFloor?.openings.filter((o) => o.kind === 'door').length || 0}</div>
-                </div>
-                <div className="bg-slate-700/50 p-3 rounded">
-                  <div className="text-slate-400">Windows</div>
-                  <div className="text-lg font-bold text-blue-400">{currentFloor?.openings.filter((o) => o.kind === 'window').length || 0}</div>
-                </div>
-              </div>
             </div>
           </div>
         </div>

@@ -46,6 +46,20 @@ export interface FloorPlanStoreState {
   // Room drawing state (for R key tool)
   drawingRoom: { x: number; y: number; width: number; height: number } | null;
 
+  // Editor UI state
+  currentTool: 'select' | 'wall' | 'room' | 'door' | 'window' | 'delete';
+  viewMode: '2d' | '3d' | 'split';
+
+  // ========================================================================
+  // ACTIONS: EDITOR UI
+  // ========================================================================
+
+  /** Set current editing tool. */
+  setCurrentTool: (tool: 'select' | 'wall' | 'room' | 'door' | 'window' | 'delete') => void;
+
+  /** Set view mode (2D, 3D, or split). */
+  setViewMode: (mode: '2d' | '3d' | 'split') => void;
+
   // ========================================================================
   // ACTIONS: 2D EDITOR
   // ========================================================================
@@ -193,6 +207,8 @@ const INITIAL_STATE: Omit<
   hoveredElementId: null,
   validationIssues: [],
   drawingRoom: null,
+  currentTool: 'select' as const,
+  viewMode: '2d' as const,
 };
 
 // ============================================================================
@@ -231,6 +247,22 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
     setGhostOpacity: (opacity) => {
       set((state) => {
         state.ghostOpacity = Math.max(0, Math.min(1, opacity));
+      });
+    },
+
+    // ========================================================================
+    // EDITOR UI
+    // ========================================================================
+
+    setCurrentTool: (tool) => {
+      set((state) => {
+        state.currentTool = tool;
+      });
+    },
+
+    setViewMode: (mode) => {
+      set((state) => {
+        state.viewMode = mode;
       });
     },
 
