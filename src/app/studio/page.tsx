@@ -13,6 +13,7 @@ import { StudioToolbar } from '@/components/studio/StudioToolbar';
 import { RightPanel } from '@/components/studio/RightPanel';
 import { TraceStatus } from '@/components/studio/TraceStatus';
 import { ValidationFeedback } from '@/components/studio/ValidationFeedback';
+import { TraceToLearnView } from '@/components/studio/TraceToLearnView';
 import { ExportGuidanceModal, type ExportPayload } from '@/components/studio/ExportGuidanceModal';
 import { createTraceFixtureFloor, traceFixtureLibrary } from '@/lib/testing/traceFixture';
 import { createFloorPlanJsonExport, createReconstructionPrompt, downloadFloorPlanJsonExport, exportFileName } from '@/lib/export/floorPlanJson';
@@ -184,10 +185,18 @@ function StudioContent() {
                 ghostImageBlur={imageBaseline?.blur}
               />
             </div>
-            <RightPanel
-              selectedElementId={selection.selectedElementId}
-              selectedElementKind={selection.selectedElementKind}
-            />
+            {isTraceMode && ghostFloor ? (
+              <TraceToLearnView
+                baseline={ghostFloor}
+                redesign={floor}
+                onAccept={() => router.push('/projects')}
+              />
+            ) : (
+              <RightPanel
+                selectedElementId={selection.selectedElementId}
+                selectedElementKind={selection.selectedElementKind}
+              />
+            )}
           </div>
         )}
         {viewMode !== '2d' && (
