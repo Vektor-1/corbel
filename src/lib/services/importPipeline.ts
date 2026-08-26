@@ -91,6 +91,7 @@ export interface ImportPipelineResult {
   warnings: string[];
   ocrFailed: boolean;
   ocrSkipped: boolean;
+  metrics?: Record<string, number>;
 }
 
 // ── Pure helpers (unit conversion + assembly) — exported for testing ─────────
@@ -242,9 +243,11 @@ export async function runImportPipeline(
   onProgress?: (progress: StageProgress) => void
 ): Promise<ImportPipelineResult> {
   const report = (i: number) => onProgress?.(STAGE_DEFS[i]);
+  const metrics: Record<string, number> = {};
 
   // P1: scene analysis — decode the image, read its dimensions.
   report(0);
+  const startP1 = performance.now();
   let width: number;
   let height: number;
   try {
@@ -252,15 +255,20 @@ export async function runImportPipeline(
     width = bitmap.width;
     height = bitmap.height;
     bitmap.close();
+    metrics['P1'] = performance.now() - startP1;
+    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P1', durationMs: metrics['P1'], success: true });
   } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P1', error: errorMsg });
     throw new Error(
-      `P1 failed: unable to decode image (${err instanceof Error ? err.message : String(err)}). ` +
+      `P1 failed: unable to decode image (${errorMsg}). ` +
         'Ensure the file is a valid PNG, JPEG, or WebP.'
     );
   }
 
   // P2: YOLOv8 detection, entirely in-browser via onnxruntime-web wasm.
   report(1);
+  const startP2 = performance.now();
   let boxes: RawBox[];
   try {
     const detection = await detectLocalMl(file, {
@@ -268,28 +276,52 @@ export async function runImportPipeline(
       iouThreshold: options.iouThreshold,
     });
     boxes = detection.boxes;
+    metrics['P2'] = performance.now() - startP2;
+    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P2', durationMs: metrics['P2'], success: true });
   } catch (err) {
-    throw new Error(`P2 failed: ONNX inference error — ${err instanceof Error ? err.message : String(err)}`);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P2', error: errorMsg });
+    throw new Error(`P2 failed: ONNX inference error — ${errorMsg}`);
   }
   if (boxes.filter((b) => b.cls === 'wall').length === 0) {
+    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P2', error: 'No walls detected' });
     throw new Error('P2 failed: no walls detected. Try a clearer, higher-resolution photo.');
   }
 
   // P3 (local refinement) and P4/P5 (network OCR+scale) run concurrently —
   // P3 has no dependency on OCR output, so we fire both and join.
   report(2);
+  const startP3 = performance.now();
   const refinementPromise = Promise.resolve().then(() => {
     const refinedWalls = refineWalls(boxes);
     const openings = reattachOpenings(boxes, refinedWalls);
+    const duration = performance.now() - startP3;
+    metrics['P3'] = duration;
+    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P3', durationMs: duration, success: true });
     return { refinedWalls, openings };
   });
 
   const ocrEnabled = options.useOcr !== false && !!options.imageUrl;
   const ocrSkippedForMissingUrl = options.useOcr !== false && !options.imageUrl;
   report(3);
+  const startOcr = performance.now();
   const ocrPromise: Promise<{ ocr: OcrScaleResponse | null; ocrFailed: boolean }> = ocrEnabled
-    ? runOcrAndScale(file, width, height, options)
-    : Promise.resolve({ ocr: null, ocrFailed: false });
+    ? runOcrAndScale(file, width, height, options).then((res) => {
+        const duration = performance.now() - startOcr;
+        metrics['P4'] = duration;
+        metrics['P5'] = duration;
+        console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P4_P5', durationMs: duration, success: !res.ocrFailed });
+        if (res.ocrFailed) {
+          console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P4_P5', error: 'OCR/Scale failed or timed out' });
+        }
+        return res;
+      })
+    : Promise.resolve({ ocr: null, ocrFailed: false }).then((res) => {
+        metrics['P4'] = 0;
+        metrics['P5'] = 0;
+        console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P4_P5', durationMs: 0, skipped: true });
+        return res;
+      });
 
   const [{ refinedWalls, openings }, { ocr, ocrFailed }] = await Promise.all([refinementPromise, ocrPromise]);
 
@@ -300,6 +332,7 @@ export async function runImportPipeline(
 
   // P6: assemble Draft.FloorPlan, then lift to Canonical.Floor.
   report(5);
+  const startP6 = performance.now();
   const draft = buildDraftFloorPlan({
     id: `draft_${Date.now()}`,
     walls: refinedWalls,
@@ -313,8 +346,12 @@ export async function runImportPipeline(
   let canonical: Canonical.Floor;
   try {
     canonical = liftFloorPlan(draft);
+    metrics['P6'] = performance.now() - startP6;
+    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P6', durationMs: metrics['P6'], success: true });
   } catch (err) {
-    throw new Error(`P6 failed: lift algorithm error — ${err instanceof Error ? err.message : String(err)}`);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P6', error: errorMsg });
+    throw new Error(`P6 failed: lift algorithm error — ${errorMsg}`);
   }
 
   const warnings = draft.warnings.map((w) => w.message);
@@ -329,7 +366,7 @@ export async function runImportPipeline(
     warnings.push('OCR/scale calibration was turned off — using a default scale. Confirm it manually before accepting.');
   }
 
-  return { draft, canonical, warnings, ocrFailed, ocrSkipped: ocrSkippedForMissingUrl || options.useOcr === false };
+  return { draft, canonical, warnings, ocrFailed, ocrSkipped: ocrSkippedForMissingUrl || options.useOcr === false, metrics };
 }
 
 async function runOcrAndScale(

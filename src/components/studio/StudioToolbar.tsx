@@ -4,21 +4,25 @@
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { useFloorPlanStore, useValidationIssues } from "@/lib/store/floorPlanStore";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { useFloorPlanStore, useValidationIssues, useTemporalStore } from "@/lib/store/floorPlanStore";
+import { AlertCircle, CheckCircle, Undo2, Redo2 } from "lucide-react";
 import { toast } from "sonner";
 import { getValidationNotification } from "./validationNotifications";
 import { ReviewBadge } from "./ReviewBadge";
+import { useFeatureFlag } from "@/lib/flags";
 
 interface StudioToolbarProps {
   isTraceMode: boolean;
 }
 
 export function StudioToolbar({ isTraceMode }: StudioToolbarProps) {
-  const validateFloor = useFloorPlanStore((s) => s.validateFloor);
-  const validationIssues = useValidationIssues();
-  const hasIssues = validationIssues.length > 0;
+  const { undo, redo, pastStates, futureStates } = useTemporalStore((state) => state);
+  const canUndo = pastStates.length > 0;
+  const canRedo = futureStates.length > 0;
 
+  const validateFloor = useFloorPlanStore((s) => s.validateFloor);
+  const validationEnabled = useFeatureFlag("validation");
+  const undoRedoEnabled = useFeatureFlag("undoRedo");
   const handleValidate = () => {
     validateFloor();
 
@@ -32,23 +36,60 @@ export function StudioToolbar({ isTraceMode }: StudioToolbarProps) {
     <TooltipProvider delay={200}>
       <div className="flex items-center gap-2">
         {/* Validation button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleValidate}
-              className={hasIssues ? "bg-red-50 border-red-200" : ""}
-            >
-              {hasIssues ? <AlertCircle size={14} className="text-red-600" /> : <CheckCircle size={14} className="text-green-600" />}
-              Validate
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Check floor plan against building code and spatial rules.
-          </TooltipContent>
-        </Tooltip>
+        {validationEnabled && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleValidate}
+                className={hasIssues ? "bg-red-50 border-red-200" : ""}
+              >
+                {hasIssues ? <AlertCircle size={14} className="text-red-600" /> : <CheckCircle size={14} className="text-green-600" />}
+                Validate
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Check floor plan against building code and spatial rules.
+            </TooltipContent>
+          </Tooltip>
+        )}
 
+        {/* Undo button */}
+        {undoRedoEnabled && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={undo}
+                disabled={!canUndo}
+                aria-label="Undo"
+              >
+                <Undo2 size={14} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Undo last change</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Redo button */}
+        {undoRedoEnabled && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={redo}
+                disabled={!canRedo}
+                aria-label="Redo"
+              >
+                <Redo2 size={14} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Redo next change</TooltipContent>
+          </Tooltip>
+        )}
         <ReviewBadge />
 
         {/* Drawing mode help */}

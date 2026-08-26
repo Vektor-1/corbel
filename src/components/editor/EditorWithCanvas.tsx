@@ -11,7 +11,6 @@ import {
   EyeOff,
   Moon,
   PanelRightClose,
-  PanelRightOpen,
   PanelsTopLeft,
   Pointer,
   Redo2,
@@ -21,6 +20,9 @@ import {
   Sun,
   Trash2,
   Undo2,
+  Grid3X3,
+  Ruler,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -34,6 +36,7 @@ import { OBJECT_CATALOG, OBJECT_CATALOG_BY_ID, OBJECT_CATEGORIES } from '@/lib/o
 import { deriveRoomsFromWalls } from '@/lib/geometry/rooms';
 import { useDesignStore } from '@/store/designStore';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useFeatureFlag } from '@/lib/flags';
 import { Canvas2D } from './Canvas2D';
 import { ComparisonPanel } from './ComparisonPanel';
 import { EditorReviewBadge } from './EditorReviewBadge';
@@ -126,6 +129,13 @@ export function EditorWithCanvas() {
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [diffMode, setDiffMode] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+  const [showRoomLabels, setShowRoomLabels] = useState(true);
+  const [showWallDimensions, setShowWallDimensions] = useState(true);
+  const validationEnabled = useFeatureFlag('validation');
+  const undoRedoEnabled = useFeatureFlag('undoRedo');
+  const traceToLearnEnabled = useFeatureFlag('traceToLearn');
+  const threeDPreviewEnabled = useFeatureFlag('threeDPreview');
 
   const {
     floorPlan,
@@ -274,6 +284,9 @@ export function EditorWithCanvas() {
                 ghostOpacity={ghostOpacity}
                 diffMode={diffMode}
                 stageRef={canvasStageRef}
+                showGrid={showGrid}
+                showRoomLabels={showRoomLabels}
+                showWallDimensions={showWallDimensions}
               />
             </div>
           )}
@@ -317,52 +330,103 @@ export function EditorWithCanvas() {
             }}
             spacing={1}
           >
-            {viewOptions.map((option) => (
-              <ToggleGroupItem
-                key={option.value}
-                value={option.value}
-                size="sm"
-                className={cn(
-                  'px-3 text-[11px] font-medium tracking-[0.02em] text-[var(--editor-text-subtle)] hover:bg-[var(--editor-surface-muted)] hover:text-[var(--editor-text)]',
-                  viewMode === option.value &&
-                    'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)] data-pressed:bg-[var(--editor-accent-soft)] data-pressed:text-[var(--editor-accent-text)]'
-                )}
-              >
-                {option.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            {viewOptions
+              .filter((opt) => opt.value === '2d' || threeDPreviewEnabled)
+              .map((option) => (
+                <ToggleGroupItem
+                  key={option.value}
+                  value={option.value}
+                  size="sm"
+                  className={cn(
+                    'px-3 text-[11px] font-medium tracking-[0.02em] text-[var(--editor-text-subtle)] hover:bg-[var(--editor-surface-muted)] hover:text-[var(--editor-text)]',
+                    viewMode === option.value &&
+                      'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)] data-pressed:bg-[var(--editor-accent-soft)] data-pressed:text-[var(--editor-accent-text)]'
+                  )}
+                >
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
         </div>
 
         {/* ── Top right · actions island ── */}
         <div className="editor-island absolute right-4 top-4 flex h-11 items-center gap-1 rounded-xl px-1.5">
+          {undoRedoEnabled && (
+            <>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => (useDesignStore as any).temporal.getState().undo()}
+                    >
+                      <Undo2 />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Undo ⌘Z</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => (useDesignStore as any).temporal.getState().redo()}
+                    >
+                      <Redo2 />
+                    </Button>
+                  }
+                />
+                <TooltipContent>Redo ⇧⌘Z</TooltipContent>
+              </Tooltip>
+            </>
+          )}
+          <Separator orientation="vertical" className="mx-1 !h-4 bg-[var(--editor-border)]" />
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
-                  variant="ghost"
+                  variant={showGrid ? 'secondary' : 'ghost'}
                   size="icon-sm"
-                  onClick={() => (useDesignStore as any).temporal.getState().undo()}
+                  onClick={() => setShowGrid((v) => !v)}
+                  aria-pressed={showGrid}
                 >
-                  <Undo2 />
+                  <Grid3X3 size={13} />
                 </Button>
               }
             />
-            <TooltipContent>Undo ⌘Z</TooltipContent>
+            <TooltipContent>{showGrid ? 'Hide grid' : 'Show grid'}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger
               render={
                 <Button
-                  variant="ghost"
+                  variant={showRoomLabels ? 'secondary' : 'ghost'}
                   size="icon-sm"
-                  onClick={() => (useDesignStore as any).temporal.getState().redo()}
+                  onClick={() => setShowRoomLabels((v) => !v)}
+                  aria-pressed={showRoomLabels}
                 >
-                  <Redo2 />
+                  <Tag size={13} />
                 </Button>
               }
             />
-            <TooltipContent>Redo ⇧⌘Z</TooltipContent>
+            <TooltipContent>{showRoomLabels ? 'Hide room labels' : 'Show room labels'}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant={showWallDimensions ? 'secondary' : 'ghost'}
+                  size="icon-sm"
+                  onClick={() => setShowWallDimensions((v) => !v)}
+                  aria-pressed={showWallDimensions}
+                >
+                  <Ruler size={13} />
+                </Button>
+              }
+            />
+            <TooltipContent>{showWallDimensions ? 'Hide wall dimensions' : 'Show wall dimensions'}</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="mx-1 !h-4 bg-[var(--editor-border)]" />
           <Tooltip>
@@ -394,16 +458,18 @@ export function EditorWithCanvas() {
             <TooltipContent>{inspectorOpen ? 'Hide inspector' : 'Show inspector'}</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="mx-1 !h-4 bg-[var(--editor-border)]" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-[var(--editor-text-muted)]"
-            onClick={() => window.location.assign('/import')}
-          >
-            <ScanLine />
-            Trace
-          </Button>
-          {ghostFloorPlan && (
+          {traceToLearnEnabled && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[var(--editor-text-muted)]"
+              onClick={() => window.location.assign('/import')}
+            >
+              <ScanLine />
+              Trace
+            </Button>
+          )}
+          {traceToLearnEnabled && ghostFloorPlan && (
             <>
               <Separator orientation="vertical" className="mx-1 !h-4 bg-[var(--editor-border)]" />
               <div className="flex items-center gap-1 px-1">
@@ -777,13 +843,13 @@ export function EditorWithCanvas() {
                         </div>
                       </div>
                     </EditorPanel>
-                    <ValidationPanel results={validationResults} hasGeometry={hasGeometry} title="Feedback" />
-                    {hasGeometry && <ComplianceScore score={complianceScore} hasGeometry={hasGeometry} />}
+                    {validationEnabled && <ValidationPanel results={validationResults} hasGeometry={hasGeometry} title="Feedback" />}
+                    {validationEnabled && hasGeometry && <ComplianceScore score={complianceScore} hasGeometry={hasGeometry} />}
                   </>
                 )}
 
                 {hasGeometry && <Statistics floorPlan={floorPlan} />}
-                <ComparisonPanel original={ghostFloorPlan} redesign={floorPlan} />
+                {traceToLearnEnabled && <ComparisonPanel original={ghostFloorPlan} redesign={floorPlan} />}
               </div>
             </ScrollArea>
           </div>
@@ -798,14 +864,18 @@ export function EditorWithCanvas() {
 
         {/* ── Bottom right · scene health ── */}
         <div className="editor-island absolute bottom-4 right-4 flex h-8 items-center gap-3 rounded-full px-3.5 font-mono text-[10px] tabular-nums text-[var(--editor-text-subtle)]">
-          <span className="flex items-center gap-1.5">
-            <span className={cn('h-1.5 w-1.5 rounded-full', errorCount ? 'bg-[var(--editor-danger)]' : 'bg-[var(--editor-border-strong)]')} />
-            {errorCount} err
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className={cn('h-1.5 w-1.5 rounded-full', warningCount ? 'bg-[var(--editor-warning)]' : 'bg-[var(--editor-border-strong)]')} />
-            {warningCount} warn
-          </span>
+          {validationEnabled && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className={cn('h-1.5 w-1.5 rounded-full', errorCount ? 'bg-[var(--editor-danger)]' : 'bg-[var(--editor-border-strong)]')} />
+                {errorCount} err
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className={cn('h-1.5 w-1.5 rounded-full', warningCount ? 'bg-[var(--editor-warning)]' : 'bg-[var(--editor-border-strong)]')} />
+                {warningCount} warn
+              </span>
+            </>
+          )}
           <span>{totalElements} elem</span>
         </div>
       </div>

@@ -22,6 +22,7 @@ import {
   finishRoomDraw,
   cancelRoomDraw,
 } from "../../lib/trace/roomTool";
+import { getFeatureFlag } from "../../lib/flags";
 import { StatusBar } from "./StatusBar";
 import { Canonical } from "../../types/schema";
 import { OPENING_CONFIDENCE_THRESHOLD, WALL_CONFIDENCE_THRESHOLD } from "../../lib/trace/confidence";
@@ -130,6 +131,29 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      const isMac = typeof navigator !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modifier && e.key === "z" && !e.shiftKey && getFeatureFlag("undoRedo")) {
+        e.preventDefault();
+        const storeWithTemporal = useFloorPlanStore as unknown as {
+          temporal: {
+            getState: () => { undo: () => void; redo: () => void };
+          };
+        };
+        storeWithTemporal.temporal.getState().undo();
+        return;
+      }
+      if (((modifier && e.key === "z" && e.shiftKey) || (modifier && e.key === "y")) && getFeatureFlag("undoRedo")) {
+        e.preventDefault();
+        const storeWithTemporal = useFloorPlanStore as unknown as {
+          temporal: {
+            getState: () => { undo: () => void; redo: () => void };
+          };
+        };
+        storeWithTemporal.temporal.getState().redo();
         return;
       }
       if (e.code === "Space") {
@@ -261,7 +285,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     lastPanPoint.current = null;
   };
 
-  const handleWallClick = (wallId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleWallClick = useCallback((wallId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     if (spaceDown) return;
     if (e.evt.button === 2) {
@@ -270,9 +294,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     } else {
       selectElement(wallId, "wall");
     }
-  };
+  }, [spaceDown, deleteWall, validateFloor, selectElement]);
 
-  const handleRoomClick = (roomId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleRoomClick = useCallback((roomId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     if (spaceDown) return;
     if (e.evt.button === 2) {
@@ -281,21 +305,29 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       return;
     }
     selectElement(roomId, "room");
-  };
+  }, [spaceDown, deleteRoom, validateFloor, selectElement]);
 
-  const handleOpeningClick = (openingId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleOpeningClick = useCallback((openingId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     if (spaceDown) return;
     selectElement(openingId, "opening");
-  };
+  }, [spaceDown, selectElement]);
 
-  const handleEndpointDrag = (wallId: string, isStart: boolean, pos: { x: number; y: number }) => {
+  const handleEndpointDrag = useCallback((wallId: string, isStart: boolean, pos: { x: number; y: number }) => {
     const wall = floor.walls.find((w) => w.id === wallId);
     if (!wall) return;
     const snappedPos = { x: snapToGrid(pos.x), y: snapToGrid(pos.y) };
     resizeWall(wallId, isStart ? snappedPos : wall.start, isStart ? wall.end : snappedPos);
     validateFloor();
-  };
+  }, [floor.walls, resizeWall, validateFloor]);
+
+  const setHoveredElementStable = useCallback((elementId: string | null) => {
+    setHoveredElement(elementId);
+  }, [setHoveredElement]);
+
+  const clearHoveredElementStable = useCallback(() => {
+    setHoveredElement(null);
+  }, [setHoveredElement]);
 
   const statusLabel = isPanning || spaceDown
     ? "Pan (Space + drag) — Ctrl+scroll to zoom"
@@ -388,9 +420,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
               room={room}
               isSelected={selection.selectedElementId === room.id}
               isHovered={hoveredElementId === room.id}
-              onClick={(ev) => handleRoomClick(room.id, ev)}
-              onMouseEnter={() => setHoveredElement(room.id)}
-              onMouseLeave={() => setHoveredElement(null)}
+              onClick={handleRoomClick}
+              onMouseEnter={setHoveredElementStable}
+              onMouseLeave={clearHoveredElementStable}
             />
           ))}
 
@@ -402,19 +434,23 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 strokeWidth={WALL_STROKE_WIDTH}
                 dash={wall.confidence < WALL_CONFIDENCE_THRESHOLD ? [8, 4] : undefined}
                 onClick={(ev) => handleWallClick(wall.id, ev)}
-                onMouseEnter={() => setHoveredElement(wall.id)}
-                onMouseLeave={() => setHoveredElement(null)}
+                onMouseEnter={() => setHoveredElementStable(wall.id)}
+                onMouseLeave={clearHoveredElementStable}
                 hitStrokeWidth={10}
               />
               <DraggableEndpoint
                 x={wall.start.x}
                 y={wall.start.y}
-                onDrag={(pos) => handleEndpointDrag(wall.id, true, pos)}
+                wallId={wall.id}
+                isStart={true}
+                onDrag={handleEndpointDrag}
               />
               <DraggableEndpoint
                 x={wall.end.x}
                 y={wall.end.y}
-                onDrag={(pos) => handleEndpointDrag(wall.id, false, pos)}
+                wallId={wall.id}
+                isStart={false}
+                onDrag={handleEndpointDrag}
               />
               {floor.openings
                 .filter((o) => o.hostWallId === wall.id)
@@ -437,8 +473,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                       dash={needsReview ? [4, 2] : undefined}
                       opacity={0.7}
                       onClick={(event) => handleOpeningClick(opening.id, event)}
-                      onMouseEnter={() => setHoveredElement(opening.id)}
-                      onMouseLeave={() => setHoveredElement(null)}
+                      onMouseEnter={() => setHoveredElementStable(opening.id)}
+                      onMouseLeave={clearHoveredElementStable}
                     />
                   );
                 })}
@@ -471,7 +507,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   );
 };
 
-const Grid: React.FC<{ cellSize: number; width: number; height: number }> = ({
+const Grid: React.FC<{ cellSize: number; width: number; height: number }> = React.memo(({
   cellSize,
   width,
   height,
@@ -488,22 +524,26 @@ const Grid: React.FC<{ cellSize: number; width: number; height: number }> = ({
     );
   }
   return <Group listening={false}>{lines}</Group>;
-};
+});
 
 const RoomPolygon: React.FC<{
   room: Canonical.Room;
   isSelected: boolean;
   isHovered: boolean;
-  onClick: (e: Konva.KonvaEventObject<MouseEvent>) => void;
-  onMouseEnter: () => void;
+  onClick: (roomId: string, e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onMouseEnter: (roomId: string) => void;
   onMouseLeave: () => void;
-}> = ({ room, isSelected, isHovered, onClick, onMouseEnter, onMouseLeave }) => {
+}> = React.memo(({ room, isSelected, isHovered, onClick, onMouseEnter, onMouseLeave }) => {
   const points = room.vertices.flatMap((v) => [v.x, v.y]);
   const fill = isSelected ? ROOM_SELECTED_FILL : isHovered ? ROOM_HOVER_FILL : ROOM_DEFAULT_FILL;
   const stroke = isSelected || isHovered ? "#00ff00" : "#999";
 
   return (
-    <Group onMouseDown={onClick} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+    <Group 
+      onMouseDown={(ev) => onClick(room.id, ev)} 
+      onMouseEnter={() => onMouseEnter(room.id)} 
+      onMouseLeave={onMouseLeave}
+    >
       <Line points={points} closed fill={fill} stroke={stroke} strokeWidth={ROOM_STROKE_WIDTH} />
       {room.label && (
         <Text
@@ -516,20 +556,22 @@ const RoomPolygon: React.FC<{
       )}
     </Group>
   );
-};
+});
 
 const DraggableEndpoint: React.FC<{
   x: number;
   y: number;
-  onDrag: (pos: { x: number; y: number }) => void;
-}> = ({ x, y, onDrag }) => (
+  wallId: string;
+  isStart: boolean;
+  onDrag: (wallId: string, isStart: boolean, pos: { x: number; y: number }) => void;
+}> = React.memo(({ x, y, wallId, isStart, onDrag }) => (
   <Circle
     x={x}
     y={y}
     radius={4}
     fill="#666"
     draggable
-    onDragEnd={(e) => onDrag({ x: e.target.x(), y: e.target.y() })}
+    onDragEnd={(e) => onDrag(wallId, isStart, { x: e.target.x(), y: e.target.y() })}
     hitStrokeWidth={8}
   />
-);
+));

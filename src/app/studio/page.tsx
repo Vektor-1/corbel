@@ -1,8 +1,9 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, MessageSquare } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { CanvasEditor } from '@/components/2d/CanvasEditor';
@@ -26,6 +27,7 @@ function StudioContent() {
   const router = useRouter();
   const params = useSearchParams();
   const isTraceMode = params.get('mode') === 'trace';
+  const hasLoadedFixture = useRef(false);
 
   const floor = useCurrentFloor();
   const selection = useSelection();
@@ -36,6 +38,9 @@ function StudioContent() {
   const library = useFloorPlanStore((s) => s.library);
   const validationIssues = useFloorPlanStore((s) => s.validationIssues);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [imageBaseline, setImageBaseline] = useState<ImageBaseline | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('split');
 
@@ -54,7 +59,8 @@ function StudioContent() {
   }, [floor, library, loadFloor, params]);
 
   useEffect(() => {
-    if (floor) return;
+    if (hasLoadedFixture.current || floor) return;
+    hasLoadedFixture.current = true;
     loadFloor(createTraceFixtureFloor(), traceFixtureLibrary);
   }, [floor, loadFloor]);
 
@@ -70,7 +76,7 @@ function StudioContent() {
 
 
   return (
-    <main className="flex h-screen flex-col bg-[#f2efe7] text-[#26221a]">
+    <main className="corbel-editor flex h-screen flex-col bg-[#f2efe7] text-[#26221a]" suppressHydrationWarning>
       <div className="flex items-center justify-between border-b border-[#d7d0c2] bg-white/80 px-4 py-2">
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => router.push('/upload')}>
@@ -78,6 +84,9 @@ function StudioContent() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
             <Download size={14} /> Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsFeedbackOpen(true)}>
+            <MessageSquare size={14} /> Feedback
           </Button>
           <div className="flex items-center rounded-md border border-[#d7d0c2] p-0.5" aria-label="Viewport mode">
             {(['2d', '3d', 'split'] as const).map((mode) => (
@@ -112,7 +121,59 @@ function StudioContent() {
         onOpenChange={setIsExportModalOpen}
         open={isExportModalOpen}
       />
-      <div className="flex flex-1 overflow-hidden">
+      {isFeedbackOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-lg border border-[#d7d0c2] bg-white p-5 shadow-lg text-sm">
+            <h3 className="text-base font-semibold mb-2 text-[#26221a]">Send Beta Feedback</h3>
+            <p className="text-xs text-[#6f685b] mb-4">
+              Help us improve Corbel. Did the AI miss a door, or is a rule wrong?
+            </p>
+            <textarea
+              className="w-full min-h-[100px] p-2 border border-[#d7d0c2] rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-[#8a6b3f] mb-4 resize-none text-[#26221a]"
+              placeholder="Describe your feedback or issue..."
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              disabled={feedbackSubmitting}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsFeedbackOpen(false);
+                  setFeedbackText("");
+                }}
+                disabled={feedbackSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (!feedbackText.trim()) return;
+                  setFeedbackSubmitting(true);
+                  // Telemetry Hook
+                  console.log("[TELEMETRY] user_feedback_submitted", {
+                    floorId: floor?.id,
+                    feedback: feedbackText.trim(),
+                    timestamp: new Date().toISOString(),
+                  });
+                  // Simulate net delay/send
+                  await new Promise((resolve) => setTimeout(resolve, 600));
+                  setFeedbackSubmitting(false);
+                  setIsFeedbackOpen(false);
+                  setFeedbackText("");
+                  toast.success("Thank you for your feedback!");
+                }}
+                disabled={!feedbackText.trim() || feedbackSubmitting}
+              >
+                {feedbackSubmitting ? "Sending..." : "Submit"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden" suppressHydrationWarning>
         {viewMode !== '3d' && (
           <div className="flex min-w-0 flex-1 overflow-hidden border-r border-[#d7d0c2]">
             <div className="min-w-0 flex-1 overflow-hidden">

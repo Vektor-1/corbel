@@ -7,6 +7,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useFloorPlanStore } from "@/lib/store/floorPlanStore";
+import { ComparisonPanel } from "../editor/ComparisonPanel";
+import { canonicalToLegacyFloorPlan } from "@/lib/utils/ghostClone";
 
 const ROOM_TYPES = [
   "Bedroom",
@@ -35,6 +37,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   const setRoomLabel = useFloorPlanStore((s) => s.setRoomLabel);
   const setRoomTypeStore = useFloorPlanStore((s) => s.setRoomType);
 
+  const currentFloor = useFloorPlanStore((s) => s.currentFloor);
+  const ghostFloor = useFloorPlanStore((s) => s.ghostFloor);
+
+  const originalLegacy = ghostFloor ? canonicalToLegacyFloorPlan(ghostFloor, library) : null;
+  const redesignLegacy = currentFloor ? canonicalToLegacyFloorPlan(currentFloor, library) : null;
   const room = selectedElementKind === "room" && selectedElementId ? getRoom(selectedElementId) : undefined;
   const wall = selectedElementKind === "wall" && selectedElementId ? getWall(selectedElementId) : undefined;
 
@@ -69,7 +76,11 @@ export const RightPanel: React.FC<RightPanelProps> = ({
       <h2 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 600 }}>Properties</h2>
 
       {!selectedElementId || !selectedElementKind ? (
-        <p style={{ color: "#6f685b", margin: 0 }}>Select a room or wall.</p>
+        ghostFloor ? (
+          <ComparisonPanel original={originalLegacy} redesign={redesignLegacy} />
+        ) : (
+          <p style={{ color: "#6f685b", margin: 0 }}>Select a room or wall.</p>
+        )
       ) : null}
 
       {room && selectedElementId ? (

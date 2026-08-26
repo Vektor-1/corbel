@@ -11,6 +11,7 @@ import { enableMapSet } from "immer";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { useShallow } from "zustand/react/shallow";
+import { temporal, type TemporalState } from "zundo";
 import { Canonical, Source } from "../../types/schema";
 import { cloneFloorAsGhost, compareFloorToGhost } from "../utils/ghostClone";
 import { validateCanonicalFloor } from "../standards/canonicalValidation";
@@ -199,8 +200,9 @@ const INITIAL_STATE: Omit<
 // ============================================================================
 
 export const useFloorPlanStore = create<FloorPlanStoreState>()(
-  immer((set, get) => ({
-    ...INITIAL_STATE,
+  temporal(
+    immer((set, get) => ({
+      ...INITIAL_STATE,
 
     // ========================================================================
     // LOAD / FREEZE
@@ -531,7 +533,7 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
     getTraceComparison: () => {
       const state = get();
       if (!state.currentFloor || !state.ghostFloor) return null;
-      return compareFloorToGhost(state.currentFloor, state.ghostFloor);
+      return compareFloorToGhost(state.currentFloor, state.ghostFloor, state.library);
     },
 
     getSelectedRoomProperties: () => {
@@ -571,7 +573,14 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         lengthM: lengthMm / 1000,
       };
     },
-  }))
+    })),
+    {
+      limit: 30,
+      partialize: (state) => ({
+        currentFloor: state.currentFloor,
+      }),
+    }
+  )
 );
 
 // ============================================================================
@@ -607,3 +616,18 @@ export const useTraceMode = () =>
     ghostOpacity: state.ghostOpacity,
     isTraceMode: state.ghostFloor !== null,
   })));
+
+/** Hook to access the zundo temporal store. */
+export const useTemporalStore = <T>(
+  selector: (state: TemporalState<{ currentFloor: Canonical.Floor | null }>) => T,
+  equalityFn?: (a: T, b: T) => boolean
+) => {
+  // Cast useFloorPlanStore to access the temporal property added by zundo middleware.
+  const storeWithTemporal = useFloorPlanStore as unknown as {
+    temporal: (
+      selector: (state: TemporalState<{ currentFloor: Canonical.Floor | null }>) => T,
+      equalityFn?: (a: T, b: T) => boolean
+    ) => T;
+  };
+  return storeWithTemporal.temporal(selector, equalityFn);
+};

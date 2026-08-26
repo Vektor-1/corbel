@@ -24,7 +24,7 @@ export function validateWallThickness(
 ): Canonical.ValidationResult | null {
   if (!wallType.loadBearing) return null;
 
-  const material = wallType.id.split("-")[0] || "sandcrete";
+  const material = wallType.material || wallType.id.split("-")[0] || "sandcrete";
   const requirements = wallThicknessRequirements[material as keyof typeof wallThicknessRequirements];
 
   if (!requirements) {

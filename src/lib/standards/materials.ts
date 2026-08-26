@@ -84,7 +84,9 @@ export const wallThicknessRequirements = {
       minimum: 75, // mm
     },
   },
-};
+} as const;
+
+export type MaterialKey = keyof typeof wallThicknessRequirements;
 
 // Common residential dimensions (Ghana context)
 export const standardDimensions = {

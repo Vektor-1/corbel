@@ -2,9 +2,9 @@
 
 import { useDesignStore } from '@/store/designStore';
 import { Stage, Layer, Rect, Line, Circle, Text, Group, Arc } from 'react-konva';
-import { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import type Konva from 'konva';
-import type React from 'react';
+import { useFeatureFlag } from '@/lib/flags';
 import type { Vector2d } from 'konva/lib/types';
 import { computeWallFootprints, wallQuad, MM_PER_PX } from '@/lib/geometry/wall-joints';
 import { pointAlongWall } from '@/lib/geometry/wall-intersections';
@@ -27,9 +27,12 @@ interface Canvas2DProps {
   ghostOpacity?: number;
   diffMode?: boolean;
   stageRef?: React.RefObject<Konva.Stage | null>;
+  showGrid?: boolean;
+  showRoomLabels?: boolean;
+  showWallDimensions?: boolean;
 }
 
-export function Canvas2D({
+export const Canvas2D = React.memo(function Canvas2D({
   defaultWallMaterial,
   defaultWallThickness,
   defaultWallHeight,
@@ -40,6 +43,9 @@ export function Canvas2D({
   ghostOpacity = 0.25,
   diffMode = false,
   stageRef: externalStageRef,
+  showGrid = true,
+  showRoomLabels = true,
+  showWallDimensions = true,
 }: Canvas2DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const internalStageRef = useRef<Konva.Stage>(null);
@@ -95,7 +101,7 @@ export function Canvas2D({
     deleteObject,
     setSelectedElement,
   } = useDesignStore();
-
+  const traceToLearnEnabled = useFeatureFlag('traceToLearn');
   const walls = floorPlan?.walls;
   const footprints = useMemo(() => computeWallFootprints(walls ?? []), [walls]);
 
@@ -359,28 +365,32 @@ export function Canvas2D({
           stroke={isSelected ? palette.roomSelected : undefined}
           strokeWidth={isSelected ? 2 : 0}
         />
-        <Text
-          x={centroid.x - 55}
-          y={centroid.y - 14}
-          width={110}
-          align="center"
-          text={room.name}
-          fontSize={11}
-          fontStyle="bold"
-          fill={palette.label}
-          listening={false}
-        />
-        <Text
-          x={centroid.x - 55}
-          y={centroid.y + 2}
-          width={110}
-          align="center"
-          text={`${room.area.toFixed(2)} m²`}
-          fontSize={10}
-          fontFamily="ui-monospace, monospace"
-          fill={palette.label}
-          listening={false}
-        />
+        {showRoomLabels && (
+          <>
+            <Text
+              x={centroid.x - 55}
+              y={centroid.y - 14}
+              width={110}
+              align="center"
+              text={room.name}
+              fontSize={11}
+              fontStyle="bold"
+              fill={palette.label}
+              listening={false}
+            />
+            <Text
+              x={centroid.x - 55}
+              y={centroid.y + 2}
+              width={110}
+              align="center"
+              text={`${room.area.toFixed(2)} m²`}
+              fontSize={10}
+              fontFamily="ui-monospace, monospace"
+              fill={palette.label}
+              listening={false}
+            />
+          </>
+        )}
       </Group>
     );
   });
@@ -462,15 +472,17 @@ export function Canvas2D({
         />
         <Circle x={wall.startPoint.x} y={wall.startPoint.y} radius={2.5} fill={palette.handle} opacity={0.9} />
         <Circle x={wall.endPoint.x} y={wall.endPoint.y} radius={2.5} fill={palette.handle} opacity={0.9} />
-        <Text
-          x={centerX - 28}
-          y={centerY - 18}
-          text={`${wallLengthMm} mm`}
-          fontSize={10}
-          fontFamily="ui-monospace, monospace"
-          fill={isSelected ? palette.handle : palette.label}
-          opacity={0.9}
-        />
+        {showWallDimensions && (
+          <Text
+            x={centerX - 28}
+            y={centerY - 18}
+            text={`${wallLengthMm} mm`}
+            fontSize={10}
+            fontFamily="ui-monospace, monospace"
+            fill={isSelected ? palette.handle : palette.label}
+            opacity={0.9}
+          />
+        )}
       </Group>
     );
   });
@@ -633,10 +645,10 @@ export function Canvas2D({
       >
         <Layer>
           <Rect x={0} y={0} width={canvasSize.width} height={canvasSize.height} fill={palette.canvas} />
-          {gridLines}
+          {showGrid && gridLines}
 
           {/* Ghost layer — original imported plan as tracing-paper underlay */}
-          {ghostFloorPlan && ghostOpacity > 0 && (
+          {traceToLearnEnabled && ghostFloorPlan && ghostOpacity > 0 && (
             <>
               {ghostFloorPlan.rooms.map((room) => (
                 <Line
@@ -738,4 +750,4 @@ export function Canvas2D({
       )}
     </div>
   );
-}
+});

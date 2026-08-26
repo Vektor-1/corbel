@@ -35,7 +35,7 @@ describe("room drawing tool", () => {
       height: 2000,
     });
 
-    updateRoomDraw(2_149, 2_151);
+    updateRoomDraw(2_149, 2_051);
     finishRoomDraw();
 
     const state = useFloorPlanStore.getState();
@@ -60,7 +60,7 @@ describe("room drawing tool", () => {
 
   it("clears an undersized preview without adding a room", () => {
     startRoomDraw(0, 0);
-    updateRoomDraw(1_999, 2_000);
+    updateRoomDraw(1_899, 2_000);
     finishRoomDraw();
 
     const state = useFloorPlanStore.getState();

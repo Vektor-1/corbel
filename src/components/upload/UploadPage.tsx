@@ -41,6 +41,7 @@ import {
   type StageProgress,
 } from '@/lib/services/importPipeline';
 import { liftFloorPlan } from '@/lib/refinement/lift';
+import { useFeatureFlag } from '@/lib/flags';
 import { validateUploadFile } from '@/lib/uploads/uploadPolicy';
 import {
   notifyAcceptance,
@@ -91,6 +92,7 @@ export default function UploadPage() {
   const loadFloor = useFloorPlanStore((s) => s.loadFloor);
   const freezeAsGhost = useFloorPlanStore((s) => s.freezeAsGhost);
   const library = useFloorPlanStore((s) => s.library);
+  const traceToLearnEnabled = useFeatureFlag('traceToLearn');
 
   const [mode, setMode] = useState<Mode>('reconstruct');
   const [file, setFile] = useState<File | null>(null);
@@ -300,25 +302,28 @@ export default function UploadPage() {
               { id: 'reconstruct' as const, label: 'Reconstruct', icon: Sparkles, desc: 'Turn a hand-drawn or printed plan into an editable model.' },
               { id: 'trace' as const, label: 'Trace-to-Learn', icon: TraceIcon, desc: 'Import a reference plan, freeze it, then redesign against it.' },
             ]
-          ).map(({ id, label, icon: Icon, desc }) => (
-            <button
-              key={id}
-              type="button"
-              disabled={phase === 'processing' || phase === 'uploading'}
-              onClick={() => setMode(id)}
-              className={`flex-1 rounded-2xl border px-5 py-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                mode === id
-                  ? 'border-[#8a6b3f] bg-white shadow-sm'
-                  : 'border-[#d7d0c2] bg-white/50 hover:bg-white/80'
-              }`}
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Icon size={16} className={mode === id ? 'text-[#8a6b3f]' : 'text-[#a39a89]'} />
-                {label}
-              </div>
-              <p className="mt-1 text-xs text-[#817969]">{desc}</p>
-            </button>
-          ))}
+          ).map(({ id, label, icon: Icon, desc }) => {
+            if (id === 'trace' && !traceToLearnEnabled) return null;
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={phase === 'processing' || phase === 'uploading'}
+                onClick={() => setMode(id)}
+                className={`flex-1 rounded-2xl border px-5 py-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  mode === id
+                    ? 'border-[#8a6b3f] bg-white shadow-sm'
+                    : 'border-[#d7d0c2] bg-white/50 hover:bg-white/80'
+                }`}
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Icon size={16} className={mode === id ? 'text-[#8a6b3f]' : 'text-[#a39a89]'} />
+                  {label}
+                </div>
+                <p className="mt-1 text-xs text-[#817969]">{desc}</p>
+              </button>
+            );
+          })}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
