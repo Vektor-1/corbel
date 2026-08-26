@@ -15,6 +15,9 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useDesignStore } from '@/store/designStore';
+import { useFloorPlanStore } from '@/store/floorPlanStore';
+import { useValidation } from '@/hooks/useValidation';
+import { ValidationPanel } from './ValidationPanel';
 
 // Mock compliance visualization component
 const ComplianceScore = ({ score }: { score: number }) => {
@@ -119,12 +122,13 @@ export default function EditorLayout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
-  // Mock data for compliance score and statistics
-  const complianceScore = 78;
-  const errorCount = validationResults.filter((r) => r.type === 'error').length;
-  const warningCount = validationResults.filter((r) => r.type === 'warning').length;
-  const infoCount = validationResults.filter((r) => r.type === 'info').length;
+  const validation = useValidation();
+  const { currentFloor, library } = useFloorPlanStore((state) => ({
+    currentFloor: state.currentFloor,
+    library: state.library,
+  }));
 
   const wallCount = floorPlan?.walls.length || 0;
   const roomCount = floorPlan?.rooms.length || 0;
@@ -329,63 +333,14 @@ export default function EditorLayout() {
               </button>
             </div>
 
-            {/* Compliance Score */}
-            <div className="p-6 border-b border-slate-700 flex flex-col items-center">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
-                Compliance Score
-              </h3>
-              <ComplianceScore score={complianceScore} />
-              <p className="text-xs text-slate-400 mt-4 text-center">
-                Design meets {complianceScore}% of Ghana Building Code standards
-              </p>
-            </div>
-
-            {/* Validation Results */}
-            <div className="p-4 border-b border-slate-700 space-y-3 flex-1 overflow-y-auto">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Issues ({errorCount + warningCount})
-              </h3>
-
-              {/* Summary Badges */}
-              <div className="flex gap-2">
-                {errorCount > 0 && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded bg-red-900/30 border border-red-800">
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    <span className="text-xs text-red-400">{errorCount} Error{errorCount !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-                {warningCount > 0 && (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded bg-yellow-900/30 border border-yellow-800">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                    <span className="text-xs text-yellow-400">{warningCount} Warning{warningCount !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Validation Messages */}
-              {validationResults.length > 0 ? (
-                <div className="space-y-2">
-                  {validationResults.slice(0, 5).map((result) => (
-                    <div
-                      key={result.id}
-                      className={`p-3 rounded text-xs border ${
-                        result.type === 'error'
-                          ? 'bg-red-900/20 border-red-800 text-red-300'
-                          : result.type === 'warning'
-                          ? 'bg-yellow-900/20 border-yellow-800 text-yellow-300'
-                          : 'bg-blue-900/20 border-blue-800 text-blue-300'
-                      }`}
-                    >
-                      <div className="font-semibold">{result.rule}</div>
-                      <div className="mt-1">{result.message}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-8 text-center">
-                  <div className="text-xs text-slate-400">No issues found</div>
-                </div>
-              )}
+            {/* Validation Panel */}
+            <div className="p-4 border-b border-slate-700 flex-1 overflow-y-auto">
+              <ValidationPanel
+                floor={currentFloor}
+                library={library}
+                selectedElementId={selectedElementId}
+                onSelectElement={(elementId) => setSelectedElementId(elementId)}
+              />
             </div>
 
             {/* Statistics */}
@@ -396,19 +351,19 @@ export default function EditorLayout() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-slate-700/50 p-3 rounded">
                   <div className="text-slate-400">Walls</div>
-                  <div className="text-lg font-bold text-blue-400">{wallCount}</div>
+                  <div className="text-lg font-bold text-blue-400">{currentFloor?.walls.length || 0}</div>
                 </div>
                 <div className="bg-slate-700/50 p-3 rounded">
                   <div className="text-slate-400">Rooms</div>
-                  <div className="text-lg font-bold text-blue-400">{roomCount}</div>
+                  <div className="text-lg font-bold text-blue-400">{currentFloor?.rooms.length || 0}</div>
                 </div>
                 <div className="bg-slate-700/50 p-3 rounded">
                   <div className="text-slate-400">Doors</div>
-                  <div className="text-lg font-bold text-blue-400">{doorCount}</div>
+                  <div className="text-lg font-bold text-blue-400">{currentFloor?.openings.filter((o) => o.kind === 'door').length || 0}</div>
                 </div>
                 <div className="bg-slate-700/50 p-3 rounded">
                   <div className="text-slate-400">Windows</div>
-                  <div className="text-lg font-bold text-blue-400">{windowCount}</div>
+                  <div className="text-lg font-bold text-blue-400">{currentFloor?.openings.filter((o) => o.kind === 'window').length || 0}</div>
                 </div>
               </div>
             </div>
