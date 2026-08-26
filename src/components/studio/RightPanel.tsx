@@ -9,6 +9,7 @@ import React, { useEffect, useState } from "react";
 import { useFloorPlanStore } from "@/lib/store/floorPlanStore";
 import { ComparisonPanel } from "../editor/ComparisonPanel";
 import { LayerTogglePanel } from "./LayerTogglePanel";
+import { AnnotationPanel } from "./AnnotationPanel";
 import { canonicalToLegacyFloorPlan } from "@/lib/utils/ghostClone";
 
 const ROOM_TYPES = [
@@ -78,6 +79,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 
       <div style={{ marginBottom: 16 }}>
         <LayerTogglePanel />
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <AnnotationPanel annotations={[]} />
       </div>
 
       {!selectedElementId || !selectedElementKind ? (
