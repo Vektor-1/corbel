@@ -17,6 +17,7 @@ import {
 import { useDesignStore } from '@/store/designStore';
 import { useFloorPlanStore } from '@/store/floorPlanStore';
 import { useValidation } from '@/hooks/useValidation';
+import { useValidationToasts } from '@/hooks/useValidationToasts';
 import { ValidationPanel } from './ValidationPanel';
 
 // Mock compliance visualization component
@@ -124,6 +125,7 @@ export default function EditorLayout() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
+  useValidationToasts(true);
   const validation = useValidation();
   const { currentFloor, library } = useFloorPlanStore((state) => ({
     currentFloor: state.currentFloor,
