@@ -14,10 +14,15 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
-import { useFloorPlanStore } from '@/store/floorPlanStore';
+import { useFloorPlanStore } from '@/lib/store/floorPlanStore';
+import { Canonical } from '@/types/schema';
 import { useValidation } from '@/hooks/useValidation';
 import { useValidationToasts } from '@/hooks/useValidationToasts';
 import { EditorRightPanel } from './EditorRightPanel';
+import { ImageUploadForm } from './ImageUploadForm';
+import { CanonicalRenderer } from '../canvas/CanonicalRenderer';
+import { ThreeDEditor } from '../canvas/ThreeDEditor';
+import { convert2DTo3D } from '@/lib/conversion/2d-3d-sync';
 
 // Mock compliance visualization component
 const ComplianceScore = ({ score }: { score: number }) => {
@@ -121,6 +126,9 @@ export default function EditorLayout() {
     ghostFloor,
     selectedElementId,
     selectElement,
+    moveWall,
+    resizeWall,
+    moveOpening,
   } = useFloorPlanStore((state) => ({
     currentTool: state.currentTool,
     setCurrentTool: state.setCurrentTool,
@@ -131,13 +139,42 @@ export default function EditorLayout() {
     ghostFloor: state.ghostFloor,
     selectedElementId: state.selectedElementId,
     selectElement: state.selectElement,
+    moveWall: state.moveWall,
+    resizeWall: state.resizeWall,
+    moveOpening: state.moveOpening,
   }));
+
+  // Cast currentFloor to include name as it is set dynamically in the project metadata
+  const floorWithMetadata = currentFloor as (Canonical.Floor & { name?: string }) | null;
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
 
   useValidationToasts(true);
   const validation = useValidation();
+
+  // Handle 3D element updates from ThreeDEditor
+  const handleElementSelect = (elementId: string, type: 'wall' | 'room' | 'opening') => {
+    selectElement(elementId, type);
+  };
+
+  const handleElementUpdate = (elementId: string, newGeometry: any) => {
+    const wall = currentFloor?.walls.find((w) => w.id === elementId);
+    const opening = currentFloor?.openings.find((o) => o.id === elementId);
+
+    if (wall && newGeometry.start && newGeometry.end) {
+      // Wall position/resize update
+      resizeWall(elementId, newGeometry.start, newGeometry.end);
+    } else if (wall && newGeometry.position) {
+      // Wall move via position delta
+      const dx = newGeometry.position.x - (wall.start.x + wall.end.x) / 2;
+      const dy = newGeometry.position.y - (wall.start.y + wall.end.y) / 2;
+      moveWall(elementId, { x: dx, y: dy });
+    } else if (opening && newGeometry.positionAlongWall) {
+      // Opening position update
+      moveOpening(elementId, newGeometry.positionAlongWall);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-50">
@@ -147,6 +184,18 @@ export default function EditorLayout() {
           sidebarOpen ? 'w-80' : 'w-0'
         } bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-300 overflow-hidden`}
       >
+        {/* Import Section */}
+        <div className="p-4 border-b border-slate-700">
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
+            Import
+          </h3>
+          <ImageUploadForm
+            onImportComplete={(result) => {
+              console.log('Floor plan imported:', result);
+            }}
+          />
+        </div>
+
         {/* Tools Section */}
         <div className="p-4 space-y-2 flex-1 overflow-y-auto">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
@@ -255,7 +304,7 @@ export default function EditorLayout() {
             <div className="flex flex-col">
               <span className="text-xs text-slate-400">Project</span>
               <span className="text-sm font-semibold text-white">
-                {currentFloor?.name || 'Untitled Floor Plan'}
+                {floorWithMetadata?.name || 'Untitled Floor Plan'}
               </span>
             </div>
           </div>
@@ -279,40 +328,45 @@ export default function EditorLayout() {
         {/* Canvas Area */}
         <div className="flex-1 flex">
           {/* 2D/3D Canvas */}
-          <div className="flex-1 bg-slate-900 relative overflow-hidden">
-            {/* Placeholder for Konva 2D or R3F 3D */}
-            <div className="w-full h-full flex items-center justify-center">
-              {viewMode === '2d' && (
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-slate-300 mb-2">
-                    2D Canvas (Konva)
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Selected tool: <span className="font-mono text-blue-400">{currentTool}</span>
-                  </div>
+          <div className="flex-1 bg-slate-900 relative overflow-hidden flex">
+            {(viewMode === '2d' || viewMode === 'split') && (
+              <div className="flex-1 relative">
+                <CanonicalRenderer
+                  floor={currentFloor}
+                  library={library}
+                  ghostFloor={ghostFloor}
+                  width={viewMode === 'split' ? window.innerWidth / 2 - 500 : window.innerWidth - 740}
+                  height={window.innerHeight - 80}
+                />
+                <div className="absolute top-4 left-4 text-xs text-slate-400">
+                  Tool: <span className="font-mono text-blue-400">{currentTool}</span>
                 </div>
-              )}
-              {viewMode === '3d' && (
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-slate-300 mb-2">
-                    3D Canvas (React Three Fiber)
+              </div>
+            )}
+
+            {(viewMode === '3d' || viewMode === 'split') && (
+              <div className={`${viewMode === 'split' ? 'flex-1' : 'w-full'} bg-slate-900 relative`}>
+                {currentFloor ? (
+                  <ThreeDEditor
+                    floor3D={convert2DTo3D(currentFloor)}
+                    onElementSelect={handleElementSelect}
+                    onElementUpdate={handleElementUpdate}
+                    editMode={currentTool !== 'select'}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-slate-300 mb-2">
+                        3D Visualization
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Import or create a floor plan to see 3D model
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500">
-                    Ready for 3D visualization
-                  </div>
-                </div>
-              )}
-              {viewMode === 'split' && (
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-slate-300 mb-2">
-                    Split View (2D + 3D)
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Left: 2D Canvas | Right: 3D Canvas
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Vertical Divider for Split View */}

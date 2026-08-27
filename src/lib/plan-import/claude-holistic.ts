@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ImportSource, ReconstructionResultV1, RawWall, RawOpening, RawLabel } from './types';
-import { extractJson, submitPipelineJob, getPipelineJob, type AskFn } from './pipeline';
+import type { ImportSource, ReconstructionResultV1 } from './types';
+import { extractJson, submitPipelineJob, getPipelineJob, type AskFn, type RawWall, type RawOpening, type RawLabel } from './pipeline';
 
 function client() {
   const key = process.env.ANTHROPIC_API_KEY;

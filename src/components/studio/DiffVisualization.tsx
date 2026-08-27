@@ -127,3 +127,40 @@ function MetricRow({ metric }: MetricRowProps) {
     </div>
   );
 }
+
+interface MatchRowProps {
+  match: ElementMatch;
+  type: 'wall' | 'room' | 'opening';
+}
+
+function MatchRow({ match, type }: MatchRowProps) {
+  const statusColors = {
+    added: 'text-green-400 bg-green-900/10 border-green-800/30',
+    removed: 'text-red-400 bg-red-900/10 border-red-800/30',
+    moved: 'text-amber-400 bg-amber-900/10 border-amber-800/30',
+    resized: 'text-blue-400 bg-blue-900/10 border-blue-800/30',
+    unchanged: 'text-slate-400 bg-slate-800/20 border-slate-700/20',
+  };
+
+  const statusIcons = {
+    added: <Plus className="w-3.5 h-3.5" />,
+    removed: <Minus className="w-3.5 h-3.5" />,
+    moved: <ArrowRight className="w-3.5 h-3.5" />,
+    resized: <ArrowRight className="w-3.5 h-3.5" />,
+    unchanged: <CheckCircle2 className="w-3.5 h-3.5" />,
+  };
+
+  const idString = match.redesignId 
+    ? `${type === 'wall' ? 'Wall' : 'Room'} ${match.redesignId.slice(0, 6)}`
+    : `${type === 'wall' ? 'Wall' : 'Room'} ${match.originalId?.slice(0, 6) || ''}`;
+
+  return (
+    <div className={`flex justify-between items-center px-2 py-1 rounded border text-xs ${statusColors[match.status]}`}>
+      <span className="font-mono">{idString}</span>
+      <div className="flex items-center gap-1.5">
+        {statusIcons[match.status]}
+        <span className="capitalize text-[10px] font-semibold">{match.status}</span>
+      </div>
+    </div>
+  );
+}

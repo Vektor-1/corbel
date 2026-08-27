@@ -11,6 +11,7 @@ import {
   EyeOff,
   Moon,
   PanelRightClose,
+  PanelRightOpen,
   PanelsTopLeft,
   Pointer,
   Redo2,
@@ -346,6 +347,7 @@ export function EditorWithCanvas() {
                   {option.label}
                 </ToggleGroupItem>
               ))}
+          </ToggleGroup>
         </div>
 
         {/* ── Top right · actions island ── */}

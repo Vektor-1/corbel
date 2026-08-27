@@ -1,0 +1,969 @@
+{
+  "testCount": 30,
+  "images": [
+    "high_quality_architectural_1041.png",
+    "high_quality_architectural_1116.png",
+    "high_quality_architectural_1141.png",
+    "high_quality_architectural_1165.png",
+    "high_quality_architectural_1191.png",
+    "high_quality_architectural_1217.png",
+    "high_quality_architectural_1228.png",
+    "high_quality_architectural_123.png",
+    "high_quality_architectural_1235.png",
+    "high_quality_architectural_1242.png",
+    "high_quality_architectural_1264.png",
+    "high_quality_architectural_1279.png",
+    "high_quality_architectural_1284.png",
+    "high_quality_architectural_1285.png",
+    "high_quality_architectural_1293.png",
+    "high_quality_architectural_1319.png",
+    "high_quality_architectural_1339.png",
+    "high_quality_architectural_141.png",
+    "high_quality_architectural_1432.png",
+    "high_quality_architectural_1444.png",
+    "high_quality_architectural_145.png",
+    "high_quality_architectural_1511.png",
+    "high_quality_architectural_1551.png",
+    "high_quality_architectural_1590.png",
+    "high_quality_architectural_1599.png",
+    "high_quality_architectural_1601.png",
+    "high_quality_architectural_1622.png",
+    "high_quality_architectural_1636.png",
+    "high_quality_architectural_165.png",
+    "high_quality_architectural_1652.png"
+  ],
+  "results": [
+    {
+      "image": "high_quality_architectural_1041.png",
+      "models": {
+        "haiku": {
+          "walls": 16,
+          "rooms": 5,
+          "openings": 19,
+          "accuracy": 91.3
+        },
+        "gpt56": {
+          "walls": 16,
+          "rooms": 5,
+          "openings": 20,
+          "accuracy": 92.9
+        },
+        "gpt55": {
+          "walls": 15,
+          "rooms": 5,
+          "openings": 19,
+          "accuracy": 89.2
+        },
+        "gemini": {
+          "walls": 16,
+          "rooms": 5,
+          "openings": 20,
+          "accuracy": 92.9
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1116.png",
+      "models": {
+        "haiku": {
+          "walls": 13,
+          "rooms": 9,
+          "openings": 15,
+          "accuracy": 92.7
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 9,
+          "openings": 15,
+          "accuracy": 90.2
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 8,
+          "openings": 16,
+          "accuracy": 91.4
+        },
+        "gemini": {
+          "walls": 13,
+          "rooms": 9,
+          "openings": 16,
+          "accuracy": 94.7
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1141.png",
+      "models": {
+        "haiku": {
+          "walls": 12,
+          "rooms": 7,
+          "openings": 17,
+          "accuracy": 94
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 7,
+          "openings": 17,
+          "accuracy": 94
+        },
+        "gpt55": {
+          "walls": 12,
+          "rooms": 7,
+          "openings": 17,
+          "accuracy": 94
+        },
+        "gemini": {
+          "walls": 11,
+          "rooms": 7,
+          "openings": 17,
+          "accuracy": 91.2
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1165.png",
+      "models": {
+        "haiku": {
+          "walls": 11,
+          "rooms": 6,
+          "openings": 19,
+          "accuracy": 89.3
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 20,
+          "accuracy": 93.7
+        },
+        "gpt55": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 20,
+          "accuracy": 93.7
+        },
+        "gemini": {
+          "walls": 11,
+          "rooms": 6,
+          "openings": 20,
+          "accuracy": 90.9
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1191.png",
+      "models": {
+        "haiku": {
+          "walls": 11,
+          "rooms": 4,
+          "openings": 17,
+          "accuracy": 88.7
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 4,
+          "openings": 17,
+          "accuracy": 91.5
+        },
+        "gpt55": {
+          "walls": 11,
+          "rooms": 4,
+          "openings": 17,
+          "accuracy": 88.7
+        },
+        "gemini": {
+          "walls": 11,
+          "rooms": 4,
+          "openings": 16,
+          "accuracy": 86.9
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1217.png",
+      "models": {
+        "haiku": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 16,
+          "accuracy": 88.9
+        },
+        "gpt56": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 16,
+          "accuracy": 88.9
+        },
+        "gpt55": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 16,
+          "accuracy": 88.9
+        },
+        "gemini": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 16,
+          "accuracy": 88.9
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1228.png",
+      "models": {
+        "haiku": {
+          "walls": 14,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 94.2
+        },
+        "gpt56": {
+          "walls": 13,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 91.8
+        },
+        "gpt55": {
+          "walls": 14,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 94.2
+        },
+        "gemini": {
+          "walls": 14,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 94.2
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_123.png",
+      "models": {
+        "haiku": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 19,
+          "accuracy": 93.6
+        },
+        "gpt56": {
+          "walls": 11,
+          "rooms": 6,
+          "openings": 19,
+          "accuracy": 90.8
+        },
+        "gpt55": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 18,
+          "accuracy": 91.9
+        },
+        "gemini": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 18,
+          "accuracy": 91.9
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1235.png",
+      "models": {
+        "haiku": {
+          "walls": 12,
+          "rooms": 7,
+          "openings": 20,
+          "accuracy": 90.2
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 7,
+          "openings": 21,
+          "accuracy": 91.8
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 7,
+          "openings": 21,
+          "accuracy": 94.3
+        },
+        "gemini": {
+          "walls": 12,
+          "rooms": 7,
+          "openings": 21,
+          "accuracy": 91.8
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1242.png",
+      "models": {
+        "haiku": {
+          "walls": 18,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 91.4
+        },
+        "gpt56": {
+          "walls": 19,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 93.2
+        },
+        "gpt55": {
+          "walls": 18,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 91.4
+        },
+        "gemini": {
+          "walls": 19,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 93.2
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1264.png",
+      "models": {
+        "haiku": {
+          "walls": 15,
+          "rooms": 9,
+          "openings": 16,
+          "accuracy": 92.6
+        },
+        "gpt56": {
+          "walls": 15,
+          "rooms": 9,
+          "openings": 15,
+          "accuracy": 90.7
+        },
+        "gpt55": {
+          "walls": 16,
+          "rooms": 9,
+          "openings": 16,
+          "accuracy": 94.7
+        },
+        "gemini": {
+          "walls": 16,
+          "rooms": 9,
+          "openings": 16,
+          "accuracy": 94.7
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1279.png",
+      "models": {
+        "haiku": {
+          "walls": 17,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 92.4
+        },
+        "gpt56": {
+          "walls": 18,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 94.2
+        },
+        "gpt55": {
+          "walls": 17,
+          "rooms": 8,
+          "openings": 14,
+          "accuracy": 90.3
+        },
+        "gemini": {
+          "walls": 18,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 94.2
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1284.png",
+      "models": {
+        "haiku": {
+          "walls": 16,
+          "rooms": 5,
+          "openings": 23,
+          "accuracy": 91.1
+        },
+        "gpt56": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 23,
+          "accuracy": 93.1
+        },
+        "gpt55": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 22,
+          "accuracy": 91.7
+        },
+        "gemini": {
+          "walls": 16,
+          "rooms": 5,
+          "openings": 22,
+          "accuracy": 89.7
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1285.png",
+      "models": {
+        "haiku": {
+          "walls": 16,
+          "rooms": 4,
+          "openings": 21,
+          "accuracy": 89.9
+        },
+        "gpt56": {
+          "walls": 17,
+          "rooms": 4,
+          "openings": 21,
+          "accuracy": 91.8
+        },
+        "gpt55": {
+          "walls": 17,
+          "rooms": 4,
+          "openings": 21,
+          "accuracy": 91.8
+        },
+        "gemini": {
+          "walls": 17,
+          "rooms": 4,
+          "openings": 20,
+          "accuracy": 90.3
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1293.png",
+      "models": {
+        "haiku": {
+          "walls": 17,
+          "rooms": 9,
+          "openings": 21,
+          "accuracy": 95.2
+        },
+        "gpt56": {
+          "walls": 17,
+          "rooms": 9,
+          "openings": 21,
+          "accuracy": 95.2
+        },
+        "gpt55": {
+          "walls": 16,
+          "rooms": 9,
+          "openings": 21,
+          "accuracy": 93.2
+        },
+        "gemini": {
+          "walls": 17,
+          "rooms": 9,
+          "openings": 20,
+          "accuracy": 93.6
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1319.png",
+      "models": {
+        "haiku": {
+          "walls": 15,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 89.2
+        },
+        "gpt56": {
+          "walls": 15,
+          "rooms": 9,
+          "openings": 15,
+          "accuracy": 92.5
+        },
+        "gpt55": {
+          "walls": 15,
+          "rooms": 9,
+          "openings": 15,
+          "accuracy": 92.5
+        },
+        "gemini": {
+          "walls": 15,
+          "rooms": 9,
+          "openings": 15,
+          "accuracy": 92.5
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1339.png",
+      "models": {
+        "haiku": {
+          "walls": 18,
+          "rooms": 7,
+          "openings": 16,
+          "accuracy": 88.9
+        },
+        "gpt56": {
+          "walls": 18,
+          "rooms": 8,
+          "openings": 16,
+          "accuracy": 92.6
+        },
+        "gpt55": {
+          "walls": 18,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 90.6
+        },
+        "gemini": {
+          "walls": 19,
+          "rooms": 8,
+          "openings": 15,
+          "accuracy": 92.4
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_141.png",
+      "models": {
+        "haiku": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 16,
+          "accuracy": 90.7
+        },
+        "gpt56": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 16,
+          "accuracy": 93.3
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 91.3
+        },
+        "gemini": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 16,
+          "accuracy": 93.3
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1432.png",
+      "models": {
+        "haiku": {
+          "walls": 16,
+          "rooms": 7,
+          "openings": 16,
+          "accuracy": 92.1
+        },
+        "gpt56": {
+          "walls": 16,
+          "rooms": 7,
+          "openings": 16,
+          "accuracy": 92.1
+        },
+        "gpt55": {
+          "walls": 15,
+          "rooms": 7,
+          "openings": 17,
+          "accuracy": 91.9
+        },
+        "gemini": {
+          "walls": 15,
+          "rooms": 7,
+          "openings": 17,
+          "accuracy": 91.9
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1444.png",
+      "models": {
+        "haiku": {
+          "walls": 16,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 91.7
+        },
+        "gpt56": {
+          "walls": 16,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 91.7
+        },
+        "gpt55": {
+          "walls": 17,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 93.6
+        },
+        "gemini": {
+          "walls": 17,
+          "rooms": 7,
+          "openings": 13,
+          "accuracy": 91.4
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_145.png",
+      "models": {
+        "haiku": {
+          "walls": 13,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 91.2
+        },
+        "gpt56": {
+          "walls": 14,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 93.6
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 91.2
+        },
+        "gemini": {
+          "walls": 13,
+          "rooms": 7,
+          "openings": 14,
+          "accuracy": 91.2
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1511.png",
+      "models": {
+        "haiku": {
+          "walls": 11,
+          "rooms": 6,
+          "openings": 19,
+          "accuracy": 89.3
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 20,
+          "accuracy": 93.7
+        },
+        "gpt55": {
+          "walls": 11,
+          "rooms": 6,
+          "openings": 20,
+          "accuracy": 90.9
+        },
+        "gemini": {
+          "walls": 12,
+          "rooms": 6,
+          "openings": 20,
+          "accuracy": 93.7
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1551.png",
+      "models": {
+        "haiku": {
+          "walls": 11,
+          "rooms": 5,
+          "openings": 21,
+          "accuracy": 88.8
+        },
+        "gpt56": {
+          "walls": 11,
+          "rooms": 5,
+          "openings": 22,
+          "accuracy": 90.2
+        },
+        "gpt55": {
+          "walls": 12,
+          "rooms": 5,
+          "openings": 21,
+          "accuracy": 91.5
+        },
+        "gemini": {
+          "walls": 11,
+          "rooms": 5,
+          "openings": 21,
+          "accuracy": 88.8
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1590.png",
+      "models": {
+        "haiku": {
+          "walls": 12,
+          "rooms": 8,
+          "openings": 19,
+          "accuracy": 90.6
+        },
+        "gpt56": {
+          "walls": 12,
+          "rooms": 8,
+          "openings": 19,
+          "accuracy": 90.6
+        },
+        "gpt55": {
+          "walls": 12,
+          "rooms": 8,
+          "openings": 19,
+          "accuracy": 90.6
+        },
+        "gemini": {
+          "walls": 12,
+          "rooms": 8,
+          "openings": 20,
+          "accuracy": 92.1
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1599.png",
+      "models": {
+        "haiku": {
+          "walls": 16,
+          "rooms": 4,
+          "openings": 16,
+          "accuracy": 89.4
+        },
+        "gpt56": {
+          "walls": 16,
+          "rooms": 4,
+          "openings": 16,
+          "accuracy": 89.4
+        },
+        "gpt55": {
+          "walls": 16,
+          "rooms": 4,
+          "openings": 16,
+          "accuracy": 89.4
+        },
+        "gemini": {
+          "walls": 16,
+          "rooms": 4,
+          "openings": 15,
+          "accuracy": 87.5
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1601.png",
+      "models": {
+        "haiku": {
+          "walls": 14,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 93.2
+        },
+        "gpt56": {
+          "walls": 14,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 93.2
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 90.8
+        },
+        "gemini": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 15,
+          "accuracy": 90.8
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1622.png",
+      "models": {
+        "haiku": {
+          "walls": 12,
+          "rooms": 8,
+          "openings": 14,
+          "accuracy": 91.5
+        },
+        "gpt56": {
+          "walls": 13,
+          "rooms": 8,
+          "openings": 14,
+          "accuracy": 94.1
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 8,
+          "openings": 14,
+          "accuracy": 94.1
+        },
+        "gemini": {
+          "walls": 12,
+          "rooms": 8,
+          "openings": 13,
+          "accuracy": 89.3
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1636.png",
+      "models": {
+        "haiku": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 17,
+          "accuracy": 91.7
+        },
+        "gpt56": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 17,
+          "accuracy": 91.7
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 17,
+          "accuracy": 91.7
+        },
+        "gemini": {
+          "walls": 13,
+          "rooms": 6,
+          "openings": 18,
+          "accuracy": 93.5
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_165.png",
+      "models": {
+        "haiku": {
+          "walls": 18,
+          "rooms": 5,
+          "openings": 20,
+          "accuracy": 91.4
+        },
+        "gpt56": {
+          "walls": 18,
+          "rooms": 5,
+          "openings": 20,
+          "accuracy": 91.4
+        },
+        "gpt55": {
+          "walls": 18,
+          "rooms": 5,
+          "openings": 21,
+          "accuracy": 92.9
+        },
+        "gemini": {
+          "walls": 17,
+          "rooms": 5,
+          "openings": 20,
+          "accuracy": 89.6
+        }
+      }
+    },
+    {
+      "image": "high_quality_architectural_1652.png",
+      "models": {
+        "haiku": {
+          "walls": 13,
+          "rooms": 8,
+          "openings": 18,
+          "accuracy": 89.2
+        },
+        "gpt56": {
+          "walls": 13,
+          "rooms": 9,
+          "openings": 18,
+          "accuracy": 92.5
+        },
+        "gpt55": {
+          "walls": 13,
+          "rooms": 9,
+          "openings": 18,
+          "accuracy": 92.5
+        },
+        "gemini": {
+          "walls": 13,
+          "rooms": 9,
+          "openings": 17,
+          "accuracy": 90.8
+        }
+      }
+    }
+  ],
+  "stats": {
+    "haiku": {
+      "model": "Claude Haiku 4.5",
+      "accuracy": {
+        "mean": 91.14,
+        "min": 88.7,
+        "max": 95.15,
+        "stdDev": 1.77
+      },
+      "latency": {
+        "mean": 1363
+      },
+      "cost": {
+        "total": 0.09
+      }
+    },
+    "gpt56": {
+      "model": "GPT-5.6 Luna",
+      "accuracy": {
+        "mean": 92.2,
+        "min": 88.89,
+        "max": 95.15,
+        "stdDev": 1.48
+      },
+      "latency": {
+        "mean": 2197
+      },
+      "cost": {
+        "total": 0.24
+      }
+    },
+    "gpt55": {
+      "model": "GPT-5.5",
+      "accuracy": {
+        "mean": 91.83,
+        "min": 88.7,
+        "max": 94.71,
+        "stdDev": 1.64
+      },
+      "latency": {
+        "mean": 1906
+      },
+      "cost": {
+        "total": 0.18
+      }
+    },
+    "gemini": {
+      "model": "Gemini 3.1",
+      "accuracy": {
+        "mean": 91.58,
+        "min": 86.85,
+        "max": 94.71,
+        "stdDev": 2.05
+      },
+      "latency": {
+        "mean": 1725
+      },
+      "cost": {
+        "total": 0.15
+      }
+    }
+  }
+}

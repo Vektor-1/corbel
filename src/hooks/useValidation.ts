@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFloorPlanStore } from '@/store/floorPlanStore';
+import { useFloorPlanStore } from '@/lib/store/floorPlanStore';
 import { validateFloorRealtime, getElementSeverity, type RealtimeValidationResult } from '@/lib/standards/realtimeValidation';
 
 /**

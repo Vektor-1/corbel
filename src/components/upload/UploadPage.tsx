@@ -399,15 +399,9 @@ export default function UploadPage() {
                   <div className="rounded-lg bg-[#f3efe7] px-3 py-3 text-xs text-[#6f685b]">
                     {file ? file.name : 'Select a source file to begin.'}
                   </div>
-                  {mode === 'reconstruct' ? (
-                    <Button className="w-full" disabled={!file} onClick={runReconstruct}>
-                      <UploadIcon /> Reconstruct with YOLO+VLM
-                    </Button>
-                  ) : (
-                    <Button className="w-full" disabled={!file} onClick={runTrace}>
-                      <TraceIcon /> Freeze as baseline (no reconstruction)
-                    </Button>
-                  )}
+                  <Button className="w-full" disabled={!file} onClick={runReconstruct}>
+                    <UploadIcon /> Reconstruct with YOLO+VLM
+                  </Button>
                 </div>
               )}
 
@@ -489,7 +483,7 @@ export default function UploadPage() {
                   )}
 
                   <Button className="w-full" onClick={accept}>
-                    <WandSparkles /> {mode === 'trace' ? 'Accept and freeze as baseline' : 'Accept reconstruction'}
+                    <WandSparkles /> Accept reconstruction
                   </Button>
                   <Button variant="outline" className="w-full" onClick={reset}>
                     Reject and start over
@@ -500,12 +494,10 @@ export default function UploadPage() {
               {accepted && (
                 <div className="mt-4 space-y-3">
                   <div className="rounded-lg bg-[#edf4ea] px-3 py-2.5 text-xs font-medium text-[#47633c]">
-                    {mode === 'trace'
-                      ? 'Baseline frozen as ghost. Now redesign against it.'
-                      : 'Loaded into the editor store.'}
+                    Loaded into the editor store.
                   </div>
                   <Button className="w-full" onClick={openEditor}>
-                    {mode === 'trace' ? 'Open editor in Trace-to-Learn mode' : 'Open editor'}
+                    Open editor
                   </Button>
                 </div>
               )}

@@ -5,6 +5,7 @@ import { ValidationPanel } from './ValidationPanel';
 import { LayerTogglePanel } from '../studio/LayerTogglePanel';
 import { AnnotationPanel } from '../studio/AnnotationPanel';
 import { TraceToLearnView } from '../studio/TraceToLearnView';
+import { ThreeDPropsPanel } from './ThreeDPropsPanel';
 
 interface EditorRightPanelProps {
   floor: Canonical.Floor | null;
@@ -47,17 +48,24 @@ export function EditorRightPanel({
           <TraceToLearnView
             baseline={ghostFloor}
             redesign={floor}
-            library={library}
           />
         </div>
       )}
+
+      {/* 3D Element Properties & Materials */}
+      <div>
+        <h3 style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: '#94a3b8', textTransform: 'uppercase' }}>
+          3D Properties
+        </h3>
+        <ThreeDPropsPanel />
+      </div>
 
       {/* Validation */}
       <div>
         <ValidationPanel
           floor={floor}
           library={library}
-          selectedElementId={selectedElementId}
+          selectedElementId={selectedElementId ?? undefined}
           onSelectElement={(elementId, elementType) => {
             const kind = elementType as 'wall' | 'room' | 'opening';
             onSelectElement(elementId, kind);
