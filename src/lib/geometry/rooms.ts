@@ -1,6 +1,6 @@
 import type { Point, Room, Wall } from '@/types/design';
+import { pixelsPerMeter } from './scale';
 
-const PX_PER_METER = 100;
 const MIN_ROOM_AREA_M2 = 0.5;
 
 type Vertex = {
@@ -33,7 +33,8 @@ function roomId(vertexKeys: string[]) {
  * Finds bounded faces in the wall endpoint graph. Walls must meet at endpoints;
  * crossings that do not create endpoints are intentionally not interpreted as rooms.
  */
-export function deriveRoomsFromWalls(walls: Wall[]): Room[] {
+export function deriveRoomsFromWalls(walls: Wall[], scale?: number): Room[] {
+  const pxPerMeter = pixelsPerMeter(scale);
   const vertices = new Map<string, Vertex>();
 
   const ensureVertex = (point: Point) => {
@@ -108,7 +109,7 @@ export function deriveRoomsFromWalls(walls: Wall[]): Room[] {
       // Canvas coordinates increase downward, so bounded clockwise faces are positive.
       if (areaPx <= 0) continue;
 
-      const area = areaPx / (PX_PER_METER * PX_PER_METER);
+      const area = areaPx / (pxPerMeter * pxPerMeter);
       if (area < MIN_ROOM_AREA_M2) continue;
 
       rooms.push({

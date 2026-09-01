@@ -2,15 +2,34 @@
 
 import { EditorWithCanvas } from '@/components/editor/EditorWithCanvas';
 import { validateFloorPlan } from '@/lib/standards/validation';
+import { validateTraceFeedback } from '@/lib/standards/traceFeedback';
+import { loadDesignSnapshot, saveDesignSnapshot } from '@/lib/persistence/designSnapshot';
 import { useDesignStore } from '@/store/designStore';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { FloorPlan } from '@/types/design';
 
 export default function EditorPage() {
-  const { floorPlan, setFloorPlan, setValidationResults } = useDesignStore();
+  const { floorPlan, ghostFloorPlan, ghostOpacity, traceImage, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage, setValidationResults } = useDesignStore();
+  const initialized = useRef(false);
 
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
     if (!floorPlan) {
+      try {
+        const snapshot = loadDesignSnapshot(window.localStorage);
+        if (snapshot) {
+          setFloorPlan(snapshot.floorPlan);
+          setGhostFloorPlan(snapshot.ghostFloorPlan);
+          setGhostOpacity(snapshot.ghostOpacity);
+          setTraceImage(snapshot.traceImage);
+          return;
+        }
+      } catch {
+        // The editor remains usable when browser storage is unavailable.
+      }
+
       const newPlan: FloorPlan = {
         id: `plan-${Date.now()}`,
         name: 'Courtyard Study',
@@ -26,9 +45,11 @@ export default function EditorPage() {
         updatedAt: new Date(),
       };
       setFloorPlan(newPlan);
-      return;
     }
+  }, [floorPlan, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage]);
 
+  useEffect(() => {
+    if (!floorPlan) return;
     const needsMigration =
       !Array.isArray(floorPlan.objects) ||
       !Array.isArray(floorPlan.rooms) ||
@@ -50,8 +71,20 @@ export default function EditorPage() {
   }, [floorPlan, setFloorPlan]);
 
   useEffect(() => {
-    setValidationResults(validateFloorPlan(floorPlan));
-  }, [floorPlan, setValidationResults]);
+    setValidationResults([
+      ...validateFloorPlan(floorPlan),
+      ...validateTraceFeedback(floorPlan, traceImage?.calibration),
+    ]);
+  }, [floorPlan, traceImage?.calibration, setValidationResults]);
+
+  useEffect(() => {
+    if (!initialized.current || !floorPlan) return;
+    try {
+      saveDesignSnapshot(window.localStorage, floorPlan, ghostFloorPlan, ghostOpacity, traceImage);
+    } catch {
+      // Quota/private-mode errors should not interrupt design work.
+    }
+  }, [floorPlan, ghostFloorPlan, ghostOpacity, traceImage]);
 
   return <EditorWithCanvas />;
 }

@@ -29,6 +29,7 @@ export const validateWallThickness = (
       id: `validation-${wallId}`,
       type: 'warning',
       message: `Material "${material}" is not yet mapped to Ghana standards data.`,
+      remediation: 'Choose a mapped material, or check this wall with your tutor before relying on the review.',
       targetId: wallId,
       rule: 'material-unknown',
     };
@@ -42,6 +43,7 @@ export const validateWallThickness = (
       id: `validation-${wallId}`,
       type: 'error',
       message: `Wall thickness ${thickness}mm is below the ${minThickness}mm minimum for a load-bearing ${material} wall in a ${stories}-storey scheme.`,
+      remediation: `Increase the thickness to at least ${minThickness}mm, or change the wall role only if it is not load-bearing.`,
       targetId: wallId,
       rule: 'wall-thickness-insufficient',
     };
@@ -63,7 +65,8 @@ export const validateSpanThickness = (
     return {
       id: `validation-${wallId}-span`,
       type: 'warning',
-      message: `Wall span-to-thickness ratio (${ratio.toFixed(1)}:1) is high. Review with an engineer.`,
+      message: `Wall span-to-thickness ratio is ${ratio.toFixed(1)}:1, above Corbel's 30:1 review threshold.`,
+      remediation: 'Shorten the unsupported run, increase wall thickness, or discuss the structural approach with your tutor.',
       targetId: wallId,
       rule: 'span-thickness-ratio-high',
     };
@@ -83,7 +86,8 @@ export const validateOpeningSize = (
     return {
       id: `validation-${openingId}`,
       type: 'warning',
-      message: `Opening width ${openingWidth}mm is very large and may need extra structural support.`,
+      message: `Opening width ${openingWidth}mm is above Corbel's 2000mm review threshold.`,
+      remediation: 'Check whether the opening needs additional structural support with your tutor or a qualified professional.',
       targetId: openingId,
       rule: 'opening-oversized',
     };
@@ -116,6 +120,7 @@ export const validateRoomLayout = (
       id: `validation-${roomId}`,
       type: 'warning',
       message: `${roomType} area ${area.toFixed(1)}m² is below the recommended ${minArea}m².`,
+      remediation: `Increase the room to at least ${minArea}m², or record why the smaller space is appropriate for this brief.`,
       targetId: roomId,
       rule: 'room-area-small',
     };
@@ -164,6 +169,7 @@ export const validateFloorPlan = (floorPlan: FloorPlan | null): ValidationResult
         id: `validation-${door.id}-host`,
         type: 'error',
         message: 'Door must fit completely within its host wall.',
+        remediation: 'Move the door away from the wall end, reduce its width, or attach it to a longer wall.',
         targetId: door.id,
         rule: 'opening-host-fit',
       });
@@ -182,6 +188,7 @@ export const validateFloorPlan = (floorPlan: FloorPlan | null): ValidationResult
         id: `validation-${window.id}-host`,
         type: 'error',
         message: 'Window must fit completely within its host wall.',
+        remediation: 'Move the window away from the wall end, reduce its width, or attach it to a longer wall.',
         targetId: window.id,
         rule: 'opening-host-fit',
       });
@@ -189,7 +196,7 @@ export const validateFloorPlan = (floorPlan: FloorPlan | null): ValidationResult
   });
 
   floorPlan.rooms.forEach((room) => {
-    const roomResult = validateRoomLayout(room.id, room.area, room.name);
+    const roomResult = validateRoomLayout(room.id, room.area, room.type ?? room.name);
     if (roomResult) results.push(roomResult);
   });
 

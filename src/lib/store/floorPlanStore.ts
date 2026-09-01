@@ -375,12 +375,26 @@ export const useFloorPlanStore = create<FloorPlanStoreState>()(
         const wall = state.currentFloor.walls.find((w: Canonical.Wall) => w.id === wallId);
         if (!wall) return;
 
+        const openingType = kind === "door"
+          ? state.library.doorTypes.get(typeRef)
+          : state.library.windowTypes.get(typeRef);
+        if (!openingType) return;
+
+        const wallLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+        const clearance = openingType.width / 2;
+        if (wallLength < openingType.width) return;
+
+        const clampedPosition = Math.max(
+          clearance,
+          Math.min(positionAlongWall, wallLength - clearance)
+        );
+
         const opening: Canonical.Opening = {
           id: `opening_${Date.now()}_${Math.random().toString(36).slice(2)}`,
           kind,
           typeRef,
           hostWallId: wallId,
-          positionAlongWall,
+          positionAlongWall: clampedPosition,
           confidence: 1.0,
           source: Source.USER,
         };

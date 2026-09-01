@@ -12,6 +12,7 @@
 // square caps. See docs/overview/ATTRIBUTION.md.
 
 import type { Point, Wall } from '@/types/design';
+import { millimetresPerPixel } from './scale';
 
 /** Canvas pixels are 10 mm each (100 px = 1 m), matching the 3D scale. */
 export const MM_PER_PX = 10;
@@ -58,7 +59,7 @@ function intersectLines(p1: Point, d1: Point, p2: Point, d2: Point): Point | nul
 }
 
 /** Half the wall's plan-view width, in canvas px. */
-export const wallHalfWidthPx = (wall: Wall) => wall.thickness / MM_PER_PX / 2;
+export const wallHalfWidthPx = (wall: Wall, scale?: number) => wall.thickness / millimetresPerPixel(scale) / 2;
 
 /** Non-mitered rectangular footprint — used for previews and as the base shape. */
 export function wallQuad(start: Point, end: Point, halfWidthPx: number): WallFootprint | null {
@@ -79,7 +80,7 @@ export function wallQuad(start: Point, end: Point, halfWidthPx: number): WallFoo
  * two wall ends coincide. Joints of three or more walls keep square caps —
  * the overlap is hidden inside the shared volume.
  */
-export function computeWallFootprints(walls: Wall[]): Map<string, WallFootprint> {
+export function computeWallFootprints(walls: Wall[], scale?: number): Map<string, WallFootprint> {
   const footprints = new Map<string, WallFootprint>();
   const joints = new Map<string, Joint>();
 
@@ -91,7 +92,7 @@ export function computeWallFootprints(walls: Wall[]): Map<string, WallFootprint>
   };
 
   for (const wall of walls) {
-    const halfWidth = wallHalfWidthPx(wall);
+    const halfWidth = wallHalfWidthPx(wall, scale);
     const quad = wallQuad(wall.startPoint, wall.endPoint, halfWidth);
     if (!quad) continue;
     footprints.set(wall.id, quad);

@@ -39,6 +39,8 @@ export interface Wall {
 export interface Room {
   id: string;
   name: string;
+  /** Student-selected use; enables type-specific educational guidance. */
+  type?: 'bedroom' | 'kitchen' | 'bathroom' | 'living' | 'dining' | 'other';
   vertices: Point[];
   area: number; // m²
 }
@@ -93,6 +95,18 @@ export interface ValidationResult {
   id: string;
   type: 'error' | 'warning' | 'info';
   message: string;
+  /** A practical next step for the student. This is guidance, not professional approval. */
+  remediation?: string;
+  /** The observable geometry or rule basis for this educational feedback. */
+  evidence?: string;
   targetId: string; // wall or element ID
   rule: string;
+}
+
+export interface TraceCalibration {
+  /** A student-confirmed wall used as the measurement reference. */
+  wallId: string;
+  knownLengthMm: number;
+  pixelsPerMeter: number;
+  calibratedAt: string;
 }

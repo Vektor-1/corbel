@@ -50,6 +50,28 @@ test('classifies a parallel wall translation as moved', () => {
   assert.deepEqual(report.walls, [{ originalId: 'wall-1', redesignId: 'wall-2', status: 'moved' }]);
 });
 
+test('globally matches nearby parallel walls instead of falsely removing one', () => {
+  const original = plan({
+    walls: [
+      wall('original-a', point(0, 0), point(400, 0)),
+      wall('original-b', point(45, 0), point(445, 0)),
+    ],
+  });
+  const redesign = plan({
+    walls: [
+      wall('redesign-a', point(10, 0), point(410, 0)),
+      wall('redesign-b', point(-40, 0), point(360, 0)),
+    ],
+  });
+
+  const report = compareFloorPlans(original, redesign);
+
+  assert.deepEqual(report.walls, [
+    { originalId: 'original-a', redesignId: 'redesign-b', status: 'moved' },
+    { originalId: 'original-b', redesignId: 'redesign-a', status: 'moved' },
+  ]);
+});
+
 test('reports a newly introduced room as added', () => {
   const report = compareFloorPlans(
     plan(),

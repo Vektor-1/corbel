@@ -125,7 +125,7 @@ export function VoxelBlockInspector() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-6 rounded-xl border border-[#232019] bg-[#161511] text-slate-200">
+    <div className="flex flex-col lg:flex-row gap-8 py-6 text-slate-200 border-b border-[#232019]">
       {/* Voxel Viewer Section */}
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-4">
@@ -137,8 +137,10 @@ export function VoxelBlockInspector() {
           {/* Material Select Toggles */}
           <div className="flex gap-1.5 bg-[#232019] p-1 rounded-lg border border-slate-800">
             <button
+              type="button"
               onClick={() => setMaterial('sandcrete')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              aria-pressed={material === 'sandcrete'}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 ${
                 material === 'sandcrete'
                   ? 'bg-[#8a6b3f] text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -147,8 +149,10 @@ export function VoxelBlockInspector() {
               Sandcrete
             </button>
             <button
+              type="button"
               onClick={() => setMaterial('laterite')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              aria-pressed={material === 'laterite'}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 ${
                 material === 'laterite'
                   ? 'bg-[#8a6b3f] text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
@@ -165,7 +169,7 @@ export function VoxelBlockInspector() {
           onMouseOver={handleMouseOver}
           onMouseLeave={handleMouseLeave}
           dangerouslySetInnerHTML={{ __html: svgMarkup }}
-          className="flex-1 min-h-[220px] bg-[#1a1814]/60 border border-[#232019] rounded-lg p-4 flex items-center justify-center cursor-pointer transition-colors duration-200 hover:border-amber-900/40 relative [&_path]:transition-all [&_path]:duration-150 [&_path:hover]:brightness-110 [&_path:hover]:stroke-amber-500 [&_path:hover]:stroke-[2px]"
+          className="flex-1 min-h-[220px] bg-[#12110e]/20 border border-[#232019] rounded-lg p-4 flex items-center justify-center cursor-pointer transition-colors duration-200 hover:border-amber-900/40 relative [&_path]:transition-all [&_path]:duration-150 [&_path:hover]:brightness-110 [&_path:hover]:stroke-amber-500 [&_path:hover]:stroke-[2px]"
         />
         
         <p className="text-[10px] text-slate-500 mt-2 text-center">

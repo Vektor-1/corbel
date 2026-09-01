@@ -110,6 +110,8 @@ export function AlternatingPlanHero() {
   useEffect(() => {
     if (!svg2dRef.current || !container3dRef.current) return;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // Select elements from 2D Plan
     const gridLines = svg2dRef.current.querySelectorAll('.grid-line');
     const wallLines = svg2dRef.current.querySelectorAll('.wall-line');
@@ -146,7 +148,7 @@ export function AlternatingPlanHero() {
     gsap.set(polygons, { opacity: 0, scaleY: 0, transformOrigin: '50% 100%' });
     gsap.set(container3dRef.current, { opacity: 0 });
 
-    const tl = gsap.timeline({ repeat: -1 });
+    const tl = gsap.timeline({ repeat: prefersReducedMotion ? 0 : -1 });
 
     // --- PHASE 1: Draw 2D Floor Plan ---
     tl.addLabel('start2d');
@@ -175,9 +177,8 @@ export function AlternatingPlanHero() {
 
     // --- PHASE 2: Transition & Lift to 3D Voxel Plan ---
     tl.addLabel('transition');
-    // Fade out 2D text labels, door lines, and dim grid lines
-    tl.to([labels, doorLines], { opacity: 0, duration: 0.6, ease: 'power2.inOut' });
-    tl.to(wallLines, { opacity: 0.2, duration: 0.8, ease: 'power2.inOut' }, '-=0.4');
+    // Fade out 2D elements completely (labels, doors, walls, and grid lines)
+    tl.to([labels, doorLines, wallLines, gridLines], { opacity: 0, duration: 0.6, ease: 'power2.inOut' });
     
     // Show 3D container
     tl.to(container3dRef.current, { opacity: 1, duration: 0.4 }, '-=0.4');
@@ -255,7 +256,7 @@ export function AlternatingPlanHero() {
       <svg
         ref={svg2dRef}
         viewBox="0 0 400 400"
-        className="absolute inset-0 w-full h-full p-8 z-10 pointer-events-none select-none"
+        className="absolute inset-0 w-full h-full p-4 z-10 pointer-events-none select-none"
       >
         {/* Fine Blueprint Grid */}
         <g className="grid-line opacity-10">

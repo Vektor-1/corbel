@@ -8,6 +8,8 @@ export interface ImportSource {
   kind: ImportSourceKind;
   fileName: string;
   url: string;
+  /** Trace baselines favour faithful reference geometry over speculative completion. */
+  purpose?: 'reconstruct' | 'trace';
   page?: number;
   width: number;
   height: number;

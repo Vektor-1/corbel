@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     let result;
     try {
       if (provider === 'rodium') {
-        result = await runRodiumDetection(source, 'gpt-5.6-luna');
+        result = await runRodiumDetection(source);
       } else {
         result = await runAgentRouterDetection(source);
       }

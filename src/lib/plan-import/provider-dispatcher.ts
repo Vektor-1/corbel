@@ -3,9 +3,30 @@ import { type RawLabel, type ScaleResult } from './pipeline';
 import { resolveProvider, type VisionProvider } from './provider';
 import * as agentRouter from './agent-router';
 import * as rodiumAi from './rodium-ai';
-import * as claudeApi from './claude-api';
-import * as claudeHolistic from './claude-holistic';
-import * as gemini from './gemini';
+
+// Jobs use UUIDs, so retain the selected provider for polling in this process.
+// This also lets local development use Rodium without changing global settings.
+const submittedJobProviders = new Map<string, VisionProvider>();
+
+function isDevelopmentLocalSource(source: ImportSource): boolean {
+  if (process.env.NODE_ENV !== 'development') return false;
+  try {
+    const url = new URL(source.url);
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+export function resolveSubmissionProvider(source: ImportSource, provider?: VisionProvider): VisionProvider {
+  const selected = provider || resolveProvider();
+  // AgentRouter is remote and cannot reach a browser's localhost upload URL.
+  // Rodium reads the image from the Next.js process and therefore works in dev.
+  if (selected === 'agent-router' && isDevelopmentLocalSource(source) && process.env.RODIUM_AI_API_KEY) {
+    return 'rodium-ai';
+  }
+  return selected;
+}
 
 // ── Detection (P1–P3) ─────────────────────────────────────────────────────────
 
@@ -18,16 +39,6 @@ export async function runDetection(source: ImportSource, provider?: VisionProvid
       return agentRouter.runAgentRouterDetection(source);
     case 'rodium-ai':
       return rodiumAi.runRodiumDetection(source);
-    case 'claude-holistic':
-      return claudeHolistic.runClaudeHolisticDetection(source);
-    case 'claude-api':
-      return claudeApi.runClaudeApiDetection(source);
-    case 'gemini':
-      return gemini.runGeminiDetection(source);
-    case 'worker':
-      throw new Error('Worker detection not yet implemented in dispatcher');
-    default:
-      throw new Error(`Unknown vision provider: ${visionProvider}`);
   }
 }
 
@@ -45,48 +56,49 @@ export async function runOcrAndScale(
       return agentRouter.runAgentRouterOcrAndScale(source);
     case 'rodium-ai':
       return rodiumAi.runRodiumOcrAndScale(source);
-    case 'claude-holistic':
-    case 'claude-api':
-      return claudeApi.runClaudeApiOcrAndScale(source);
-    case 'gemini':
-      return gemini.runGeminiOcrAndScale(source);
-    case 'worker':
-      throw new Error('Worker OCR not yet implemented in dispatcher');
-    default:
-      throw new Error(`Unknown vision provider: ${visionProvider}`);
   }
 }
 
 // ── Job-based detection (async) ───────────────────────────────────────────────
 
 export function submitDetectionJob(source: ImportSource, provider?: VisionProvider): string {
-  const visionProvider = provider || resolveProvider();
+  const visionProvider = resolveSubmissionProvider(source, provider);
   console.log(`[provider-dispatcher] Submitting detection job with ${visionProvider}`);
 
   switch (visionProvider) {
-    case 'agent-router':
-      return agentRouter.submitAgentRouterJob(source);
-    case 'rodium-ai':
-      return rodiumAi.submitRodiumJob(source);
-    case 'claude-holistic':
-      return claudeHolistic.submitClaudeHolisticJob(source);
-    case 'claude-api':
-      return claudeApi.submitClaudeApiJob(source);
-    case 'gemini':
-      return gemini.submitGeminiJob(source);
-    case 'worker':
-      throw new Error('Worker job submission not yet implemented in dispatcher');
-    default:
-      throw new Error(`Unknown vision provider: ${visionProvider}`);
+    case 'agent-router': {
+      const id = agentRouter.submitAgentRouterJob(source);
+      submittedJobProviders.set(id, visionProvider);
+      return id;
+    }
+    case 'rodium-ai': {
+      const id = rodiumAi.submitRodiumJob(source);
+      submittedJobProviders.set(id, visionProvider);
+      return id;
+    }
   }
+}
+
+/**
+ * Jobs created by the current providers use UUIDs from the shared pipeline
+ * store. Older integrations may supply a provider-prefixed id, so retain that
+ * routing convention while treating an unprefixed id as belonging to the
+ * selected provider.
+ */
+export function resolveDetectionJobProvider(id: string, provider: VisionProvider): VisionProvider {
+  if (id.startsWith('agent-router-')) return 'agent-router';
+  if (id.startsWith('rodium-')) return 'rodium-ai';
+  return provider;
 }
 
 export function getDetectionJob(id: string, provider?: VisionProvider) {
   const visionProvider = provider || resolveProvider();
-  // Job ID prefixes encode the provider, so this is mostly for compatibility
-  if (id.startsWith('agent-router-')) return agentRouter.getAgentRouterJob(id);
-  if (id.startsWith('rodium-')) return rodiumAi.getRodiumJob(id);
-  if (id.startsWith('claude-')) return claudeApi.getClaudeApiJob(id);
-  if (id.startsWith('gemini-')) return gemini.getGeminiJob(id);
-  return claudeApi.getClaudeApiJob(id); // fallback
+  const jobProvider = resolveDetectionJobProvider(id, submittedJobProviders.get(id) ?? visionProvider);
+
+  switch (jobProvider) {
+    case 'agent-router':
+      return agentRouter.getAgentRouterJob(id);
+    case 'rodium-ai':
+      return rodiumAi.getRodiumJob(id);
+  }
 }

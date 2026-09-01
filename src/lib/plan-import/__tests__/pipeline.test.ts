@@ -1,13 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { scoreLLMDesignIteration } from '../../standards/llmScoring';
-import type { Canonical } from '../../../types/schema';
+import { Source, type Canonical } from '../../../types/schema';
 
 describe('AI Pipeline Tests', () => {
   // Helper to create minimal floor plan
   function createFloor(wallCount: number, roomCount: number): Canonical.Floor {
     return {
       id: `floor-${Date.now()}`,
-      name: 'Test Floor',
+      elevation: 0,
+      floorHeight: 2800,
       walls: Array.from({ length: wallCount }, (_, i) => ({
         id: `wall-${i}`,
         start: { x: 0, y: 0 },
@@ -15,23 +16,24 @@ describe('AI Pipeline Tests', () => {
         typeRef: 'ext-200',
         openingIds: [],
         confidence: 1.0,
-        source: 0, // Source.USER
+        source: Source.USER,
       })),
       rooms: Array.from({ length: roomCount }, (_, i) => ({
         id: `room-${i}`,
         label: `Room ${i}`,
         type: 'bedroom',
         area: 20000000, // 20m²
-        centroid: { x: 500, y: 500 },
+        vertices: [
+          { x: 0, y: 0 },
+          { x: 5000, y: 0 },
+          { x: 5000, y: 4000 },
+          { x: 0, y: 4000 },
+        ],
         boundingWallIds: [],
         confidence: 1.0,
-        source: 0,
+        source: Source.USER,
       })),
       openings: [],
-      metadata: {
-        createdAt: Date.now(),
-        modifiedAt: Date.now(),
-      },
     };
   }
 

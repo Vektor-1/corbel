@@ -24,11 +24,15 @@ export interface Box {
   max: Point2D;
 }
 
-export enum Source {
-  AI = "ai",
-  USER = "user",
-  REFINED = "refined",
-}
+export const Source = {
+  AI: "ai",
+  USER: "user",
+  REFINED: "refined",
+  // YOLO is an AI source retained for imported-plan provenance.
+  YOLO: "ai",
+} as const;
+
+export type Source = (typeof Source)[keyof typeof Source];
 
 // ============================================================================
 // DRAFT TIER: Loose, confidence-tagged, minimal topology

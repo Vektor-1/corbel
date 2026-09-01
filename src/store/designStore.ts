@@ -1,8 +1,17 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { DesignObject, FloorPlan, Wall, Room, Door, Window, ValidationResult } from '@/types/design';
+import type { DesignObject, FloorPlan, Wall, Room, Door, Window, ValidationResult, TraceCalibration } from '@/types/design';
+import { pixelsPerMeter } from '@/lib/geometry/scale';
 import { insertWallWithIntersections, rehostWallOpening } from '@/lib/geometry/wall-intersections';
 import { cloneFloorPlan, createRedesignPlan } from '@/lib/redesign';
+
+export interface TraceImageReference {
+  url: string;
+  scale: number;
+  opacity: number;
+  blur: number;
+  calibration?: TraceCalibration;
+}
 
 interface DesignState {
   // Current floor plan
@@ -12,6 +21,7 @@ interface DesignState {
   // Ghost underlay (original import for Trace-to-Learn compare)
   ghostFloorPlan: FloorPlan | null;
   ghostOpacity: number;
+  traceImage: TraceImageReference | null;
 
   // UI state
   selectedElementId: string | null;
@@ -20,10 +30,17 @@ interface DesignState {
 
   // Actions
   setFloorPlan: (floorPlan: FloorPlan) => void;
+  clearDesign: () => void;
   applyImportedFloorPlan: (floorPlan: FloorPlan) => void;
+  beginImportedEdit: (floorPlan: FloorPlan) => void;
   beginRedesign: (floorPlan: FloorPlan) => void;
+  beginImageTrace: (imageUrl: string, fileName: string) => void;
+  restoreGhostBaseline: () => void;
   setGhostFloorPlan: (floorPlan: FloorPlan | null) => void;
   setGhostOpacity: (opacity: number) => void;
+  setTraceImage: (reference: TraceImageReference | null) => void;
+  updateTraceImage: (updates: Partial<Omit<TraceImageReference, 'url'>>) => void;
+  calibrateTraceFromWall: (wallId: string, knownLengthMm: number) => boolean;
   setValidationResults: (results: ValidationResult[]) => void;
   setSelectedElement: (id: string | null) => void;
   setCurrentTool: (tool: DesignState['currentTool']) => void;
@@ -61,25 +78,66 @@ export const useDesignStore = create<DesignState>(
       validationResults: [],
       ghostFloorPlan: null,
       ghostOpacity: 0.25,
+      traceImage: null,
       selectedElementId: null,
       currentTool: 'select',
       viewMode: '2d',
 
       setFloorPlan: (floorPlan: FloorPlan) => set({ floorPlan }),
+      clearDesign: () =>
+        set((state: DesignState) => {
+          if (!state.floorPlan) return state;
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              walls: [],
+              rooms: [],
+              doors: [],
+              windows: [],
+              objects: [],
+              updatedAt: new Date(),
+            },
+            ghostFloorPlan: null,
+            ghostOpacity: 0.25,
+            traceImage: null,
+            selectedElementId: null,
+            currentTool: 'select',
+            validationResults: [],
+          };
+        }),
       applyImportedFloorPlan: (floorPlan: FloorPlan) =>
         set({
           floorPlan,
           ghostFloorPlan: null,
+          traceImage: null,
           selectedElementId: null,
           currentTool: 'select',
           viewMode: '2d',
           validationResults: [],
         }),
+      beginImportedEdit: (floorPlan: FloorPlan) => {
+        const baseline = cloneFloorPlan(floorPlan);
+        const editable = cloneFloorPlan(floorPlan);
+        editable.id = `edit-${baseline.id}`;
+        editable.name = `${baseline.name} · editable copy`;
+        editable.updatedAt = new Date();
+        set({
+          floorPlan: editable,
+          ghostFloorPlan: baseline,
+          ghostOpacity: 0.18,
+          traceImage: null,
+          selectedElementId: null,
+          currentTool: 'select',
+          viewMode: '2d',
+          validationResults: [],
+        });
+      },
       beginRedesign: (floorPlan: FloorPlan) => {
         const original = cloneFloorPlan(floorPlan);
         set({
           ghostFloorPlan: original,
           ghostOpacity: 0.25,
+          traceImage: null,
           floorPlan: createRedesignPlan(original),
           selectedElementId: null,
           currentTool: 'wall',
@@ -87,10 +145,85 @@ export const useDesignStore = create<DesignState>(
           validationResults: [],
         });
       },
+      beginImageTrace: (imageUrl: string, fileName: string) => {
+        const now = new Date();
+        const name = fileName.replace(/\.[^.]+$/, '').trim() || 'Reference plan';
+        set({
+          floorPlan: {
+            id: `trace-${crypto.randomUUID()}`,
+            name: `${name} · trace study`,
+            width: 12000,
+            height: 9000,
+            scale: 100,
+            walls: [],
+            rooms: [],
+            doors: [],
+            windows: [],
+            objects: [],
+            createdAt: now,
+            updatedAt: now,
+          },
+          ghostFloorPlan: null,
+          ghostOpacity: 0.25,
+          traceImage: { url: imageUrl, scale: 0.7, opacity: 0.58, blur: 2 },
+          selectedElementId: null,
+          currentTool: 'wall',
+          viewMode: '2d',
+          validationResults: [],
+        });
+      },
+      restoreGhostBaseline: () =>
+        set((state: DesignState) => {
+          if (!state.ghostFloorPlan || !state.floorPlan) return state;
+          const restored = cloneFloorPlan(state.ghostFloorPlan);
+          restored.id = state.floorPlan.id;
+          restored.name = `${state.ghostFloorPlan.name} · editable copy`;
+          restored.updatedAt = new Date();
+          return {
+            floorPlan: restored,
+            selectedElementId: null,
+            currentTool: 'select',
+            validationResults: [],
+          };
+        }),
       setGhostFloorPlan: (floorPlan: FloorPlan | null) =>
         set({ ghostFloorPlan: floorPlan ? cloneFloorPlan(floorPlan) : null }),
       setGhostOpacity: (opacity: number) =>
         set({ ghostOpacity: Math.max(0, Math.min(1, opacity)) }),
+      setTraceImage: (traceImage: TraceImageReference | null) => set({ traceImage }),
+      updateTraceImage: (updates: Partial<Omit<TraceImageReference, 'url'>>) =>
+        set((state: DesignState) => {
+          if (!state.traceImage) return state;
+          return {
+            traceImage: {
+              ...state.traceImage,
+              ...updates,
+              scale: Math.max(0.1, Math.min(3, updates.scale ?? state.traceImage.scale)),
+              opacity: Math.max(0, Math.min(1, updates.opacity ?? state.traceImage.opacity)),
+              blur: Math.max(0, Math.min(20, updates.blur ?? state.traceImage.blur)),
+            },
+          };
+        }),
+      calibrateTraceFromWall: (wallId: string, knownLengthMm: number) => {
+        let calibrated = false;
+        set((state: DesignState) => {
+          const wall = state.floorPlan?.walls.find((candidate) => candidate.id === wallId);
+          if (!state.floorPlan || !state.traceImage || !wall || !Number.isFinite(knownLengthMm) || knownLengthMm <= 0) return state;
+          const wallPixels = Math.hypot(wall.endPoint.x - wall.startPoint.x, wall.endPoint.y - wall.startPoint.y);
+          const nextPixelsPerMeter = wallPixels / (knownLengthMm / 1_000);
+          if (!Number.isFinite(nextPixelsPerMeter) || nextPixelsPerMeter < 20 || nextPixelsPerMeter > 2_000) return state;
+          calibrated = true;
+          return {
+            floorPlan: { ...state.floorPlan, scale: pixelsPerMeter(nextPixelsPerMeter), updatedAt: new Date() },
+            traceImage: {
+              ...state.traceImage,
+              calibration: { wallId, knownLengthMm, pixelsPerMeter: nextPixelsPerMeter, calibratedAt: new Date().toISOString() },
+            },
+            validationResults: [],
+          };
+        });
+        return calibrated;
+      },
       setValidationResults: (results: ValidationResult[]) => set({ validationResults: results }),
       setSelectedElement: (id: string | null) => set({ selectedElementId: id }),
       setCurrentTool: (tool: DesignState['currentTool']) => set({ currentTool: tool }),

@@ -19,7 +19,7 @@ export function notifyReconstructionFailure(toast: UploadToast) {
 export function notifyAcceptance(toast: UploadToast, mode: 'reconstruct' | 'trace') {
   toast.success(
     mode === 'trace'
-      ? 'Trace baseline frozen. Redesign it in Studio.'
+      ? 'Reference image ready. Redraw it in the 2D editor.'
       : 'Reconstruction loaded into the editor.'
   );
 }

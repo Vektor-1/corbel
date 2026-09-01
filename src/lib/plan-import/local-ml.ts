@@ -1,4 +1,5 @@
 import * as ort from 'onnxruntime-web';
+import { enhancePlanPixels } from './image-preprocess';
 
 // Client-side YOLOv8n detection over the corbel-trained ONNX model.
 // Classes: 0=wall, 1=door, 2=window. Runs entirely in the browser — no
@@ -48,7 +49,7 @@ interface Letterbox {
 
 // Resize into a square canvas preserving aspect ratio (YOLO "letterbox"),
 // returning the tensor data plus the transform needed to map boxes back.
-function preprocess(bitmap: ImageBitmap): { tensor: Float32Array; letterbox: Letterbox } {
+function preprocess(bitmap: ImageBitmap, enhance = true): { tensor: Float32Array; letterbox: Letterbox } {
   const canvas = document.createElement('canvas');
   canvas.width = INPUT_SIZE;
   canvas.height = INPUT_SIZE;
@@ -66,13 +67,15 @@ function preprocess(bitmap: ImageBitmap): { tensor: Float32Array; letterbox: Let
   ctx.drawImage(bitmap, padX, padY, scaledW, scaledH);
 
   const { data } = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
+  // Preserve the original file and use enhancement only for the inference tensor.
+  const inferencePixels = enhance ? enhancePlanPixels(data, INPUT_SIZE, INPUT_SIZE) : data;
   const tensor = new Float32Array(3 * INPUT_SIZE * INPUT_SIZE);
   const plane = INPUT_SIZE * INPUT_SIZE;
 
   for (let i = 0; i < plane; i++) {
-    tensor[i] = data[i * 4] / 255; // R
-    tensor[plane + i] = data[i * 4 + 1] / 255; // G
-    tensor[plane * 2 + i] = data[i * 4 + 2] / 255; // B
+    tensor[i] = inferencePixels[i * 4] / 255; // R
+    tensor[plane + i] = inferencePixels[i * 4 + 1] / 255; // G
+    tensor[plane * 2 + i] = inferencePixels[i * 4 + 2] / 255; // B
   }
 
   return { tensor, letterbox: { scale, padX, padY } };
@@ -154,13 +157,14 @@ export interface LocalMlResult {
 
 export async function detectLocalMl(
   source: File | Blob | string,
-  options?: { confThreshold?: number; iouThreshold?: number }
+  options?: { confThreshold?: number; iouThreshold?: number; enhanceImage?: boolean }
 ): Promise<LocalMlResult> {
   const confThreshold = options?.confThreshold ?? 0.25;
   const iouThreshold = options?.iouThreshold ?? 0.45;
 
   const bitmap = await loadImageBitmap(source);
-  const { tensor, letterbox } = preprocess(bitmap);
+  // The filter is opt-in until it improves the frozen held-out benchmark.
+  const { tensor, letterbox } = preprocess(bitmap, options?.enhanceImage === true);
 
   const session = await getSession();
   const inputTensor = new ort.Tensor('float32', tensor, [1, 3, INPUT_SIZE, INPUT_SIZE]);

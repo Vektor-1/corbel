@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
-import { isAllowedImportUrl, submitRunpodImport } from '@/lib/plan-import/runpod';
-import { submitGeminiJob } from '@/lib/plan-import/gemini';
-import { submitClaudeAgentJob } from '@/lib/plan-import/claude-agent';
-import { submitClaudeApiJob } from '@/lib/plan-import/claude-api';
-import { submitClaudeHolisticJob } from '@/lib/plan-import/claude-holistic';
-import { resolveProvider } from '@/lib/plan-import/provider';
+import { isAllowedImportUrl } from '@/lib/plan-import/runpod';
+import { submitDetectionJob } from '@/lib/plan-import/provider-dispatcher';
 import { parseImportSource } from '@/lib/plan-import/validate';
 
 export const runtime = 'nodejs';
@@ -21,30 +17,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'The source file host is not allowed.' }, { status: 400 });
     }
 
-    const provider = resolveProvider();
-
-    if (provider === 'claude-holistic' || provider === 'claude-api' || provider === 'claude-agent' || provider === 'gemini') {
-      let id: string;
-      if (provider === 'claude-holistic') {
-        id = submitClaudeHolisticJob(source);
-      } else if (provider === 'claude-api') {
-        id = submitClaudeApiJob(source);
-      } else if (provider === 'claude-agent') {
-        id = submitClaudeAgentJob(source);
-      } else {
-        id = submitGeminiJob(source);
-      }
-      return NextResponse.json(
-        { id, providerJobId: id, status: 'processing', source, progress: 20,
-          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-        { status: 202 }
-      );
-    }
-
-    const job = await submitRunpodImport(source);
+    const id = submitDetectionJob(source);
     return NextResponse.json(
-      { id: job.providerJobId, providerJobId: job.providerJobId, status: job.status,
-        source, progress: 10, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id, providerJobId: id, status: 'processing', source, progress: 20,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
       { status: 202 }
     );
   } catch (error) {

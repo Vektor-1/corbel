@@ -37,7 +37,7 @@ const ROOM_HOVER_FILL = "#22c55e55";
 const ROOM_SELECTED_FILL = "#00ff0055";
 const ROOM_DEFAULT_FILL = "#cccccc55";
 
-type EditorTool = "wall" | "room";
+type EditorTool = "wall" | "room" | "door" | "window";
 
 interface DrawingState {
   isDrawing: boolean;
@@ -81,6 +81,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const ghostOpacity = useFloorPlanStore((state) => state.ghostOpacity);
   const {
     drawWall,
+    placeOpening,
     resizeWall,
     deleteWall,
     deleteRoom,
@@ -91,6 +92,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   } = useFloorPlanStore(
     useShallow((state) => ({
       drawWall: state.drawWall,
+      placeOpening: state.placeOpening,
       resizeWall: state.resizeWall,
       deleteWall: state.deleteWall,
       deleteRoom: state.deleteRoom,
@@ -291,10 +293,31 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     if (e.evt.button === 2) {
       deleteWall(wallId);
       validateFloor();
+    } else if (tool === "door" || tool === "window") {
+      const wall = floor.walls.find((candidate) => candidate.id === wallId);
+      const pointer = pointerWorld();
+      if (!wall || !pointer) return;
+
+      const dx = wall.end.x - wall.start.x;
+      const dy = wall.end.y - wall.start.y;
+      const length = Math.hypot(dx, dy);
+      if (length === 0) return;
+
+      const projectedDistance = ((pointer.raw.x - wall.start.x) * dx + (pointer.raw.y - wall.start.y) * dy) / length;
+      const openingId = placeOpening(
+        tool,
+        wallId,
+        projectedDistance,
+        tool === "door" ? "d-900" : "w-1200"
+      );
+      if (openingId) {
+        selectElement(openingId, "opening");
+        validateFloor();
+      }
     } else {
       selectElement(wallId, "wall");
     }
-  }, [spaceDown, deleteWall, validateFloor, selectElement]);
+  }, [spaceDown, tool, floor.walls, pointerWorld, placeOpening, deleteWall, validateFloor, selectElement]);
 
   const handleRoomClick = useCallback((roomId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
@@ -335,6 +358,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       ? drawingRoom
         ? "Drawing room… (click to place, Esc to cancel)"
         : "Room tool (click to start, Esc for wall tool)"
+      : tool === "door" || tool === "window"
+        ? `Click a wall to place a ${tool}`
       : drawing.isDrawing
         ? "Drawing wall… (click to end)"
         : "Wall tool — R rooms · Space pan · Ctrl+scroll zoom";
@@ -354,6 +379,27 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         cursor: spaceDown || isPanning ? "grab" : "default",
       }}
     >
+      <div className="flex flex-wrap gap-1 border-b border-stone-300 bg-stone-50 p-2" role="toolbar" aria-label="Drawing tools">
+        {([
+          ["wall", "Wall"],
+          ["room", "Room"],
+          ["door", "Door"],
+          ["window", "Window"],
+        ] as const).map(([nextTool, label]) => (
+          <button
+            aria-pressed={tool === nextTool}
+            className={`rounded px-2 py-1 text-xs font-medium ${tool === nextTool ? "bg-stone-800 text-white" : "bg-white text-stone-700 ring-1 ring-stone-300"}`}
+            key={nextTool}
+            onClick={() => {
+              setDrawing({ isDrawing: false, startPoint: null, currentPoint: null });
+              setTool(nextTool);
+            }}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <Stage
         ref={stageRef}
         width={containerSize.width}

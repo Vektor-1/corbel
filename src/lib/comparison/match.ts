@@ -7,6 +7,8 @@ const ENDPOINT_TOLERANCE = 12;
 const ANGLE_TOLERANCE = Math.PI / 18;
 const OFFSET_RATIO_TOLERANCE = 0.08;
 const EPSILON = 1e-9;
+const WALL_MATCH_MAX_COST = 1;
+const IMPOSSIBLE_COST = 1_000_000;
 
 const distance = (left: Point, right: Point) => Math.hypot(left.x - right.x, left.y - right.y);
 const wallLength = (wall: Wall) => distance(wall.startPoint, wall.endPoint);
@@ -28,23 +30,99 @@ function statusForWalls(original: Wall, redesign: Wall, endpoints: number): Matc
   return 'moved';
 }
 
+/**
+ * Finds a globally minimal one-to-one assignment using the Hungarian algorithm.
+ * Trace plans commonly contain nearby parallel walls; greedy matching can consume
+ * the only plausible redraw for a later wall and report a false removal.
+ */
+function minimumCostAssignment(costs: number[][]): number[] {
+  const rows = costs.length;
+  const columns = costs[0]?.length ?? 0;
+  const u = Array<number>(rows + 1).fill(0);
+  const v = Array<number>(columns + 1).fill(0);
+  const p = Array<number>(columns + 1).fill(0);
+  const way = Array<number>(columns + 1).fill(0);
+
+  for (let row = 1; row <= rows; row += 1) {
+    p[0] = row;
+    let column0 = 0;
+    const minValue = Array<number>(columns + 1).fill(Infinity);
+    const used = Array<boolean>(columns + 1).fill(false);
+    do {
+      used[column0] = true;
+      const row0 = p[column0];
+      let delta = Infinity;
+      let column1 = 0;
+      for (let column = 1; column <= columns; column += 1) {
+        if (used[column]) continue;
+        const current = costs[row0 - 1][column - 1] - u[row0] - v[column];
+        if (current < minValue[column]) {
+          minValue[column] = current;
+          way[column] = column0;
+        }
+        if (minValue[column] < delta) {
+          delta = minValue[column];
+          column1 = column;
+        }
+      }
+      for (let column = 0; column <= columns; column += 1) {
+        if (used[column]) {
+          u[p[column]] += delta;
+          v[column] -= delta;
+        } else {
+          minValue[column] -= delta;
+        }
+      }
+      column0 = column1;
+    } while (p[column0] !== 0);
+
+    do {
+      const column1 = way[column0];
+      p[column0] = p[column1];
+      column0 = column1;
+    } while (column0 !== 0);
+  }
+
+  const assignment = Array<number>(rows).fill(-1);
+  for (let column = 1; column <= columns; column += 1) {
+    if (p[column] > 0) assignment[p[column] - 1] = column - 1;
+  }
+  return assignment;
+}
+
+function wallMatchCost(original: Wall, redesign: Wall): number {
+  const endpoints = endpointDistance(original, redesign);
+  const angle = angleDistance(wallAngle(original), wallAngle(redesign));
+  const sourceLength = wallLength(original);
+  const candidateLength = wallLength(redesign);
+  const lengthDifference = Math.abs(sourceLength - candidateLength) / Math.max(sourceLength, candidateLength, 1);
+  const endpointLimit = ENDPOINT_TOLERANCE * 8;
+
+  if (endpoints > endpointLimit || angle > ANGLE_TOLERANCE || lengthDifference > 0.5) return IMPOSSIBLE_COST;
+  return (endpoints / endpointLimit) * 0.7
+    + (angle / ANGLE_TOLERANCE) * 0.15
+    + lengthDifference * 0.1
+    + (original.thickness === redesign.thickness ? 0 : 0.05);
+}
+
 export function matchWalls(original: Wall[], redesign: Wall[]): ElementMatch[] {
+  const costs = original.map((source) => [
+    ...redesign.map((candidate) => wallMatchCost(source, candidate)),
+    ...Array<number>(original.length).fill(WALL_MATCH_MAX_COST),
+  ]);
+  const assignment = minimumCostAssignment(costs);
   const used = new Set<string>();
   const matches: ElementMatch[] = [];
 
-  for (const source of original) {
-    let best: { wall: Wall; endpoints: number } | undefined;
-    for (const candidate of redesign) {
-      if (used.has(candidate.id) || angleDistance(wallAngle(source), wallAngle(candidate)) > ANGLE_TOLERANCE) continue;
-      const endpoints = endpointDistance(source, candidate);
-      if (!best || endpoints < best.endpoints) best = { wall: candidate, endpoints };
-    }
-    if (!best || best.endpoints > ENDPOINT_TOLERANCE * 8) {
+  for (const [index, source] of original.entries()) {
+    const candidateIndex = assignment[index];
+    const candidate = candidateIndex >= 0 && candidateIndex < redesign.length ? redesign[candidateIndex] : undefined;
+    if (!candidate || costs[index][candidateIndex] >= WALL_MATCH_MAX_COST) {
       matches.push({ originalId: source.id, redesignId: null, status: 'removed' });
       continue;
     }
-    used.add(best.wall.id);
-    matches.push({ originalId: source.id, redesignId: best.wall.id, status: statusForWalls(source, best.wall, best.endpoints) });
+    used.add(candidate.id);
+    matches.push({ originalId: source.id, redesignId: candidate.id, status: statusForWalls(source, candidate, endpointDistance(source, candidate)) });
   }
   for (const candidate of redesign) if (!used.has(candidate.id)) matches.push({ originalId: null, redesignId: candidate.id, status: 'added' });
   return matches;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { resolveDetectionJobProvider, resolveSubmissionProvider } from '../provider-dispatcher';
 
 describe('AI Providers', () => {
   beforeEach(() => {
@@ -8,6 +9,17 @@ describe('AI Providers', () => {
   });
 
   describe('Rodium AI Provider', () => {
+    it('uses Rodium\'s fast vision-capable profile by default', async () => {
+      const { resolveRodiumModel } = await import('../rodium-ai');
+      const savedModel = process.env.RODIUM_AI_MODEL;
+      delete process.env.RODIUM_AI_MODEL;
+      try {
+        expect(resolveRodiumModel()).toBe('rodium/fast');
+      } finally {
+        if (savedModel) process.env.RODIUM_AI_MODEL = savedModel;
+      }
+    });
+
     it('should create ask function', async () => {
       const { makeAsk } = await import('../rodium-ai');
       const ask = makeAsk('https://example.com/test.png', 'gpt-5.6-luna');
@@ -93,6 +105,29 @@ describe('AI Providers', () => {
   });
 
   describe('Provider Orchestration', () => {
+    it('routes UUID job IDs through the selected provider', () => {
+      const jobId = '2e4549dc-2a21-4838-9aaf-2df7077f433d';
+
+      expect(resolveDetectionJobProvider(jobId, 'agent-router')).toBe('agent-router');
+      expect(resolveDetectionJobProvider(jobId, 'rodium-ai')).toBe('rodium-ai');
+    });
+
+    it('uses Rodium for localhost uploads in development so the image is provider-readable', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      try {
+        expect(resolveSubmissionProvider({
+          kind: 'image', fileName: 'plan.png', url: 'http://localhost:3000/api/plan-import/local-upload/plan.png', width: 800, height: 600,
+        }, 'agent-router')).toBe('rodium-ai');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('honours legacy provider-prefixed job IDs', () => {
+      expect(resolveDetectionJobProvider('agent-router-old-job', 'rodium-ai')).toBe('agent-router');
+      expect(resolveDetectionJobProvider('rodium-old-job', 'agent-router')).toBe('rodium-ai');
+    });
+
     it('should support multiple providers in parallel', async () => {
       const { makeAskImageAnalysis, makeAskOcr, makeAskScaleCalibration } =
         await import('../agent-router');

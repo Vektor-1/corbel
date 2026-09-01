@@ -32,12 +32,12 @@ describe('upload outcome notifications', () => {
     expect(toast.error).toHaveBeenCalledWith('Could not apply corrections. Review the error and retry.');
   });
 
-  test('selects the acceptance copy for reconstruct and Trace-to-Learn modes', () => {
+  test('selects the acceptance copy for reconstruction and image retrace modes', () => {
     notifyAcceptance(toast, 'reconstruct');
     notifyAcceptance(toast, 'trace');
 
     expect(toast.success).toHaveBeenCalledWith('Reconstruction loaded into the editor.');
-    expect(toast.success).toHaveBeenCalledWith('Trace baseline frozen. Redesign it in Studio.');
+    expect(toast.success).toHaveBeenCalledWith('Reference image ready. Redraw it in the 2D editor.');
   });
 
   test('reports a rejected file using its safe validation message', () => {

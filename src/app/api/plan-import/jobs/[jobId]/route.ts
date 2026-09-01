@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRunpodImport } from '@/lib/plan-import/runpod';
-import { getPipelineJob } from '@/lib/plan-import/pipeline';
-import { resolveProvider } from '@/lib/plan-import/provider';
+import { getDetectionJob } from '@/lib/plan-import/provider-dispatcher';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,15 +11,8 @@ export async function GET(_: Request, context: { params: Promise<{ jobId: string
 
   try {
     const { jobId } = await context.params;
-    const provider = resolveProvider();
-
-    if (provider === 'claude-holistic' || provider === 'claude-api' || provider === 'claude-agent' || provider === 'gemini') {
-      const job = getPipelineJob(jobId);
-      if (!job) return NextResponse.json({ error: 'Job not found.' }, { status: 404 });
-      return NextResponse.json({ id: jobId, providerJobId: jobId, ...job, updatedAt: new Date().toISOString() });
-    }
-
-    const job = await getRunpodImport(jobId);
+    const job = getDetectionJob(jobId);
+    if (!job) return NextResponse.json({ error: 'Job not found.' }, { status: 404 });
     return NextResponse.json({ id: jobId, providerJobId: jobId, ...job, updatedAt: new Date().toISOString() });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to read import job.';

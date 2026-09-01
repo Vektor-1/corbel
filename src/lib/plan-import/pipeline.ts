@@ -105,7 +105,7 @@ Return only the JSON object.`;
 
 // ── Stage 2: Wall skeleton ────────────────────────────────────────────────────
 
-async function stage2_walls(ask: AskFn, meta: ImageMeta, tag: string): Promise<RawWall[]> {
+async function stage2_walls(ask: AskFn, meta: ImageMeta, tag: string, isTraceBaseline: boolean): Promise<RawWall[]> {
   console.log(`[${tag}] Stage 2: wall detection`);
   const prompt = `This is a floor plan image (${meta.widthPx}×${meta.heightPx}px, quality: ${meta.quality}).
 ${meta.rotationNeeded !== 0 ? `Note: the image appears rotated ${meta.rotationNeeded}°, interpret coordinates accordingly.` : ''}
@@ -127,6 +127,9 @@ Rules:
 - Trace each wall as a straight segment between two endpoints.
 - Outer/perimeter walls are loadBearing, inner dividers are partition.
 - Do not include doors or windows — walls pass straight through openings.
+- Split walls at visible junctions and corners. Do not merge parallel walls or bridge an uncertain gap.
+- If a line is obscured, return a lower confidence instead of inventing a connection.
+${isTraceBaseline ? '- This is a Trace-to-Learn reference plan. Preserve the source layout faithfully; do not simplify, complete, or improve the design.' : ''}
 - Return only the JSON array.`;
 
   const result = await ask(prompt) as RawWall[];
@@ -136,7 +139,7 @@ Rules:
 
 // ── Stage 3: Opening detection ────────────────────────────────────────────────
 
-async function stage3_openings(ask: AskFn, walls: RawWall[], tag: string): Promise<RawOpening[]> {
+async function stage3_openings(ask: AskFn, walls: RawWall[], tag: string, isTraceBaseline: boolean): Promise<RawOpening[]> {
   console.log(`[${tag}] Stage 3: opening detection`);
   const wallSummary = walls.map(w => `${w.id}: (${w.startX},${w.startY})→(${w.endX},${w.endY})`).join('\n');
 
@@ -161,6 +164,8 @@ Rules:
 - A window shows as a gap with parallel lines or a glazing symbol.
 - offsetRatio 0.0 = at the wall start point, 1.0 = at the wall end point.
 - Only reference wall IDs from the list above.
+- If an opening symbol is ambiguous, omit it rather than guessing its type or host wall.
+${isTraceBaseline ? '- Preserve only openings supported by a visible symbol, because this plan will be used as a read-only learning reference.' : ''}
 - Return only the JSON array.`;
 
   const result = await ask(prompt) as RawOpening[];
@@ -245,7 +250,8 @@ async function stage6_validate(
   walls: RawWall[],
   openings: RawOpening[],
   labels: RawLabel[],
-  tag: string
+  tag: string,
+  isTraceBaseline: boolean
 ): Promise<ValidationIssue[]> {
   console.log(`[${tag}] Stage 6: validation rescan`);
 
@@ -269,6 +275,8 @@ async function stage6_validate(
 - ${summary.openings} doors/windows detected
 - Rooms identified: ${summary.rooms.join(', ') || 'none'}
 - Potentially disconnected walls: ${summary.disconnected.join(', ') || 'none'}
+
+${isTraceBaseline ? 'This is a Trace-to-Learn baseline. Flag any uncertain or invented-looking element so the student can review it; do not treat a plausible guess as confirmed.' : ''}
 
 Look at the original image and verify the reconstruction. Return a JSON array of issues found:
 [{
@@ -364,14 +372,15 @@ export async function runDetectionPipeline(
 
   report('stage1');
   const meta = await stage1_analyse(ask, source, tag);
+  const isTraceBaseline = source.purpose === 'trace';
 
   report('stage2');
-  const walls = await stage2_walls(ask, meta, tag);
+  const walls = await stage2_walls(ask, meta, tag, isTraceBaseline);
   if (walls.length === 0) throw new Error('No walls detected. Check image quality.');
 
   report('stage3');
   const [openings, labels] = await Promise.all([
-    stage3_openings(ask, walls, tag),
+    stage3_openings(ask, walls, tag, isTraceBaseline),
     stage4_ocr(ask, tag),
   ]);
 
@@ -379,7 +388,7 @@ export async function runDetectionPipeline(
   const scale = await stage5_scale(ask, labels, meta, source, tag);
 
   report('stage6');
-  const issues = await stage6_validate(ask, walls, openings, labels, tag);
+  const issues = await stage6_validate(ask, walls, openings, labels, tag, isTraceBaseline);
 
   return assemble(source, walls, openings, labels, scale, issues);
 }

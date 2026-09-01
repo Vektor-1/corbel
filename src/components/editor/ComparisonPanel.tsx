@@ -46,9 +46,17 @@ export function ComparisonPanel({
     regressed: 'text-[var(--editor-warning)]',
     neutral: 'text-[var(--editor-text-subtle)]',
   };
+  const improvedCount = rubric.filter((item) => item.status === 'improved').length;
+  const regressedCount = rubric.filter((item) => item.status === 'regressed').length;
+  const reviewSummary = regressedCount > 0
+    ? `${regressedCount} comparison area${regressedCount === 1 ? '' : 's'} need review. Use the change highlights to inspect the affected design decisions.`
+    : improvedCount > 0
+      ? `${improvedCount} comparison area${improvedCount === 1 ? '' : 's'} improved against the reference plan. Explain the design choices that caused the change.`
+      : 'No rubric change was detected. Use the reference plan and change highlights to explain your design decisions.';
 
   return (
     <EditorPanel title="Redesign review">
+      <p className="mb-3 text-[11px] leading-4 text-[var(--editor-text-muted)]">{reviewSummary}</p>
       <div className="mb-3 flex flex-wrap gap-1.5 text-[10px]">
         {([
           ['added', counts.added, 'bg-[color-mix(in_srgb,var(--editor-success)_18%,transparent)] text-[var(--editor-success)]'],

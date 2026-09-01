@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { EditorPanel } from '@/components/ui/editor-panel';
 import { FieldLabel, Input, Select } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -94,7 +95,9 @@ export function SelectedWallInspector({
               : 'bg-[var(--editor-success-soft)] text-[var(--editor-success)]'
           )}
         >
-          {primaryIssue ? primaryIssue.type : 'Passing'}
+          {wall.source === 'ai' && typeof wall.confidence === 'number'
+            ? `AI ${Math.round(wall.confidence * 100)}%`
+            : primaryIssue ? primaryIssue.type : 'Passing'}
         </span>
       }
     >
@@ -165,7 +168,7 @@ export function SelectedDoorInspector({
     <EditorPanel
       title="Door"
       description="Hosted by a wall; the arc shows its swing"
-      action={<span className="rounded bg-[var(--editor-accent-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--editor-accent-text)]">Opening</span>}
+      action={<span className="rounded bg-[var(--editor-accent-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--editor-accent-text)]">{door.source === 'ai' && typeof door.confidence === 'number' ? `AI ${Math.round(door.confidence * 100)}%` : 'Opening'}</span>}
     >
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
@@ -216,7 +219,7 @@ export function SelectedWindowInspector({
     <EditorPanel
       title="Window"
       description="Hosted by a wall with plan and elevation dimensions"
-      action={<span className="rounded bg-[var(--editor-info-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--editor-info)]">Opening</span>}
+      action={<span className="rounded bg-[var(--editor-info-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--editor-info)]">{window.source === 'ai' && typeof window.confidence === 'number' ? `AI ${Math.round(window.confidence * 100)}%` : 'Opening'}</span>}
     >
       <div className="grid grid-cols-2 gap-3">
         <FieldLabel label="Width" unit="mm">
@@ -254,6 +257,20 @@ export function SelectedRoomInspector({
       }
     >
       <div className="space-y-3">
+        <FieldLabel label="Room type">
+          <Select
+            value={room.type ?? ''}
+            onChange={(event) => onUpdate({ type: (event.target.value || undefined) as Room['type'] })}
+          >
+            <option value="">Choose a type</option>
+            <option value="bedroom">Bedroom</option>
+            <option value="kitchen">Kitchen</option>
+            <option value="bathroom">Bathroom</option>
+            <option value="living">Living room</option>
+            <option value="dining">Dining room</option>
+            <option value="other">Other / not assessed</option>
+          </Select>
+        </FieldLabel>
         <FieldLabel label="Room name">
           <Input
             value={room.name}
@@ -272,7 +289,9 @@ export function SelectedRoomInspector({
           </div>
         </dl>
         <p className="text-[11px] leading-4 text-[var(--editor-text-subtle)]">
-          Move or redraw a wall to change this space. Area feedback updates with the boundary.
+          {room.type && room.type !== 'other'
+            ? 'Area guidance now uses this room type. Move or redraw a wall to change the space.'
+            : 'Choose a room type to enable area guidance, then move or redraw a wall to change the space.'}
         </p>
       </div>
     </EditorPanel>
@@ -346,15 +365,22 @@ export function ValidationPanel({
   title = 'Feedback',
   subtitle,
   emptyMessage = 'No issues found.',
+  onSelectElement,
 }: {
   results: ValidationResult[];
   hasGeometry: boolean;
   title?: string;
   subtitle?: string;
   emptyMessage?: string;
+  onSelectElement?: (id: string) => void;
 }) {
   const errors = results.filter((result) => result.type === 'error').length;
   const warnings = results.filter((result) => result.type === 'warning').length;
+  const priorityGroups = [
+    { type: 'error' as const, label: 'Fix first' },
+    { type: 'warning' as const, label: 'Review next' },
+    { type: 'info' as const, label: 'Learning note' },
+  ].map((group) => ({ ...group, results: results.filter((result) => result.type === group.type) }));
 
   return (
     <EditorPanel
@@ -371,28 +397,46 @@ export function ValidationPanel({
       ) : results.length === 0 ? (
         <p className="text-[11px] leading-4 text-[var(--editor-success)]">{emptyMessage}</p>
       ) : (
-        <div className="space-y-1.5">
-          {results.map((result) => (
-            <div key={result.id} className="rounded-md bg-[var(--editor-surface-muted)] px-2.5 py-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-medium capitalize text-[var(--editor-text)]">{result.rule.replace(/-/g, ' ')}</p>
-                <span
-                  className={cn(
-                    'h-1.5 w-1.5 shrink-0 rounded-full',
-                    result.type === 'error'
-                      ? 'bg-[var(--editor-danger)]'
-                      : result.type === 'warning'
-                      ? 'bg-[var(--editor-warning)]'
-                      : 'bg-[var(--editor-info)]'
-                  )}
-                />
+        <div className="space-y-3">
+          {priorityGroups.filter((group) => group.results.length > 0).map((group) => (
+            <div key={group.type}>
+              <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--editor-text-subtle)]">{group.label}</p>
+              <div className="space-y-1.5">
+                {group.results.map((result) => (
+                  <FeedbackItem key={result.id} result={result} onSelectElement={onSelectElement} />
+                ))}
               </div>
-              <p className="mt-1 text-[11px] leading-4 text-[var(--editor-text-subtle)]">{result.message}</p>
             </div>
           ))}
         </div>
       )}
     </EditorPanel>
+  );
+}
+
+function FeedbackItem({ result, onSelectElement }: { result: ValidationResult; onSelectElement?: (id: string) => void }) {
+  const [hintOpen, setHintOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const title = result.rule.replace(/-/g, ' ');
+
+  return (
+    <article className="rounded-md bg-[var(--editor-surface-muted)] px-2.5 py-2">
+      <button type="button" onClick={() => onSelectElement?.(result.targetId)} className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]" aria-label={`Review ${title}`}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-medium capitalize text-[var(--editor-text)]">{title}</p>
+          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', result.type === 'error' ? 'bg-[var(--editor-danger)]' : result.type === 'warning' ? 'bg-[var(--editor-warning)]' : 'bg-[var(--editor-info)]')} />
+        </div>
+        <p className="mt-1 text-[11px] leading-4 text-[var(--editor-text-subtle)]">{result.message}</p>
+      </button>
+      {(result.remediation || result.evidence) && (
+        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
+          {result.remediation && <button type="button" className="font-medium text-[var(--editor-accent-text)] underline decoration-[var(--editor-accent)]/40 underline-offset-2" onClick={() => setHintOpen((open) => !open)} aria-expanded={hintOpen}>Need a hint?</button>}
+          {result.evidence && <button type="button" className="font-medium text-[var(--editor-text-muted)] underline decoration-[var(--editor-border-strong)]/60 underline-offset-2" onClick={() => setEvidenceOpen((open) => !open)} aria-expanded={evidenceOpen}>Why this?</button>}
+        </div>
+      )}
+      {hintOpen && result.remediation && <p className="mt-1.5 text-[11px] leading-4 text-[var(--editor-text-muted)]"><span className="font-medium text-[var(--editor-text)]">Try this: </span>{result.remediation}</p>}
+      {evidenceOpen && result.evidence && <p className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-subtle)]"><span className="font-medium text-[var(--editor-text-muted)]">Evidence: </span>{result.evidence}</p>}
+    </article>
   );
 }
 

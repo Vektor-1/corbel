@@ -106,11 +106,11 @@ export function createSnappingMiddleware<T extends { currentFloor: any; moveWall
         // Validate connection
         const updatedState = get();
         if (updatedState.currentFloor) {
-          const newWall = updatedState.currentFloor.walls.find(w => w.id === wallId);
+          const newWall = updatedState.currentFloor.walls.find((w: any) => w.id === wallId);
           if (newWall) {
             // Check for possible T-junctions or crosses
             const possibleConnections = updatedState.currentFloor.walls.filter(
-              w => w.id !== wallId && canConnectWalls(w, newWall)
+              (w: any) => w.id !== wallId && canConnectWalls(w, newWall)
             );
 
             // Apply joint constraints
@@ -118,7 +118,7 @@ export function createSnappingMiddleware<T extends { currentFloor: any; moveWall
             updated = applyJointConstraints(updated, wallId, 'start');
             updated = applyJointConstraints(updated, wallId, 'end');
 
-            set(() => ({
+            (set as any)(() => ({
               currentFloor: updated,
             }));
           }

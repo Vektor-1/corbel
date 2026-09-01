@@ -81,6 +81,8 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
       material: 'sandcrete',
       type: detection.role ?? 'loadBearing',
       height: 2700,
+      confidence: detection.confidence,
+      source: 'ai' as const,
     }));
 
   let walls: Wall[] = [];
@@ -108,6 +110,8 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
         width: detection.widthMm,
         type: 'internal',
         swing: detection.swing ?? 'left',
+        confidence: detection.confidence,
+        source: 'ai',
       };
       doors.push(rehostWallOpening(door, rawWalls, walls));
     } else {
@@ -118,6 +122,8 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
         width: detection.widthMm,
         height: detection.heightMm ?? 1200,
         sillHeight: detection.sillHeightMm ?? 900,
+        confidence: detection.confidence,
+        source: 'ai',
       };
       windows.push(rehostWallOpening(window, rawWalls, walls));
     }

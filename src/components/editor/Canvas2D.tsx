@@ -1,17 +1,19 @@
 'use client';
 
 import { useDesignStore } from '@/store/designStore';
-import { Stage, Layer, Rect, Line, Circle, Text, Group, Arc } from 'react-konva';
+import { Stage, Layer, Rect, Line, Circle, Text, Group, Arc, Image as KonvaImage } from 'react-konva';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import type Konva from 'konva';
+import Konva from 'konva';
 import { useFeatureFlag } from '@/lib/flags';
 import type { Vector2d } from 'konva/lib/types';
-import { computeWallFootprints, wallQuad, MM_PER_PX } from '@/lib/geometry/wall-joints';
+import { computeWallFootprints, wallQuad } from '@/lib/geometry/wall-joints';
+import { millimetresPerPixel, pixelsPerMeter } from '@/lib/geometry/scale';
 import { pointAlongWall } from '@/lib/geometry/wall-intersections';
 import { polygonCentroid } from '@/lib/geometry/rooms';
 import { OBJECT_CATALOG_BY_ID } from '@/lib/objects/catalog';
 import { compareFloorPlans, type MatchStatus } from '@/lib/comparison';
 import type { DesignObject, Door, MaterialType, ObjectAssetId, Wall, WallType, Window } from '@/types/design';
+import { formatArea, formatLength, type AreaUnit, type LengthUnit } from '@/lib/units/measurements';
 
 const GRID_SIZE = 20;
 const SNAP_DISTANCE = 10;
@@ -25,11 +27,14 @@ interface Canvas2DProps {
   activeObjectAssetId: ObjectAssetId;
   ghostFloorPlan?: import('@/types/design').FloorPlan | null;
   ghostOpacity?: number;
+  traceImage?: import('@/store/designStore').TraceImageReference | null;
   diffMode?: boolean;
   stageRef?: React.RefObject<Konva.Stage | null>;
   showGrid?: boolean;
   showRoomLabels?: boolean;
   showWallDimensions?: boolean;
+  lengthUnit?: LengthUnit;
+  areaUnit?: AreaUnit;
 }
 
 export const Canvas2D = React.memo(function Canvas2D({
@@ -41,11 +46,14 @@ export const Canvas2D = React.memo(function Canvas2D({
   activeObjectAssetId,
   ghostFloorPlan,
   ghostOpacity = 0.25,
+  traceImage,
   diffMode = false,
   stageRef: externalStageRef,
   showGrid = true,
   showRoomLabels = true,
   showWallDimensions = true,
+  lengthUnit = 'mm',
+  areaUnit = 'm²',
 }: Canvas2DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const internalStageRef = useRef<Konva.Stage>(null);
@@ -54,6 +62,7 @@ export const Canvas2D = React.memo(function Canvas2D({
   const [startPos, setStartPos] = useState<Vector2d | null>(null);
   const [wallPreview, setWallPreview] = useState<{ start: Vector2d; end: Vector2d } | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 900, height: 600 });
+  const [referenceImage, setReferenceImage] = useState<HTMLImageElement | null>(null);
 
   const palette = theme === 'dark'
     ? {
@@ -101,12 +110,15 @@ export const Canvas2D = React.memo(function Canvas2D({
     deleteObject,
     setSelectedElement,
   } = useDesignStore();
+  const planPixelsPerMeter = pixelsPerMeter(floorPlan?.scale);
+  const planMillimetresPerPixel = millimetresPerPixel(floorPlan?.scale);
+  const ghostMillimetresPerPixel = millimetresPerPixel(ghostFloorPlan?.scale);
   const traceToLearnEnabled = useFeatureFlag('traceToLearn');
   const walls = floorPlan?.walls;
-  const footprints = useMemo(() => computeWallFootprints(walls ?? []), [walls]);
+  const footprints = useMemo(() => computeWallFootprints(walls ?? [], planPixelsPerMeter), [walls, planPixelsPerMeter]);
 
   const ghostWalls = ghostFloorPlan?.walls;
-  const ghostFootprints = useMemo(() => computeWallFootprints(ghostWalls ?? []), [ghostWalls]);
+  const ghostFootprints = useMemo(() => computeWallFootprints(ghostWalls ?? [], ghostFloorPlan?.scale), [ghostWalls, ghostFloorPlan?.scale]);
 
   // Semantic diff: map each ghost (original) element to its match status so the
   // underlay can show what the redesign removed, moved, or resized.
@@ -148,6 +160,21 @@ export const Canvas2D = React.memo(function Canvas2D({
 
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!traceImage?.url) {
+      setReferenceImage(null);
+      return;
+    }
+    const image = new window.Image();
+    image.onload = () => setReferenceImage(image);
+    image.onerror = () => setReferenceImage(null);
+    image.src = traceImage.url;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [traceImage?.url]);
 
   const snapToGrid = (pos: Vector2d): Vector2d => ({
     x: Math.round(pos.x / GRID_SIZE) * GRID_SIZE,
@@ -260,7 +287,7 @@ export const Canvas2D = React.memo(function Canvas2D({
 
       const projectedOffset = ((pointer.x - wall.startPoint.x) * dx + (pointer.y - wall.startPoint.y) * dy) / length;
       const openingWidthMm = currentTool === 'door' ? 900 : 1200;
-      const halfWidthPx = openingWidthMm / MM_PER_PX / 2;
+      const halfWidthPx = openingWidthMm / planMillimetresPerPixel / 2;
       const offset = Math.max(halfWidthPx, Math.min(length - halfWidthPx, projectedOffset));
       if (length < halfWidthPx * 2) return;
 
@@ -383,7 +410,7 @@ export const Canvas2D = React.memo(function Canvas2D({
               y={centroid.y + 2}
               width={110}
               align="center"
-              text={`${room.area.toFixed(2)} m²`}
+              text={formatArea(room.area, areaUnit)}
               fontSize={10}
               fontFamily="ui-monospace, monospace"
               fill={palette.label}
@@ -454,7 +481,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     const centerX = (wall.startPoint.x + wall.endPoint.x) / 2;
     const centerY = (wall.startPoint.y + wall.endPoint.y) / 2;
     const wallLengthMm = Math.round(
-      Math.hypot(wall.endPoint.x - wall.startPoint.x, wall.endPoint.y - wall.startPoint.y) * MM_PER_PX
+      Math.hypot(wall.endPoint.x - wall.startPoint.x, wall.endPoint.y - wall.startPoint.y) * planMillimetresPerPixel
     );
 
     return (
@@ -476,7 +503,7 @@ export const Canvas2D = React.memo(function Canvas2D({
           <Text
             x={centerX - 28}
             y={centerY - 18}
-            text={`${wallLengthMm} mm`}
+            text={formatLength(wallLengthMm, lengthUnit)}
             fontSize={10}
             fontFamily="ui-monospace, monospace"
             fill={isSelected ? palette.handle : palette.label}
@@ -494,7 +521,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     const center = pointAlongWall(wall, door.position.x);
     const angle = Math.atan2(wall.endPoint.y - wall.startPoint.y, wall.endPoint.x - wall.startPoint.x);
     const angleDegrees = (angle * 180) / Math.PI;
-    const width = door.width / MM_PER_PX;
+    const width = door.width / planMillimetresPerPixel;
     const halfWidth = width / 2;
     const direction = { x: Math.cos(angle), y: Math.sin(angle) };
     const hinge = door.swing === 'left'
@@ -524,7 +551,7 @@ export const Canvas2D = React.memo(function Canvas2D({
             center.y + direction.y * halfWidth,
           ]}
           stroke={palette.canvas}
-          strokeWidth={wall.thickness / MM_PER_PX + 3}
+          strokeWidth={wall.thickness / planMillimetresPerPixel + 3}
         />
         <Line
           points={[hinge.x, hinge.y, leafEnd.x, leafEnd.y]}
@@ -557,7 +584,7 @@ export const Canvas2D = React.memo(function Canvas2D({
 
     const center = pointAlongWall(wall, window.position.x);
     const angle = Math.atan2(wall.endPoint.y - wall.startPoint.y, wall.endPoint.x - wall.startPoint.x);
-    const width = window.width / MM_PER_PX;
+    const width = window.width / planMillimetresPerPixel;
     const halfWidth = width / 2;
     const direction = { x: Math.cos(angle), y: Math.sin(angle) };
     const normal = { x: -direction.y, y: direction.x };
@@ -581,7 +608,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         <Line
           points={endpoints(0)}
           stroke={palette.canvas}
-          strokeWidth={wall.thickness / MM_PER_PX + 3}
+          strokeWidth={wall.thickness / planMillimetresPerPixel + 3}
         />
         <Line points={endpoints(-3)} stroke={color} strokeWidth={1.5} />
         <Line points={endpoints(0)} stroke={color} strokeWidth={1.5} />
@@ -592,7 +619,7 @@ export const Canvas2D = React.memo(function Canvas2D({
   });
 
   const previewQuad = wallPreview
-    ? wallQuad(wallPreview.start, wallPreview.end, defaultWallThickness / MM_PER_PX / 2)
+    ? wallQuad(wallPreview.start, wallPreview.end, defaultWallThickness / planMillimetresPerPixel / 2)
     : null;
 
   const previewWall = wallPreview ? (
@@ -616,12 +643,15 @@ export const Canvas2D = React.memo(function Canvas2D({
       <Text
         x={(wallPreview.start.x + wallPreview.end.x) / 2 - 28}
         y={(wallPreview.start.y + wallPreview.end.y) / 2 - 18}
-        text={`${Math.round(
-          Math.hypot(
-            wallPreview.end.x - wallPreview.start.x,
-            wallPreview.end.y - wallPreview.start.y
-          ) * MM_PER_PX
-        )} mm`}
+        text={formatLength(
+          Math.round(
+            Math.hypot(
+              wallPreview.end.x - wallPreview.start.x,
+              wallPreview.end.y - wallPreview.start.y
+            ) * planMillimetresPerPixel
+          ),
+          lengthUnit
+        )}
         fontSize={10}
         fontFamily="ui-monospace, monospace"
         fill={palette.previewLabel}
@@ -630,6 +660,14 @@ export const Canvas2D = React.memo(function Canvas2D({
   ) : null;
 
   const hasGeometry = (floorPlan?.walls.length ?? 0) + (floorPlan?.objects?.length ?? 0) > 0;
+  const referenceWidth = referenceImage ? referenceImage.width * (traceImage?.scale ?? 1) : 0;
+  const referenceHeight = referenceImage ? referenceImage.height * (traceImage?.scale ?? 1) : 0;
+  const calibrationWall = traceImage?.calibration
+    ? floorPlan?.walls.find((wall) => wall.id === traceImage.calibration?.wallId)
+    : null;
+  const calibrationLabel = traceImage?.calibration
+    ? `Calibration · ${formatLength(traceImage.calibration.knownLengthMm, lengthUnit)}`
+    : null;
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[var(--editor-canvas)]">
@@ -645,6 +683,42 @@ export const Canvas2D = React.memo(function Canvas2D({
       >
         <Layer>
           <Rect x={0} y={0} width={canvasSize.width} height={canvasSize.height} fill={palette.canvas} />
+          {traceImage && referenceImage && traceImage.opacity > 0 && (
+            <KonvaImage
+              image={referenceImage}
+              x={(canvasSize.width - referenceWidth) / 2}
+              y={(canvasSize.height - referenceHeight) / 2}
+              width={referenceWidth}
+              height={referenceHeight}
+              opacity={traceImage.opacity}
+              filters={traceImage.blur > 0 ? [Konva.Filters.Blur] : undefined}
+              blurRadius={traceImage.blur}
+              listening={false}
+            />
+          )}
+          {calibrationWall && calibrationLabel && (
+            <>
+              <Line
+                points={[calibrationWall.startPoint.x, calibrationWall.startPoint.y, calibrationWall.endPoint.x, calibrationWall.endPoint.y]}
+                stroke={palette.selection}
+                strokeWidth={4}
+                lineCap="round"
+                opacity={0.9}
+                listening={false}
+              />
+              <Text
+                x={(calibrationWall.startPoint.x + calibrationWall.endPoint.x) / 2 - 70}
+                y={(calibrationWall.startPoint.y + calibrationWall.endPoint.y) / 2 - 36}
+                width={140}
+                align="center"
+                text={calibrationLabel}
+                fontSize={10}
+                fontStyle="bold"
+                fill={palette.selection}
+                listening={false}
+              />
+            </>
+          )}
           {showGrid && gridLines}
 
           {/* Ghost layer — original imported plan as tracing-paper underlay */}
@@ -681,7 +755,7 @@ export const Canvas2D = React.memo(function Canvas2D({
                 if (!wall) return null;
                 const center = pointAlongWall(wall, door.position.x);
                 const angle = Math.atan2(wall.endPoint.y - wall.startPoint.y, wall.endPoint.x - wall.startPoint.x);
-                const w = door.width / MM_PER_PX;
+                const w = door.width / ghostMillimetresPerPixel;
                 const dir = { x: Math.cos(angle), y: Math.sin(angle) };
                 return (
                   <Line
@@ -691,7 +765,7 @@ export const Canvas2D = React.memo(function Canvas2D({
                       center.x + dir.x * w / 2, center.y + dir.y * w / 2,
                     ]}
                     stroke={diffTint(door.id, theme === 'dark' ? '#8a7055' : '#9a7a58')}
-                    strokeWidth={wall.thickness / MM_PER_PX + 1}
+                    strokeWidth={wall.thickness / ghostMillimetresPerPixel + 1}
                     opacity={ghostOpacity}
                     listening={false}
                   />
@@ -702,7 +776,7 @@ export const Canvas2D = React.memo(function Canvas2D({
                 if (!wall) return null;
                 const center = pointAlongWall(wall, win.position.x);
                 const angle = Math.atan2(wall.endPoint.y - wall.startPoint.y, wall.endPoint.x - wall.startPoint.x);
-                const w = win.width / MM_PER_PX;
+                const w = win.width / ghostMillimetresPerPixel;
                 const dir = { x: Math.cos(angle), y: Math.sin(angle) };
                 return (
                   <Line
@@ -712,7 +786,7 @@ export const Canvas2D = React.memo(function Canvas2D({
                       center.x + dir.x * w / 2, center.y + dir.y * w / 2,
                     ]}
                     stroke={diffTint(win.id, theme === 'dark' ? '#5a8090' : '#6a9aaa')}
-                    strokeWidth={wall.thickness / MM_PER_PX + 1}
+                    strokeWidth={wall.thickness / ghostMillimetresPerPixel + 1}
                     opacity={ghostOpacity}
                     listening={false}
                   />
@@ -732,7 +806,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         </Layer>
       </Stage>
 
-      {!hasGeometry && !ghostFloorPlan && (
+      {!hasGeometry && !ghostFloorPlan && !traceImage && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="max-w-sm text-center">
             <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--editor-text-subtle)]">

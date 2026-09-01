@@ -80,6 +80,8 @@ export interface ImportPipelineOptions {
   fetchImpl?: typeof fetch;
   confThreshold?: number;
   iouThreshold?: number;
+  /** Apply temporary contrast and edge enhancement to the YOLO input. Default false pending benchmark improvement. */
+  enhanceImage?: boolean;
   /** Pixels-per-metre to use when OCR is skipped or fails. */
   fixedScale?: number;
   ocrTimeoutMs?: number; // default 20_000
@@ -274,6 +276,7 @@ export async function runImportPipeline(
     const detection = await detectLocalMl(file, {
       confThreshold: options.confThreshold,
       iouThreshold: options.iouThreshold,
+      enhanceImage: options.enhanceImage,
     });
     boxes = detection.boxes;
     metrics['P2'] = performance.now() - startP2;

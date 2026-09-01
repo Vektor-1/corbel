@@ -4,14 +4,12 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, useGLTF } from '@react-three/drei';
 import { useDesignStore } from '@/store/designStore';
 import { computeWallFootprints, type WallFootprint } from '@/lib/geometry/wall-joints';
+import { pixelsPerMeter } from '@/lib/geometry/scale';
 import * as THREE from 'three';
 import { Component, Suspense, useEffect, useMemo, type ReactNode } from 'react';
 import { OBJECT_CATALOG_BY_ID } from '@/lib/objects/catalog';
 
 import type { DesignObject, ObjectAsset, Wall, Door, Window } from '@/types/design';
-
-/** Canvas px → meters (100 px = 1 m). */
-const PX_TO_M = 0.01;
 
 // Physical material palette — walls read as limestone plaster, doors as
 // walnut joinery, windows as steel-framed glass. Constant across themes;
@@ -39,7 +37,7 @@ const environments = {
   },
 } as const;
 
-function WallMesh({ wall, footprint }: { wall: Wall; footprint: WallFootprint }) {
+function WallMesh({ wall, footprint, pixelsPerMetre }: { wall: Wall; footprint: WallFootprint; pixelsPerMetre: number }) {
   const height = Math.max(1.2, wall.height / 1000);
   const color = wall.type === 'loadBearing' ? materials.loadBearing : materials.partition;
 
@@ -49,13 +47,13 @@ function WallMesh({ wall, footprint }: { wall: Wall; footprint: WallFootprint })
   // (x, y) lands on world (x, z) with the extrusion pointing up.
   const geometry = useMemo(() => {
     const shape = new THREE.Shape();
-    shape.moveTo(footprint[0].x * PX_TO_M, -footprint[0].y * PX_TO_M);
+    shape.moveTo(footprint[0].x / pixelsPerMetre, -footprint[0].y / pixelsPerMetre);
     for (let i = 1; i < footprint.length; i += 1) {
-      shape.lineTo(footprint[i].x * PX_TO_M, -footprint[i].y * PX_TO_M);
+      shape.lineTo(footprint[i].x / pixelsPerMetre, -footprint[i].y / pixelsPerMetre);
     }
     shape.closePath();
     return new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
-  }, [footprint, height]);
+  }, [footprint, height, pixelsPerMetre]);
 
   return (
     <mesh geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
@@ -64,7 +62,7 @@ function WallMesh({ wall, footprint }: { wall: Wall; footprint: WallFootprint })
   );
 }
 
-function DoorMesh({ door, wall }: { door: Door; wall: Wall }) {
+function DoorMesh({ door, wall, pixelsPerMetre }: { door: Door; wall: Wall; pixelsPerMetre: number }) {
   const doorWidth = Math.max(0.6, door.width / 1000);
   const doorHeight = Math.min(wall.height / 1000, 2.1);
 
@@ -73,8 +71,8 @@ function DoorMesh({ door, wall }: { door: Door; wall: Wall }) {
   const wallLength = Math.sqrt(dx * dx + dy * dy);
   const t = door.position.x / wallLength;
 
-  const doorX = (wall.startPoint.x + (wall.endPoint.x - wall.startPoint.x) * t) / 100;
-  const doorZ = (wall.startPoint.y + (wall.endPoint.y - wall.startPoint.y) * t) / 100;
+  const doorX = (wall.startPoint.x + (wall.endPoint.x - wall.startPoint.x) * t) / pixelsPerMetre;
+  const doorZ = (wall.startPoint.y + (wall.endPoint.y - wall.startPoint.y) * t) / pixelsPerMetre;
   const angle = Math.atan2(dy, dx);
 
   const doorColor = door.type === 'entry' ? materials.doorEntry : materials.doorInternal;
@@ -87,7 +85,7 @@ function DoorMesh({ door, wall }: { door: Door; wall: Wall }) {
   );
 }
 
-function WindowMesh({ window: win, wall }: { window: Window; wall: Wall }) {
+function WindowMesh({ window: win, wall, pixelsPerMetre }: { window: Window; wall: Wall; pixelsPerMetre: number }) {
   const winWidth = Math.max(0.8, win.width / 1000);
   const winHeight = Math.max(0.6, win.height / 1000);
 
@@ -96,8 +94,8 @@ function WindowMesh({ window: win, wall }: { window: Window; wall: Wall }) {
   const wallLength = Math.sqrt(dx * dx + dy * dy);
   const t = win.position.x / wallLength;
 
-  const winX = (wall.startPoint.x + (wall.endPoint.x - wall.startPoint.x) * t) / 100;
-  const winZ = (wall.startPoint.y + (wall.endPoint.y - wall.startPoint.y) * t) / 100;
+  const winX = (wall.startPoint.x + (wall.endPoint.x - wall.startPoint.x) * t) / pixelsPerMetre;
+  const winZ = (wall.startPoint.y + (wall.endPoint.y - wall.startPoint.y) * t) / pixelsPerMetre;
   const angle = Math.atan2(dy, dx);
   const windowSillHeight = win.sillHeight / 1000;
 
@@ -197,7 +195,8 @@ function Floor({ width, height, theme }: { width: number; height: number; theme:
 function SceneContent({ theme }: { theme: 'light' | 'dark' }) {
   const { floorPlan, selectedElementId, setSelectedElement } = useDesignStore();
   const walls = floorPlan?.walls;
-  const footprints = useMemo(() => computeWallFootprints(walls ?? []), [walls]);
+  const planPixelsPerMeter = pixelsPerMeter(floorPlan?.scale);
+  const footprints = useMemo(() => computeWallFootprints(walls ?? [], planPixelsPerMeter), [walls, planPixelsPerMeter]);
 
   if (!floorPlan) return null;
 
@@ -230,17 +229,17 @@ function SceneContent({ theme }: { theme: 'light' | 'dark' }) {
       <Floor width={floorPlan.width} height={floorPlan.height} theme={theme} />
       {floorPlan.walls.map((wall) => {
         const footprint = footprints.get(wall.id);
-        return footprint ? <WallMesh key={wall.id} wall={wall} footprint={footprint} /> : null;
+        return footprint ? <WallMesh key={wall.id} wall={wall} footprint={footprint} pixelsPerMetre={planPixelsPerMeter} /> : null;
       })}
 
       {floorPlan.doors.map((door) => {
         const wall = wallMap.get(door.wallId);
-        return wall ? <DoorMesh key={door.id} door={door} wall={wall} /> : null;
+        return wall ? <DoorMesh key={door.id} door={door} wall={wall} pixelsPerMetre={planPixelsPerMeter} /> : null;
       })}
 
       {floorPlan.windows.map((win) => {
         const wall = wallMap.get(win.wallId);
-        return wall ? <WindowMesh key={win.id} window={win} wall={wall} /> : null;
+        return wall ? <WindowMesh key={win.id} window={win} wall={wall} pixelsPerMetre={planPixelsPerMeter} /> : null;
       })}
 
       {(floorPlan.objects ?? []).map((object) => {
@@ -248,7 +247,7 @@ function SceneContent({ theme }: { theme: 'light' | 'dark' }) {
         if (!asset) return null;
 
         return (
-          <group key={object.id} position={[object.position.x / 100, 0, object.position.y / 100]}>
+          <group key={object.id} position={[object.position.x / planPixelsPerMeter, 0, object.position.y / planPixelsPerMeter]}>
             <ObjectAssetBoundary asset={asset}>
               <Suspense fallback={<ObjectPlaceholder asset={asset} />}>
                 <ObjectMesh

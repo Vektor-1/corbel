@@ -8,8 +8,13 @@ function client() {
   return { apiKey: key, baseUrl };
 }
 
+/** Use Rodium's fast vision-capable profile unless a catalog model is configured. */
+export function resolveRodiumModel(): string {
+  return process.env.RODIUM_AI_MODEL?.trim() || 'rodium/fast';
+}
+
 interface RodiumAIRequest {
-  model: 'gpt-5.6-luna' | 'gemini-3.1';
+  model: string;
   messages: Array<{ role: 'user' | 'system'; content: string | { type: string; text?: string; image_url?: string }[] }>;
   temperature?: number;
   max_tokens?: number;
@@ -30,6 +35,7 @@ async function makeRodiumRequest(request: RodiumAIRequest): Promise<string> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(45_000),
   });
 
   if (!response.ok) {
@@ -47,7 +53,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
   return Buffer.from(buffer).toString('base64');
 }
 
-export function makeAsk(imageUrl: string, model: 'gpt-5.6-luna' | 'gemini-3.1'): AskFn {
+export function makeAsk(imageUrl: string, model = resolveRodiumModel()): AskFn {
   let cachedBase64: string | null = null;
 
   return async (prompt: string) => {
@@ -83,7 +89,7 @@ export function makeAsk(imageUrl: string, model: 'gpt-5.6-luna' | 'gemini-3.1'):
 
 export async function runRodiumDetection(
   source: ImportSource,
-  model: 'gpt-5.6-luna' | 'gemini-3.1' = 'gpt-5.6-luna'
+  model = resolveRodiumModel()
 ): Promise<ReconstructionResultV1> {
   const ask = makeAsk(source.url, model);
   return runDetectionPipeline(ask, source, `rodium-${model}`);
@@ -91,7 +97,7 @@ export async function runRodiumDetection(
 
 export function submitRodiumJob(
   source: ImportSource,
-  model: 'gpt-5.6-luna' | 'gemini-3.1' = 'gpt-5.6-luna'
+  model = resolveRodiumModel()
 ): string {
   return submitPipelineJob(source, `rodium-${model}`, async () => makeAsk(source.url, model));
 }
@@ -102,7 +108,7 @@ export function getRodiumJob(id: string) {
 
 export async function runRodiumOcrAndScale(
   source: ImportSource,
-  model: 'gpt-5.6-luna' | 'gemini-3.1' = 'gemini-3.1'
+  model = resolveRodiumModel()
 ): Promise<{ labels: RawLabel[]; scale: ScaleResult }> {
   const ask = makeAsk(source.url, model);
   return runOcrAndScale(ask, source, `rodium-ocr-${model}`);

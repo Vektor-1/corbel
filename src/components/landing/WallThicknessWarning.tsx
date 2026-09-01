@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Heerich } from 'heerich';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export function WallThicknessWarning() {
   const [stories, setStories] = useState<1 | 2>(1);
@@ -94,7 +95,7 @@ export function WallThicknessWarning() {
   const svgMarkup = h.toSVG({ padding: 15 });
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-6 rounded-xl border border-[#232019] bg-[#161511] text-slate-200">
+    <div className="flex flex-col lg:flex-row gap-8 py-6 text-slate-200 border-b border-[#232019]">
       {/* 3D Rendering Canvas */}
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-4">
@@ -106,8 +107,10 @@ export function WallThicknessWarning() {
           {/* Building Height Selectors */}
           <div className="flex gap-1 bg-[#232019] p-1 rounded-lg border border-slate-800">
             <button
+              type="button"
               onClick={() => setStories(1)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              aria-pressed={stories === 1}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 ${
                 stories === 1
                   ? 'bg-emerald-600/25 border border-emerald-500/40 text-emerald-300'
                   : 'text-slate-400 hover:text-white'
@@ -116,8 +119,10 @@ export function WallThicknessWarning() {
               1-Storey
             </button>
             <button
+              type="button"
               onClick={() => setStories(2)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              aria-pressed={stories === 2}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all active:scale-95 ${
                 stories === 2
                   ? 'bg-red-950/40 border border-red-500/40 text-red-400 font-semibold'
                   : 'text-slate-400 hover:text-white'
@@ -131,7 +136,7 @@ export function WallThicknessWarning() {
         {/* Oblique Voxel Scene Display */}
         <div
           dangerouslySetInnerHTML={{ __html: svgMarkup }}
-          className="flex-1 min-h-[220px] bg-[#1a1814]/60 border border-[#232019] rounded-lg p-4 flex items-center justify-center relative [&_path]:transition-colors [&_path]:duration-300"
+          className="flex-1 min-h-[220px] bg-[#12110e]/20 border border-[#232019] rounded-lg p-4 flex items-center justify-center relative [&_path]:transition-colors [&_path]:duration-300"
         />
 
         {/* Labels underneath the model */}
@@ -160,7 +165,7 @@ export function WallThicknessWarning() {
           {isInvalid ? (
             <div className="rounded-lg border border-red-500/20 bg-red-950/20 p-4 mb-4">
               <div className="flex items-center gap-2 text-red-400 text-sm font-bold mb-1">
-                <span>⚠️</span>
+                <AlertTriangle className="w-4 h-4" aria-hidden="true" />
                 <span>STRUCTURAL HAZARD DETECTED</span>
               </div>
               <p className="text-xs text-red-200/80 leading-relaxed">
@@ -170,7 +175,7 @@ export function WallThicknessWarning() {
           ) : (
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-4 mb-4">
               <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold mb-1">
-                <span>✓</span>
+                <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                 <span>STRUCTURE COMPLIANT</span>
               </div>
               <p className="text-xs text-emerald-200/80 leading-relaxed">

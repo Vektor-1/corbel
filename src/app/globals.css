@@ -4,6 +4,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  --font-geist-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-display: Iowan Old Style, Palatino Linotype, Book Antiqua, Georgia, serif;
+  --font-brutal: Arial Narrow, Avenir Next Condensed, Impact, sans-serif;
+}
+
 @layer base {
   html {
     @apply scroll-smooth font-sans;
@@ -19,63 +26,67 @@
 
 /* ───────────────────────────────────────────────────────────────
    Corbel editor themes
-   Light  — "Gallery":  warm limestone paper, bronze accent
-   Dark   — "Atelier":  matte warm charcoal, champagne accent
+   Light  — "Gallery":  warm paper, kiln-clay accent
+   Dark   — "Atelier":  matte charcoal, burnished brass accent
    ─────────────────────────────────────────────────────────────── */
 .corbel-editor {
-  --editor-bg: #eae6de;
-  --editor-canvas: #f2efe7;
-  --editor-surface: #faf8f2;
+  --editor-bg: #e7e1d6;
+  --editor-canvas: #f3f0e8;
+  --editor-surface: #fcfaf5;
   --editor-surface-raised: #ffffff;
-  --editor-surface-muted: #e8e3d8;
-  --editor-border: #d8d2c4;
-  --editor-border-strong: #a89f8d;
-  --editor-text: #26221a;
-  --editor-text-muted: #4f4a3d;
-  --editor-text-subtle: #837c6b;
-  --editor-accent: #8a6b3f;
-  --editor-accent-hover: #75592f;
-  --editor-accent-soft: #eadfc9;
-  --editor-accent-text: #6d5327;
-  --editor-grid: #ddd7c9;
-  --editor-success: #3f6f4f;
-  --editor-success-soft: #dfe8dd;
-  --editor-warning: #92661d;
-  --editor-warning-soft: #f2e7cd;
-  --editor-danger: #9c3c31;
-  --editor-danger-soft: #f1dcd7;
-  --editor-info: #5b6a74;
-  --editor-glass: rgba(250, 248, 242, 0.8);
-  --editor-glass-border: rgba(38, 34, 26, 0.1);
-  --editor-glass-shadow: 0 1px 2px rgba(28, 25, 18, 0.05), 0 12px 32px -12px rgba(28, 25, 18, 0.18);
+  --editor-surface-muted: #ede6d9;
+  --editor-border: #d5c9b8;
+  --editor-border-strong: #a99a83;
+  --editor-text: #29241d;
+  --editor-text-muted: #5d5447;
+  --editor-text-subtle: #7d7363;
+  --editor-accent: #975d36;
+  --editor-accent-hover: #7c4829;
+  --editor-accent-soft: #f0ddc7;
+  --editor-accent-text: #6b3b20;
+  --editor-grid: #d8d0c1;
+  --editor-success: #3d704f;
+  --editor-success-soft: #deebdf;
+  --editor-warning: #875b13;
+  --editor-warning-soft: #f5e6c8;
+  --editor-danger: #a34237;
+  --editor-danger-soft: #f4ddd8;
+  --editor-info: #3f6978;
+  --editor-info-soft: #dcecf0;
+  --editor-glass: rgba(252, 250, 245, 0.92);
+  --editor-menu-surface: #fcfaf5;
+  --editor-glass-border: rgba(41, 36, 29, 0.12);
+  --editor-glass-shadow: 0 2px 5px rgba(40, 32, 22, 0.06), 0 16px 36px -18px rgba(40, 32, 22, 0.25);
 }
 
 .corbel-editor[data-theme="dark"] {
-  --editor-bg: #12110e;
-  --editor-canvas: #161511;
-  --editor-surface: #1d1b16;
-  --editor-surface-raised: #24211b;
-  --editor-surface-muted: #1a1814;
-  --editor-border: #2c2921;
-  --editor-border-strong: #4d4839;
-  --editor-text: #ece7da;
-  --editor-text-muted: #c4bda9;
-  --editor-text-subtle: #8b8471;
-  --editor-accent: #c9a96a;
-  --editor-accent-hover: #dbbd80;
-  --editor-accent-soft: #2e2718;
-  --editor-accent-text: #e3c98f;
-  --editor-grid: #232019;
-  --editor-success: #a4c2a0;
-  --editor-success-soft: #1d291c;
-  --editor-warning: #d9b36a;
-  --editor-warning-soft: #33270f;
-  --editor-danger: #d98873;
-  --editor-danger-soft: #331b14;
-  --editor-info: #9db4bd;
-  --editor-glass: rgba(23, 21, 16, 0.76);
-  --editor-glass-border: rgba(236, 231, 218, 0.09);
-  --editor-glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 16px 40px -12px rgba(0, 0, 0, 0.55);
+  --editor-bg: #15120f;
+  --editor-canvas: #191613;
+  --editor-surface: #211d18;
+  --editor-surface-raised: #29231e;
+  --editor-surface-muted: #1c1814;
+  --editor-border: #393026;
+  --editor-border-strong: #625242;
+  --editor-text: #f1eadc;
+  --editor-text-muted: #cec3b1;
+  --editor-text-subtle: #978b78;
+  --editor-accent: #d4a168;
+  --editor-accent-hover: #e4b77f;
+  --editor-accent-soft: #3b2a1c;
+  --editor-accent-text: #f0c993;
+  --editor-grid: #28221d;
+  --editor-success: #a8ceab;
+  --editor-success-soft: #1d2d20;
+  --editor-warning: #e1b76a;
+  --editor-warning-soft: #392a10;
+  --editor-danger: #e29480;
+  --editor-danger-soft: #3b1e18;
+  --editor-info: #a8cbd5;
+  --editor-info-soft: #1c3037;
+  --editor-glass: rgba(33, 29, 24, 0.93);
+  --editor-menu-surface: #29231e;
+  --editor-glass-border: rgba(241, 234, 220, 0.1);
+  --editor-glass-shadow: 0 3px 8px rgba(0, 0, 0, 0.34), 0 18px 44px -18px rgba(0, 0, 0, 0.72);
 }
 
 /* Floating island panels that hover over the canvas */
@@ -83,8 +94,25 @@
   background: var(--editor-glass);
   border: 1px solid var(--editor-glass-border);
   box-shadow: var(--editor-glass-shadow);
-  backdrop-filter: blur(20px) saturate(1.15);
-  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.05);
+  -webkit-backdrop-filter: blur(14px) saturate(1.05);
+}
+
+/* Menus need a stable, readable surface above detailed plan geometry. */
+.corbel-editor .editor-action-menu {
+  background: var(--editor-menu-surface);
+  border-color: var(--editor-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.corbel-editor ::selection {
+  background: var(--editor-accent-soft);
+  color: var(--editor-accent-text);
+}
+
+.corbel-editor :focus-visible {
+  outline-color: var(--editor-accent);
 }
 
 .font-display {
@@ -95,41 +123,61 @@
    the editor. Set on <html> while the editor route is mounted so portaled
    content rendered at <body> inherits the same palette. */
 html[data-corbel-editor] {
-  --background: #f2efe7;
-  --foreground: #26221a;
-  --popover: #faf8f2;
-  --popover-foreground: #26221a;
-  --primary: #26221a;
-  --primary-foreground: #faf8f2;
-  --secondary: #e8e3d8;
-  --secondary-foreground: #26221a;
-  --muted: #e8e3d8;
-  --muted-foreground: #837c6b;
-  --accent: #eadfc9;
-  --accent-foreground: #6d5327;
-  --destructive: #9c3c31;
-  --border: #d8d2c4;
-  --input: #d8d2c4;
-  --ring: #8a6b3f;
+  --background: #f3f0e8;
+  --foreground: #29241d;
+  --popover: #fcfaf5;
+  --popover-foreground: #29241d;
+  --primary: #975d36;
+  --primary-foreground: #ffffff;
+  --secondary: #ede6d9;
+  --secondary-foreground: #29241d;
+  --muted: #ede6d9;
+  --muted-foreground: #7d7363;
+  --accent: #f0ddc7;
+  --accent-foreground: #6b3b20;
+  --destructive: #a34237;
+  --border: #d5c9b8;
+  --input: #d5c9b8;
+  --ring: #975d36;
 }
 
 html[data-corbel-editor="dark"] {
-  --background: #161511;
-  --foreground: #ece7da;
-  --popover: #24211b;
-  --popover-foreground: #ece7da;
-  --primary: #c9a96a;
-  --primary-foreground: #1d1a12;
-  --secondary: #24211b;
-  --secondary-foreground: #ece7da;
-  --muted: #24211b;
-  --muted-foreground: #8b8471;
-  --accent: #2e2718;
-  --accent-foreground: #e3c98f;
-  --destructive: #d98873;
-  --border: #2c2921;
-  --input: rgba(236, 231, 218, 0.14);
-  --ring: #c9a96a;
+  --background: #191613;
+  --foreground: #f1eadc;
+  --popover: #29231e;
+  --popover-foreground: #f1eadc;
+  --primary: #d4a168;
+  --primary-foreground: #21170f;
+  --secondary: #29231e;
+  --secondary-foreground: #f1eadc;
+  --muted: #29231e;
+  --muted-foreground: #978b78;
+  --accent: #3b2a1c;
+  --accent-foreground: #f0c993;
+  --destructive: #e29480;
+  --border: #393026;
+  --input: rgba(241, 234, 220, 0.16);
+  --ring: #d4a168;
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Accessibility: focus-visible + reduced motion contract
+   ─────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid #c9a96a;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {
