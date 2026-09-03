@@ -111,14 +111,20 @@ async function stage2_walls(ask: AskFn, meta: ImageMeta, tag: string, isTraceBas
 ${meta.rotationNeeded !== 0 ? `Note: the image appears rotated ${meta.rotationNeeded}°, interpret coordinates accordingly.` : ''}
 
 Detect every wall segment. We will use an SVG format to leverage your pre-trained spatial representations.
+IMPORTANT - CHAIN OF THOUGHT:
+Before generating coordinates, you MUST output a <reasoning> block. 
+Describe the overall building shape, where the main exterior walls are, and the layout of the internal rooms. This semantic map ensures your coordinates are accurate.
 
 IMPORTANT - ORDERED ATTENTION:
-Do not trace randomly. Follow this exact sequence:
+After your reasoning block, follow this exact sequence for tracing:
 Step 1: Trace the complete outer perimeter (loadBearing) clockwise starting from the top-left.
 Step 2: Trace internal loadBearing walls top-to-bottom.
 Step 3: Trace internal partition walls left-to-right.
 
-Return your result strictly as valid SVG <line> elements inside an <svg> tag:
+Return your result strictly in this format:
+<reasoning>
+(Your spatial analysis here)
+</reasoning>
 <svg width="${meta.widthPx}" height="${meta.heightPx}">
   <line id="w1" x1="<pixel x>" y1="<pixel y>" x2="<pixel x>" y2="<pixel y>" stroke-width="<thickness in mm, e.g. 225>" class="loadBearing" data-confidence="<0.0-1.0>" />
 </svg>
@@ -128,8 +134,14 @@ Rules:
 - Trace each wall as a single straight line passing straight through doors/windows.
 - Outer walls are class="loadBearing" (typically 225mm), inner dividers are class="partition" (typically 115mm).
 - Split walls at visible T-junctions or corners.
+
+NEGATIVE CONSTRAINTS (NOISE REJECTION):
+- DO NOT trace furniture (beds, tables, counters, fixtures).
+- DO NOT trace text annotations, labels, or dimension lines.
+- DO NOT trace the red coordinate grid or its axis labels.
+- Ignore shadows, hatch patterns, and decorative elements.
 ${isTraceBaseline ? '- This is a Trace-to-Learn reference plan. Preserve the source layout faithfully; do not simplify.' : ''}
-- Return ONLY the raw <svg> string.`;
+- Return ONLY the XML/SVG format requested above, nothing else.`;
 
   const rawSvg = await ask(prompt) as string;
   
