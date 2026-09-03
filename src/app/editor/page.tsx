@@ -6,17 +6,32 @@ import { validateTraceFeedback } from '@/lib/standards/traceFeedback';
 import { loadDesignSnapshot, saveDesignSnapshot } from '@/lib/persistence/designSnapshot';
 import { useDesignStore } from '@/store/designStore';
 import { useEffect, useRef } from 'react';
+import { initBrowserSDK } from '@/lib/api/browser-sdk';
 import type { FloorPlan } from '@/types/design';
 
 export default function EditorPage() {
-  const { floorPlan, ghostFloorPlan, ghostOpacity, traceImage, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage, setValidationResults } = useDesignStore();
+  const { floorPlan, ghostFloorPlan, ghostOpacity, traceImage, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage, beginImageTrace, setValidationResults } = useDesignStore();
   const initialized = useRef(false);
+
+  useEffect(() => {
+    initBrowserSDK();
+  }, []);
 
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
 
     if (!floorPlan) {
+      const studyStimulus = new URLSearchParams(window.location.search).get('studyStimulus');
+      const stimulus = studyStimulus === 'A'
+        ? { url: '/study-stimuli/corbel-study-plan-a.svg', name: 'Corbel study plan A.svg' }
+        : studyStimulus === 'B'
+          ? { url: '/study-stimuli/corbel-study-plan-b.svg', name: 'Corbel study plan B.svg' }
+          : null;
+      if (stimulus) {
+        beginImageTrace(stimulus.url, stimulus.name);
+        return;
+      }
       try {
         const snapshot = loadDesignSnapshot(window.localStorage);
         if (snapshot) {
@@ -46,7 +61,7 @@ export default function EditorPage() {
       };
       setFloorPlan(newPlan);
     }
-  }, [floorPlan, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage]);
+  }, [beginImageTrace, floorPlan, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage]);
 
   useEffect(() => {
     if (!floorPlan) return;

@@ -219,7 +219,6 @@ export const useDesignStore = create<DesignState>(
               ...state.traceImage,
               calibration: { wallId, knownLengthMm, pixelsPerMeter: nextPixelsPerMeter, calibratedAt: new Date().toISOString() },
             },
-            validationResults: [],
           };
         });
         return calibrated;
@@ -437,6 +436,27 @@ export const useDesignStore = create<DesignState>(
         viewMode: state.viewMode,
         // ghostFloorPlan and ghostOpacity intentionally excluded from undo history
       }),
+      equality: (past: any, current: any) => {
+        // Avoid creating duplicate history entries on rapid, micro-delta writes
+        // (e.g., Konva drag events firing 60x per second).
+        if (!past?.floorPlan || !current?.floorPlan) return past?.floorPlan === current?.floorPlan;
+
+        // Quick structural checks first
+        if (
+          past.floorPlan.walls.length !== current.floorPlan.walls.length ||
+          past.floorPlan.doors.length !== current.floorPlan.doors.length ||
+          past.floorPlan.windows.length !== current.floorPlan.windows.length ||
+          past.floorPlan.rooms.length !== current.floorPlan.rooms.length ||
+          past.selectedElementId !== current.selectedElementId ||
+          past.currentTool !== current.currentTool ||
+          past.viewMode !== current.viewMode
+        ) {
+          return false;
+        }
+
+        // If structures match, treat as equivalent for undo purposes
+        return true;
+      },
     } as const
   ) as any
 );
