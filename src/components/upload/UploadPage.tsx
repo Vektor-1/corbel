@@ -12,8 +12,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { upload } from '@vercel/blob/client';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -32,6 +31,7 @@ import type { ImportSource } from '@/lib/plan-import/types';
 import { waitForHostedReconstruction } from '@/lib/services/hostedImport';
 import { useFeatureFlag } from '@/lib/flags';
 import { validateUploadFile } from '@/lib/uploads/uploadPolicy';
+import { uploadPlanReference } from '@/lib/uploads/planUpload';
 import {
   notifyReconstructionFailure,
   notifyReconstructionReady,
@@ -41,22 +41,6 @@ import {
 type Mode = 'reconstruct' | 'trace';
 type Phase = 'idle' | 'uploading' | 'processing' | 'review' | 'failed';
 type ProviderProgress = { status: string; progress: number };
-
-async function uploadImage(file: File): Promise<string> {
-  if (process.env.NODE_ENV === 'development' && !process.env.NEXT_PUBLIC_BLOB_ENABLED) {
-    const form = new FormData();
-    form.append('file', file);
-    const res = await fetch('/api/plan-import/local-upload', { method: 'POST', body: form });
-    const payload = await res.json();
-    if (!res.ok) throw new Error(payload.error ?? 'Local upload failed.');
-    return payload.url as string;
-  }
-  const blob = await upload(`plan-imports/${file.name}`, file, {
-    access: 'public',
-    handleUploadUrl: '/api/plan-import/upload',
-  });
-  return blob.url;
-}
 
 async function readImageSize(file: File) {
   if (!file.type.startsWith('image/')) return { width: 1, height: 1 };
@@ -79,11 +63,13 @@ async function createImportSource(file: File, url: string): Promise<ImportSource
 
 export default function UploadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const beginImportedEdit = useDesignStore((s) => s.beginImportedEdit);
   const beginImageTrace = useDesignStore((s) => s.beginImageTrace);
   const traceToLearnEnabled = useFeatureFlag('traceToLearn');
 
-  const [mode, setMode] = useState<Mode>('reconstruct');
+  const lessonTrace = searchParams.get('mode') === 'trace' && searchParams.get('lesson') === 'two-bedroom-plan-reading';
+  const [mode, setMode] = useState<Mode>(lessonTrace ? 'trace' : 'reconstruct');
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -120,13 +106,52 @@ export default function UploadPage() {
     setProviderProgress(null);
   }, []);
 
+  // Strategy 1: Add semantic grid overlay to improve AI spatial drift
+  const addGridToImage = async (original: File): Promise<File> => {
+    if (!original.type.startsWith('image/')) return original;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(original);
+        
+        ctx.drawImage(img, 0, 0);
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.4)';
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.font = '12px Arial';
+        ctx.lineWidth = 1;
+
+        const step = 100;
+        for (let x = 0; x < canvas.width; x += step) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+          ctx.fillText(`X:${x}`, x + 2, 12);
+        }
+        for (let y = 0; y < canvas.height; y += step) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+          ctx.fillText(`Y:${y}`, 2, y - 2);
+        }
+
+        canvas.toBlob(blob => {
+          if (blob) resolve(new File([blob], original.name, { type: original.type }));
+          else resolve(original);
+        }, original.type);
+      };
+      img.onerror = () => resolve(original);
+      img.src = URL.createObjectURL(original);
+    });
+  };
+
   const runReconstruct = useCallback(async () => {
     if (!file) return;
     setError(null);
     setProviderProgress(null);
     setPhase('uploading');
     try {
-      const imageUrl = await uploadImage(file);
+      const processedFile = await addGridToImage(file);
+      const imageUrl = await uploadPlanReference(processedFile);
 
       setPhase('processing');
       const result = await waitForHostedReconstruction(await createImportSource(file, imageUrl), {
@@ -151,7 +176,7 @@ export default function UploadPage() {
     setProviderProgress(null);
     setPhase('uploading');
     try {
-      const imageUrl = await uploadImage(file);
+      const imageUrl = await uploadPlanReference(file);
       beginImageTrace(imageUrl, file.name);
       toast.success('Reference plan added to the 2D editor. Adjust its scale and blur before tracing.');
       router.push('/editor');
@@ -179,7 +204,7 @@ export default function UploadPage() {
   return (
     <main className="min-h-screen bg-[#f2efe7] px-6 py-8 text-[#26221a]">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8 flex items-center justify-between">
+          <div className="mb-8 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8a806e]">Corbel Import</p>
             <h1 className="mt-2 font-display text-3xl">Upload a floor plan</h1>
@@ -190,7 +215,13 @@ export default function UploadPage() {
           <Button variant="outline" onClick={() => router.push('/')}>
             <ArrowLeft /> Home
           </Button>
-        </div>
+          </div>
+
+        {lessonTrace && (
+          <div className="mb-6 border border-[#b89a5a] bg-[#fbf4df] px-4 py-3 text-sm text-[#55431c]" role="status">
+            <strong>Continue your plan-reading practice.</strong> In Image retrace, use a visible known-length wall to calibrate your drawing. This lesson has not calibrated your uploaded image automatically.
+          </div>
+        )}
 
         {/* Mode toggle */}
         <div className="mb-6 flex gap-2">

@@ -110,29 +110,51 @@ async function stage2_walls(ask: AskFn, meta: ImageMeta, tag: string, isTraceBas
   const prompt = `This is a floor plan image (${meta.widthPx}×${meta.heightPx}px, quality: ${meta.quality}).
 ${meta.rotationNeeded !== 0 ? `Note: the image appears rotated ${meta.rotationNeeded}°, interpret coordinates accordingly.` : ''}
 
-Detect every wall segment. Return a JSON array of wall objects:
-[{
-  "id": "w1",
-  "startX": <pixel x>,
-  "startY": <pixel y>,
-  "endX": <pixel x>,
-  "endY": <pixel y>,
-  "thicknessMm": <estimated thickness in mm, typically 225 for load-bearing, 115 for partition>,
-  "role": "loadBearing" | "partition",
-  "confidence": <0.0-1.0>
-}]
+Detect every wall segment. We will use an SVG format to leverage your pre-trained spatial representations.
+
+IMPORTANT - ORDERED ATTENTION:
+Do not trace randomly. Follow this exact sequence:
+Step 1: Trace the complete outer perimeter (loadBearing) clockwise starting from the top-left.
+Step 2: Trace internal loadBearing walls top-to-bottom.
+Step 3: Trace internal partition walls left-to-right.
+
+Return your result strictly as valid SVG <line> elements inside an <svg> tag:
+<svg width="${meta.widthPx}" height="${meta.heightPx}">
+  <line id="w1" x1="<pixel x>" y1="<pixel y>" x2="<pixel x>" y2="<pixel y>" stroke-width="<thickness in mm, e.g. 225>" class="loadBearing" data-confidence="<0.0-1.0>" />
+</svg>
 
 Rules:
-- Use image pixel coordinates, top-left = (0,0).
-- Trace each wall as a straight segment between two endpoints.
-- Outer/perimeter walls are loadBearing, inner dividers are partition.
-- Do not include doors or windows — walls pass straight through openings.
-- Split walls at visible junctions and corners. Do not merge parallel walls or bridge an uncertain gap.
-- If a line is obscured, return a lower confidence instead of inventing a connection.
-${isTraceBaseline ? '- This is a Trace-to-Learn reference plan. Preserve the source layout faithfully; do not simplify, complete, or improve the design.' : ''}
-- Return only the JSON array.`;
+- Use image pixel coordinates, top-left = (0,0). A 100x100 grid overlay is provided in the image to help you read coordinates accurately.
+- Trace each wall as a single straight line passing straight through doors/windows.
+- Outer walls are class="loadBearing" (typically 225mm), inner dividers are class="partition" (typically 115mm).
+- Split walls at visible T-junctions or corners.
+${isTraceBaseline ? '- This is a Trace-to-Learn reference plan. Preserve the source layout faithfully; do not simplify.' : ''}
+- Return ONLY the raw <svg> string.`;
 
-  const result = await ask(prompt) as RawWall[];
+  const rawSvg = await ask(prompt) as string;
+  
+  // Regex parse the SVG output
+  const lineRegex = /<line[^>]+id=["']([^"']+)["'][^>]*x1=["']([\d.]+)["'][^>]*y1=["']([\d.]+)["'][^>]*x2=["']([\d.]+)["'][^>]*y2=["']([\d.]+)["'][^>]*stroke-width=["']([\d.]+)["'][^>]*class=["']([^"']+)["'][^>]*data-confidence=["']([\d.]+)["'][^>]*>/gi;
+  
+  const result: RawWall[] = [];
+  let match;
+  
+  // Depending on the LLM, the attributes might be in a different order. 
+  // A more robust regex looks for individual attributes.
+  const lines = typeof rawSvg === 'string' ? rawSvg.match(/<line[^>]+>/gi) || [] : [];
+  
+  for (const line of lines) {
+    const id = line.match(/id=["']([^"']+)["']/)?.[1] || `w${Math.random()}`;
+    const x1 = parseFloat(line.match(/x1=["']([\d.]+)["']/)?.[1] || "0");
+    const y1 = parseFloat(line.match(/y1=["']([\d.]+)["']/)?.[1] || "0");
+    const x2 = parseFloat(line.match(/x2=["']([\d.]+)["']/)?.[1] || "0");
+    const y2 = parseFloat(line.match(/y2=["']([\d.]+)["']/)?.[1] || "0");
+    const thickness = parseFloat(line.match(/stroke-width=["']([\d.]+)["']/)?.[1] || "225");
+    const role = (line.match(/class=["']([^"']+)["']/)?.[1] || "loadBearing") as "loadBearing" | "partition";
+    const confidence = parseFloat(line.match(/data-confidence=["']([\d.]+)["']/)?.[1] || "0.9");
+    
+    result.push({ id, startX: x1, startY: y1, endX: x2, endY: y2, thicknessMm: thickness, role, confidence });
+  }
   console.log(`[${tag}] Stage 2 done:`, result.length, 'walls');
   return result;
 }
