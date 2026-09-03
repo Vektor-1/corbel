@@ -55,35 +55,62 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 
 export function makeAsk(imageUrl: string, model = resolveRodiumModel()): AskFn {
   let cachedBase64: string | null = null;
+  
+  // Hardcoded Gold Standard for Few-Shot Visual Anchoring
+  // Generated from a clean 500x500 2-room layout.
+  const goldStandardImageBase64 = require('fs').readFileSync('gold_standard.json') 
+    ? JSON.parse(require('fs').readFileSync('gold_standard.json')).imageBase64 
+    : '';
+  const goldStandardSvg = require('fs').readFileSync('gold_standard.json') 
+    ? JSON.parse(require('fs').readFileSync('gold_standard.json')).svg 
+    : '';
 
   return async (prompt: string) => {
     if (!cachedBase64) {
       cachedBase64 = await fetchImageAsBase64(imageUrl);
     }
+    
+    // Construct Few-Shot messages array
+    const messages: any[] = [];
+    
+    // If this is a wall-detection prompt, inject the Few-Shot context
+    if (prompt.includes('valid SVG <line> elements')) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${goldStandardImageBase64}` } }
+        ]
+      });
+      messages.push({
+        role: 'assistant',
+        content: [
+          { type: 'text', text: `<reasoning>\nThe image shows a simple rectangular building envelope (500x500). There is a single internal partition wall splitting it vertically down the middle at X=250.\n</reasoning>\n${goldStandardSvg}` }
+        ]
+      });
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Excellent. Now apply those exact same trace rules to this new image:' },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${cachedBase64}` } }
+        ]
+      });
+    } else {
+      // Standard zero-shot for OCR/Scale
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:image/png;base64,${cachedBase64}` } },
+        ],
+      });
+    }
 
-    const text = await makeRodiumRequest({
+    const responseText = await makeRodiumRequest({
       model,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: `data:image/png;base64,${cachedBase64}`,
-            } as any,
-            {
-              type: 'text',
-              text: prompt,
-            } as any,
-          ] as any,
-        },
-      ],
-      temperature: 0.1,
-      max_tokens: 8192,
-      response_format: { type: 'json_object' },
+      messages,
     });
-
-    return extractJson(text);
+    return extractJson(responseText);
   };
 }
 
