@@ -1,0 +1,6 @@
+ultralytics>=8.3
+onnx>=1.16
+onnxruntime>=1.18
+lxml>=5.0
+pillow>=10.0
+tqdm>=4.66
