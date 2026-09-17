@@ -18,10 +18,19 @@ interface Segment {
   confidence: number;
 }
 
+// Geometry is refined in pixels. Convert detector-measured sizes only once
+// calibration is known; the historical fallback is 100 pixels per metre.
+function millimetresPerPixel(pixelsPerMeter: number): number {
+  if (!Number.isFinite(pixelsPerMeter) || pixelsPerMeter <= 0) {
+    throw new Error('A positive pixels-per-meter calibration is required.');
+  }
+  return 1000 / pixelsPerMeter;
+}
+
 // ── Step 1: box -> segment ────────────────────────────────────────────────────
 
-function boxToSegment(box: RawBox, index: number): Segment | null {
-  if (box.confidence < MIN_WALL_CONFIDENCE) return null;
+function boxToSegment(box: RawBox, index: number, mmPerPixel: number): Segment | null {
+  if (!validBox(box) || box.confidence < MIN_WALL_CONFIDENCE) return null;
   const w = box.x1 - box.x0;
   const h = box.y1 - box.y0;
   const horizontal = w >= h;
@@ -31,9 +40,14 @@ function boxToSegment(box: RawBox, index: number): Segment | null {
     startY: horizontal ? (box.y0 + box.y1) / 2 : box.y0,
     endX: horizontal ? box.x1 : (box.x0 + box.x1) / 2,
     endY: horizontal ? (box.y0 + box.y1) / 2 : box.y1,
-    thicknessMm: Math.round((horizontal ? h : w) * 10),
+    thicknessMm: Math.round((horizontal ? h : w) * mmPerPixel),
     confidence: box.confidence,
   };
+}
+
+function validBox(box: RawBox): boolean {
+  return [box.x0, box.y0, box.x1, box.y1, box.confidence].every(Number.isFinite) &&
+    box.x1 > box.x0 && box.y1 > box.y0 && box.confidence >= 0 && box.confidence <= 1;
 }
 
 // ── Step 2: axis snapping ─────────────────────────────────────────────────────
@@ -169,10 +183,11 @@ function mergeOverlaps(segments: Segment[]): Segment[] {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function refineWalls(boxes: RawBox[]): RawWall[] {
+export function refineWalls(boxes: RawBox[], pixelsPerMeter = 100): RawWall[] {
+  const mmPerPixel = millimetresPerPixel(pixelsPerMeter);
   const wallBoxes = boxes.filter((b) => b.cls === 'wall');
   const segments = wallBoxes
-    .map(boxToSegment)
+    .map((box, index) => boxToSegment(box, index, mmPerPixel))
     .filter((s): s is Segment => s !== null)
     .map(snapToAxis);
 
@@ -191,34 +206,48 @@ export function refineWalls(boxes: RawBox[]): RawWall[] {
     }));
 }
 
-export function reattachOpenings(boxes: RawBox[], walls: RawWall[]): RawOpening[] {
-  const nearestWall = (cx: number, cy: number) => {
-    let best = { id: walls[0]?.id ?? '', dist: Infinity, offsetRatio: 0.5 };
+export function reattachOpenings(boxes: RawBox[], walls: RawWall[], pixelsPerMeter = 100): RawOpening[] {
+  const mmPerPixel = millimetresPerPixel(pixelsPerMeter);
+  const nearestWall = (box: RawBox) => {
+    const cx = (box.x0 + box.x1) / 2;
+    const cy = (box.y0 + box.y1) / 2;
+    const boxWidth = box.x1 - box.x0, boxHeight = box.y1 - box.y0;
+    let best = { id: '', dist: Infinity, offsetRatio: 0.5, widthPx: 0 };
     for (const wall of walls) {
       const dx = wall.endX - wall.startX;
       const dy = wall.endY - wall.startY;
-      const len2 = dx * dx + dy * dy || 1;
-      const t = Math.max(0, Math.min(1, ((cx - wall.startX) * dx + (cy - wall.startY) * dy) / len2));
+      const len2 = dx * dx + dy * dy;
+      if (!Number.isFinite(len2) || len2 <= 0) continue;
+      const length = Math.sqrt(len2);
+      const t = ((cx - wall.startX) * dx + (cy - wall.startY) * dy) / len2;
+      if (t < 0 || t > 1) continue;
+      // Project the symbol onto the host axis. Using its longest box edge
+      // mistakes a door's swing depth for the opening width on vertical walls.
+      const widthPx = (Math.abs(dx) * boxWidth + Math.abs(dy) * boxHeight) / length;
+      const depthPx = (Math.abs(dy) * boxWidth + Math.abs(dx) * boxHeight) / length;
+      if (widthPx > length) continue;
       const px = wall.startX + t * dx;
       const py = wall.startY + t * dy;
       const dist = Math.hypot(cx - px, cy - py);
-      if (dist < best.dist) best = { id: wall.id, dist, offsetRatio: t };
+      const wallHalfWidth = wall.thicknessMm / mmPerPixel / 2;
+      // The symbol box must reach the wall's physical strip. A remote
+      // false positive must not be pulled across the room onto a wall.
+      if (dist > depthPx / 2 + wallHalfWidth) continue;
+      if (dist < best.dist) best = { id: wall.id, dist, offsetRatio: t, widthPx };
     }
     return best;
   };
 
   return boxes
-    .filter((b) => b.cls === 'door' || b.cls === 'window')
+    .filter((b) => (b.cls === 'door' || b.cls === 'window') && validBox(b))
     .map((b, i) => {
-      const cx = (b.x0 + b.x1) / 2;
-      const cy = (b.y0 + b.y1) / 2;
-      const { id: wallId, offsetRatio } = nearestWall(cx, cy);
+      const { id: wallId, offsetRatio, widthPx } = nearestWall(b);
       return {
         id: `o${i}`,
         kind: b.cls as 'door' | 'window',
         wallId,
         offsetRatio,
-        widthMm: Math.round(Math.max(b.x1 - b.x0, b.y1 - b.y0) * 10),
+        widthMm: Math.round(widthPx * mmPerPixel),
         confidence: b.confidence,
       };
     })

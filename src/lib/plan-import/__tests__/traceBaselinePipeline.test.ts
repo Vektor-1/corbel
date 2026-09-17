@@ -10,7 +10,7 @@ describe('Trace-to-Learn baseline detection', () => {
         return { widthPx: 1200, heightPx: 800, orientation: 'landscape', rotationNeeded: 0, hasScaleBar: false, hasDimensions: false, quality: 'clear', notes: 'clear plan' };
       }
       if (prompt.includes('Detect every wall segment')) {
-        return [{ id: 'w1', startX: 0, startY: 0, endX: 400, endY: 0, thicknessMm: 225, role: 'loadBearing', confidence: 0.9 }];
+        return `<svg width="1200" height="800"><line id="w1" x1="0" y1="0" x2="400" y2="0" stroke-width="225" class="loadBearing" data-confidence="0.9" /></svg>`;
       }
       if (prompt.includes('Now detect all doors and windows')) return [];
       if (prompt.includes('Extract all visible text annotations')) return [];

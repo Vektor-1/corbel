@@ -1,5 +1,6 @@
 import { deriveRoomsFromWalls } from '@/lib/geometry/rooms';
 import { insertWallWithIntersections, rehostWallOpening } from '@/lib/geometry/wall-intersections';
+import { centerizeFloorPlan } from '@/lib/geometry/origin';
 import type { Door, FloorPlan, Point, Wall, Window } from '@/types/design';
 import type {
   DetectedLabel,
@@ -110,6 +111,7 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
         width: detection.widthMm,
         type: 'internal',
         swing: detection.swing ?? 'left',
+        openDirection: 'in',
         confidence: detection.confidence,
         source: 'ai',
       };
@@ -154,6 +156,8 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
     createdAt: now,
     updatedAt: now,
   };
+  // Reconstruction coordinates are top-left-anchored; convert to the centered sheet origin.
+  const centeredPlan = centerizeFloorPlan(floorPlan);
 
   const diagnostics = buildDiagnostics(result);
   if (walls.length === 0) {
@@ -168,7 +172,7 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
   }
 
   return {
-    floorPlan,
+    floorPlan: centeredPlan,
     source: result.source,
     detections: result.detections,
     diagnostics,

@@ -19,7 +19,7 @@ export async function fetchImagePart(url: string): Promise<Part> {
 }
 
 export function makeAsk(imagePart: Part): AskFn {
-  return async (prompt: string) => {
+  return async (prompt, format = 'json') => {
     const ai = client();
     const model = ai.getGenerativeModel({ model: MODEL() });
     const result = await model.generateContent({
@@ -27,10 +27,10 @@ export function makeAsk(imagePart: Part): AskFn {
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
+        responseMimeType: format === 'svg' ? 'text/plain' : 'application/json',
       },
     });
-    return extractJson(result.response.text());
+    return format === 'svg' ? result.response.text() : extractJson(result.response.text());
   };
 }
 

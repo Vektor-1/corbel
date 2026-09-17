@@ -33,6 +33,10 @@ interface AgentRouterResponse {
   error?: string;
 }
 
+function parseRouterResult(result: unknown): unknown {
+  return typeof result === 'string' ? extractJson(result) : result;
+}
+
 async function makeAgentRouterRequest(request: AgentRouterRequest): Promise<AgentRouterResponse> {
   const { apiKey, baseUrl } = getConfig();
   const response = await fetch(`${baseUrl}/route`, {
@@ -66,7 +70,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 // Route to GPT 5.6 Luna primarily (detailed analysis), fallback to Gemini 3.1
 
 export function makeAskImageAnalysis(imageUrl: string): AskFn {
-  return async (prompt: string) => {
+  return async (prompt, format = 'json') => {
     const response = await makeAgentRouterRequest({
       task: 'image-analysis',
       image_url: imageUrl,
@@ -79,7 +83,7 @@ export function makeAskImageAnalysis(imageUrl: string): AskFn {
       throw new Error(`Image analysis failed: ${response.error}`);
     }
 
-    return extractJson(JSON.stringify(response.result));
+    return format === 'svg' ? response.result : parseRouterResult(response.result);
   };
 }
 
@@ -100,7 +104,7 @@ export function makeAskOcr(imageUrl: string): AskFn {
       throw new Error(`OCR failed: ${response.error}`);
     }
 
-    return extractJson(JSON.stringify(response.result));
+    return parseRouterResult(response.result);
   };
 }
 
@@ -121,7 +125,7 @@ export function makeAskScaleCalibration(imageUrl: string): AskFn {
       throw new Error(`Scale calibration failed: ${response.error}`);
     }
 
-    return extractJson(JSON.stringify(response.result));
+    return parseRouterResult(response.result);
   };
 }
 

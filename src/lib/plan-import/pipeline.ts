@@ -2,8 +2,8 @@ import type { ImportJobStatus, ImportSource, ReconstructionResultV1 } from './ty
 import { parseReconstructionResult } from './validate';
 
 // A provider supplies an ask function with the plan image already bound.
-// It receives a stage prompt and must return parsed JSON.
-export type AskFn = (prompt: string) => Promise<unknown>;
+// It returns parsed JSON by default, or raw SVG text for wall detection.
+export type AskFn = (prompt: string, format?: 'json' | 'svg') => Promise<unknown>;
 
 // Robust JSON extraction shared by providers whose models may wrap output
 // in fences or prose.
@@ -105,10 +105,10 @@ Return only the JSON object.`;
 
 // ── Stage 2: Wall skeleton ────────────────────────────────────────────────────
 
-async function stage2_walls(ask: AskFn, meta: ImageMeta, tag: string, isTraceBaseline: boolean): Promise<RawWall[]> {
+export async function stage2_walls(ask: AskFn, meta: ImageMeta, tag: string, isTraceBaseline: boolean): Promise<RawWall[]> {
   console.log(`[${tag}] Stage 2: wall detection`);
   const prompt = `This is a floor plan image (${meta.widthPx}×${meta.heightPx}px, quality: ${meta.quality}).
-${meta.rotationNeeded !== 0 ? `Note: the image appears rotated ${meta.rotationNeeded}°, interpret coordinates accordingly.` : ''}
+Keep all coordinates in the original image frame, even if the drawing appears rotated. Do not rotate or resize coordinates.
 
 Detect every wall segment. We will use an SVG format to leverage your pre-trained spatial representations.
 IMPORTANT - CHAIN OF THOUGHT:
@@ -130,7 +130,7 @@ Return your result strictly in this format:
 </svg>
 
 Rules:
-- Use image pixel coordinates, top-left = (0,0). A 100x100 grid overlay is provided in the image to help you read coordinates accurately.
+- Use image pixel coordinates, top-left = (0,0), x increasing rightward and y downward.
 - Trace each wall as a single straight line passing straight through doors/windows.
 - Outer walls are class="loadBearing" (typically 225mm), inner dividers are class="partition" (typically 115mm).
 - Split walls at visible T-junctions or corners.
@@ -143,27 +143,30 @@ NEGATIVE CONSTRAINTS (NOISE REJECTION):
 ${isTraceBaseline ? '- This is a Trace-to-Learn reference plan. Preserve the source layout faithfully; do not simplify.' : ''}
 - Return ONLY the XML/SVG format requested above, nothing else.`;
 
-  const rawSvg = await ask(prompt) as string;
+  const rawSvg = await ask(prompt, 'svg');
   
   // Regex parse the SVG output
-  const lineRegex = /<line[^>]+id=["']([^"']+)["'][^>]*x1=["']([\d.]+)["'][^>]*y1=["']([\d.]+)["'][^>]*x2=["']([\d.]+)["'][^>]*y2=["']([\d.]+)["'][^>]*stroke-width=["']([\d.]+)["'][^>]*class=["']([^"']+)["'][^>]*data-confidence=["']([\d.]+)["'][^>]*>/gi;
-  
   const result: RawWall[] = [];
-  let match;
   
   // Depending on the LLM, the attributes might be in a different order. 
   // A more robust regex looks for individual attributes.
   const lines = typeof rawSvg === 'string' ? rawSvg.match(/<line[^>]+>/gi) || [] : [];
   
   for (const line of lines) {
-    const id = line.match(/id=["']([^"']+)["']/)?.[1] || `w${Math.random()}`;
-    const x1 = parseFloat(line.match(/x1=["']([\d.]+)["']/)?.[1] || "0");
-    const y1 = parseFloat(line.match(/y1=["']([\d.]+)["']/)?.[1] || "0");
-    const x2 = parseFloat(line.match(/x2=["']([\d.]+)["']/)?.[1] || "0");
-    const y2 = parseFloat(line.match(/y2=["']([\d.]+)["']/)?.[1] || "0");
-    const thickness = parseFloat(line.match(/stroke-width=["']([\d.]+)["']/)?.[1] || "225");
-    const role = (line.match(/class=["']([^"']+)["']/)?.[1] || "loadBearing") as "loadBearing" | "partition";
-    const confidence = parseFloat(line.match(/data-confidence=["']([\d.]+)["']/)?.[1] || "0.9");
+    const attrs = Object.fromEntries([...line.matchAll(/([\w-]+)\s*=\s*(["'])(.*?)\2/g)].map(m => [m[1], m[3]]));
+    const coordinate = (key: string) => attrs[key]?.trim() ? Number(attrs[key]) : NaN;
+    const id = attrs.id || `w${result.length + 1}`;
+    const x1 = coordinate('x1'), y1 = coordinate('y1');
+    const x2 = coordinate('x2'), y2 = coordinate('y2');
+    if (![x1, y1, x2, y2].every(Number.isFinite) || Math.hypot(x2 - x1, y2 - y1) === 0) {
+      throw new Error(`Wall ${id} has missing or invalid SVG endpoints.`);
+    }
+    if (result.some(wall => wall.id === id)) throw new Error(`Duplicate wall id: ${id}.`);
+    const thickness = attrs['stroke-width'] === undefined ? 225 : Number(attrs['stroke-width']);
+    if (!Number.isFinite(thickness) || thickness <= 0) throw new Error(`Wall ${id} has invalid thickness.`);
+    const role = attrs.class?.split(/\s+/).includes('partition') ? 'partition' : 'loadBearing';
+    const confidence = attrs['data-confidence'] === undefined ? 0.5 : Number(attrs['data-confidence']);
+    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) throw new Error(`Wall ${id} has invalid confidence.`);
     
     result.push({ id, startX: x1, startY: y1, endX: x2, endY: y2, thicknessMm: thickness, role, confidence });
   }
@@ -309,6 +312,9 @@ async function stage6_validate(
 - ${summary.openings} doors/windows detected
 - Rooms identified: ${summary.rooms.join(', ') || 'none'}
 - Potentially disconnected walls: ${summary.disconnected.join(', ') || 'none'}
+
+Geometry to compare against the image (original image pixels; physical sizes in mm):
+${JSON.stringify({ walls, openings, labels })}
 
 ${isTraceBaseline ? 'This is a Trace-to-Learn baseline. Flag any uncertain or invented-looking element so the student can review it; do not treat a plausible guess as confirmed.' : ''}
 

@@ -25,6 +25,12 @@ import { refineWalls, reattachOpenings } from '@/lib/plan-import/refine';
 import type { RawWall, RawOpening } from '@/lib/plan-import/pipeline';
 import { OPENING_CONFIDENCE_THRESHOLD, WALL_CONFIDENCE_THRESHOLD } from '@/lib/trace/confidence';
 export { WALL_CONFIDENCE_THRESHOLD, OPENING_CONFIDENCE_THRESHOLD } from '@/lib/trace/confidence';
+import {
+  DEFAULT_PIXELS_PER_METRE,
+  detectSegmentationPixelSpace,
+  segmentationVectorToGeometry,
+} from '@/lib/plan-import/geometry-provider';
+export { DEFAULT_PIXELS_PER_METRE } from '@/lib/plan-import/geometry-provider';
 
 // ── Stage metadata ────────────────────────────────────────────────────────────
 
@@ -47,8 +53,6 @@ export const STAGE_DEFS: readonly StageProgress[] = [
 
 // ── Confidence thresholds (shared with UploadPage highlighting) ──────────────
 
-export const DEFAULT_PIXELS_PER_METRE = 100;
-
 // ── OCR/scale response shape (mirrors /api/plan-import/ocr-scale) ────────────
 
 export interface OcrLabel {
@@ -68,6 +72,18 @@ export interface OcrScaleResponse {
 // ── Options ────────────────────────────────────────────────────────────────
 
 export interface ImportPipelineOptions {
+  /**
+   * Which P2 geometry detector to use. Default 'yolo-box' -- the box
+   * path's behavior is unchanged unless this is explicitly set
+   * (docs/corbel-ship-segmentation-plan.md, Day 5). 'auto' resolves to
+   * 'custom-seg' when WebGPU capability is present, else 'yolo-box' --
+   * on WASM-only devices custom-seg's own full-pipeline latency (2347ms
+   * p50, Day 6) is worse than yolo-box's worst measured point (Run C's
+   * 1893ms p50, DETECTOR-ACCURACY-FINDINGS.md Section 6.5), so 'auto'
+   * never attempts segmentation somewhere it would be the slower choice
+   * (Day 7). Not yet the default -- see that day's writeup for why.
+   */
+  geometryProvider?: 'yolo-box' | 'custom-seg' | 'auto';
   /** Run Gemini OCR + scale calibration (P4/P5). Default true. */
   useOcr?: boolean;
   /**
@@ -100,6 +116,22 @@ export interface ImportPipelineResult {
 
 export function pxToMm(px: number, pixelsPerMetre: number): number {
   return (px / pixelsPerMetre) * 1000;
+}
+
+/**
+ * Resolves 'auto' to a concrete provider before P2 starts, based on
+ * WebGPU capability alone -- not by attempting segmentation and
+ * discovering a slow WASM fallback afterward. docs/corbel-ship-
+ * segmentation-plan.md, Day 7.
+ */
+export function resolveGeometryProvider(
+  requested: 'yolo-box' | 'custom-seg' | 'auto' | undefined,
+  webgpuAvailable: boolean
+): 'yolo-box' | 'custom-seg' {
+  if (requested === undefined || requested === 'yolo-box' || requested === 'custom-seg') {
+    return requested ?? 'yolo-box';
+  }
+  return webgpuAvailable ? 'custom-seg' : 'yolo-box';
 }
 
 export interface BuildDraftParams {
@@ -268,39 +300,62 @@ export async function runImportPipeline(
     );
   }
 
-  // P2: YOLOv8 detection, entirely in-browser via onnxruntime-web wasm.
+  // P2: geometry detection -- 'yolo-box' (default, in-browser YOLOv8 via
+  // onnxruntime-web wasm) or 'custom-seg' (G0 segmentation + vectorizer,
+  // docs/corbel-ship-segmentation-plan.md Day 5). Only pixel-space
+  // detection happens here; scale-dependent conversion to mm is a
+  // separate, cheap step (P3 below) so it can be re-run once OCR
+  // resolves the final scale without re-running inference.
+  const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
+  const geometryProvider = resolveGeometryProvider(options.geometryProvider, webgpuAvailable);
   report(1);
   const startP2 = performance.now();
-  let boxes: RawBox[];
+  let boxes: RawBox[] = [];
+  let segPixelSpace: Awaited<ReturnType<typeof detectSegmentationPixelSpace>> | null = null;
   try {
-    const detection = await detectLocalMl(file, {
-      confThreshold: options.confThreshold,
-      iouThreshold: options.iouThreshold,
-      enhanceImage: options.enhanceImage,
-    });
-    boxes = detection.boxes;
+    if (geometryProvider === 'yolo-box') {
+      const detection = await detectLocalMl(file, {
+        confThreshold: options.confThreshold,
+        iouThreshold: options.iouThreshold,
+        enhanceImage: options.enhanceImage,
+      });
+      boxes = detection.boxes;
+    } else {
+      segPixelSpace = await detectSegmentationPixelSpace(file);
+    }
     metrics['P2'] = performance.now() - startP2;
-    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P2', durationMs: metrics['P2'], success: true });
+    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P2', provider: geometryProvider, durationMs: metrics['P2'], success: true });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P2', error: errorMsg });
-    throw new Error(`P2 failed: ONNX inference error — ${errorMsg}`);
+    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P2', provider: geometryProvider, error: errorMsg });
+    throw new Error(`P2 failed: ${geometryProvider === 'yolo-box' ? 'ONNX inference error' : 'segmentation inference error'} — ${errorMsg}`);
   }
-  if (boxes.filter((b) => b.cls === 'wall').length === 0) {
-    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P2', error: 'No walls detected' });
+  const noWallsDetected = geometryProvider === 'yolo-box'
+    ? boxes.filter((b) => b.cls === 'wall').length === 0
+    : segPixelSpace!.vector.walls.length === 0;
+  if (noWallsDetected) {
+    console.error(`[TELEMETRY] import_pipeline_error`, { stage: 'P2', provider: geometryProvider, error: 'No walls detected' });
     throw new Error('P2 failed: no walls detected. Try a clearer, higher-resolution photo.');
   }
 
   // P3 (local refinement) and P4/P5 (network OCR+scale) run concurrently —
-  // P3 has no dependency on OCR output, so we fire both and join.
+  // P3 has no dependency on OCR output, so we fire both and join. Both
+  // providers use DEFAULT_PIXELS_PER_METRE optimistically here; P5 below
+  // re-derives at the real scale once OCR resolves it.
   report(2);
   const startP3 = performance.now();
   const refinementPromise = Promise.resolve().then(() => {
-    const refinedWalls = refineWalls(boxes);
-    const openings = reattachOpenings(boxes, refinedWalls);
+    let refinedWalls: RawWall[];
+    let openings: RawOpening[];
+    if (geometryProvider === 'yolo-box') {
+      refinedWalls = refineWalls(boxes);
+      openings = reattachOpenings(boxes, refinedWalls);
+    } else {
+      ({ walls: refinedWalls, openings } = segmentationVectorToGeometry(segPixelSpace!.vector, DEFAULT_PIXELS_PER_METRE));
+    }
     const duration = performance.now() - startP3;
     metrics['P3'] = duration;
-    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P3', durationMs: duration, success: true });
+    console.log(`[METRIC] import_pipeline_stage_duration`, { stage: 'P3', provider: geometryProvider, durationMs: duration, success: true });
     return { refinedWalls, openings };
   });
 
@@ -326,12 +381,27 @@ export async function runImportPipeline(
         return res;
       });
 
-  const [{ refinedWalls, openings }, { ocr, ocrFailed }] = await Promise.all([refinementPromise, ocrPromise]);
+  const [initialGeometry, { ocr, ocrFailed }] = await Promise.all([refinementPromise, ocrPromise]);
 
   // P5: scale calibration — already resolved by the OCR round trip; fall
   // back to a fixed/default scale when OCR was skipped or failed.
   report(4);
   const pixelsPerMetre = ocr?.scale.pixelsPerMeter ?? options.fixedScale ?? DEFAULT_PIXELS_PER_METRE;
+  // P3 ran with the default calibration while OCR was pending. Recompute
+  // measured thicknesses and widths at the final scale -- from the
+  // original boxes (yolo-box) or the already-detected pixel-space vector
+  // (custom-seg), never by re-running detection/inference.
+  let refinedWalls: RawWall[];
+  let openings: RawOpening[];
+  if (pixelsPerMetre === DEFAULT_PIXELS_PER_METRE) {
+    refinedWalls = initialGeometry.refinedWalls;
+    openings = initialGeometry.openings;
+  } else if (geometryProvider === 'yolo-box') {
+    refinedWalls = refineWalls(boxes, pixelsPerMetre);
+    openings = reattachOpenings(boxes, refinedWalls, pixelsPerMetre);
+  } else {
+    ({ walls: refinedWalls, openings } = segmentationVectorToGeometry(segPixelSpace!.vector, pixelsPerMetre));
+  }
 
   // P6: assemble Draft.FloorPlan, then lift to Canonical.Floor.
   report(5);

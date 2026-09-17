@@ -44,18 +44,47 @@ export async function runDetection(source: ImportSource, provider?: VisionProvid
 
 // ── OCR + Scale (P4–P5) ───────────────────────────────────────────────────────
 
-export async function runOcrAndScale(
-  source: ImportSource,
-  provider?: VisionProvider
-): Promise<{ labels: RawLabel[]; scale: ScaleResult }> {
-  const visionProvider = provider || resolveProvider();
-  console.log(`[provider-dispatcher] Running OCR+scale with ${visionProvider}`);
+function hasProviderKey(visionProvider: VisionProvider): boolean {
+  return visionProvider === 'agent-router' ? !!process.env.AGENT_ROUTER_API_KEY : !!process.env.RODIUM_AI_API_KEY;
+}
 
+function runOcrAndScaleOnce(visionProvider: VisionProvider, source: ImportSource) {
+  console.log(`[provider-dispatcher] Running OCR+scale with ${visionProvider}`);
   switch (visionProvider) {
     case 'agent-router':
       return agentRouter.runAgentRouterOcrAndScale(source);
     case 'rodium-ai':
       return rodiumAi.runRodiumOcrAndScale(source);
+  }
+}
+
+/**
+ * Falls back to the other configured provider if the primary one fails, for
+ * any reason (quota/billing, network, timeout) -- a VISION_PROVIDER pin
+ * picks which provider is tried *first*, not a promise to stay hard-blocked
+ * when the alternative is already configured and available. If both fail,
+ * the thrown error includes both real messages so the failure is
+ * diagnosable instead of only ever reporting whichever ran last.
+ */
+export async function runOcrAndScale(
+  source: ImportSource,
+  provider?: VisionProvider
+): Promise<{ labels: RawLabel[]; scale: ScaleResult }> {
+  const primary = provider || resolveProvider();
+  const fallback: VisionProvider = primary === 'agent-router' ? 'rodium-ai' : 'agent-router';
+
+  try {
+    return await runOcrAndScaleOnce(primary, source);
+  } catch (primaryError) {
+    if (!hasProviderKey(fallback)) throw primaryError;
+    const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+    console.warn(`[provider-dispatcher] OCR+scale failed on ${primary} (${primaryMessage}), retrying with ${fallback}`);
+    try {
+      return await runOcrAndScaleOnce(fallback, source);
+    } catch (fallbackError) {
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      throw new Error(`OCR/scale failed on both providers. ${primary}: ${primaryMessage}. ${fallback}: ${fallbackMessage}.`);
+    }
   }
 }
 

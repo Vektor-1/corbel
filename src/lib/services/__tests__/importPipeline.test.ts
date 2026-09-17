@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'vitest';
 
-import { buildDraftFloorPlan, applyDraftOverrides, pxToMm, WALL_CONFIDENCE_THRESHOLD, OPENING_CONFIDENCE_THRESHOLD } from '../importPipeline';
+import { buildDraftFloorPlan, applyDraftOverrides, pxToMm, resolveGeometryProvider, WALL_CONFIDENCE_THRESHOLD, OPENING_CONFIDENCE_THRESHOLD } from '../importPipeline';
 import { liftFloorPlan } from '@/lib/refinement/lift';
 import type { RawWall, RawOpening } from '@/lib/plan-import/pipeline';
 
@@ -29,6 +29,26 @@ const LABELS = [{ id: 'label-0', text: 'Bedroom', x: 240, y: 190, role: 'room-na
 test('pxToMm converts pixel coordinates using the calibrated scale', () => {
   assert.equal(pxToMm(100, 100), 1000); // 100px at 100px/m = 1m = 1000mm
   assert.equal(pxToMm(400, 100), 4000);
+});
+
+// docs/corbel-ship-segmentation-plan.md, Day 7: 'auto' decides before P2
+// starts (not by attempting segmentation and discovering a slow WASM
+// fallback afterward), based on WebGPU capability alone.
+test('resolveGeometryProvider: explicit choices pass through unchanged', () => {
+  assert.equal(resolveGeometryProvider('yolo-box', true), 'yolo-box');
+  assert.equal(resolveGeometryProvider('yolo-box', false), 'yolo-box');
+  assert.equal(resolveGeometryProvider('custom-seg', true), 'custom-seg');
+  assert.equal(resolveGeometryProvider('custom-seg', false), 'custom-seg');
+});
+
+test('resolveGeometryProvider: omitted defaults to yolo-box', () => {
+  assert.equal(resolveGeometryProvider(undefined, true), 'yolo-box');
+  assert.equal(resolveGeometryProvider(undefined, false), 'yolo-box');
+});
+
+test('resolveGeometryProvider: auto picks custom-seg only when WebGPU is available', () => {
+  assert.equal(resolveGeometryProvider('auto', true), 'custom-seg');
+  assert.equal(resolveGeometryProvider('auto', false), 'yolo-box');
 });
 
 test('buildDraftFloorPlan assembles walls, openings, and labels with correct confidence stats', () => {

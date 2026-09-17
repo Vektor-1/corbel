@@ -24,6 +24,7 @@ export function parseImportSource(value: unknown): ImportSource {
     height: value.height,
   };
   if (isNumber(value.page) && value.page >= 1) source.page = Math.floor(value.page);
+  if (value.purpose === 'trace' || value.purpose === 'reconstruct') source.purpose = value.purpose;
   return source;
 }
 
@@ -90,6 +91,9 @@ function parseDetection(value: unknown): PlanDetection {
 export function parseReconstructionResult(value: unknown): ReconstructionResultV1 {
   if (!isRecord(value) || value.schemaVersion !== 1) throw new Error('Unsupported reconstruction result.');
   if (!isRecord(value.scale) || !isNumber(value.scale.pixelsPerMeter) || !isNumber(value.scale.confidence)) {
+    throw new Error('Invalid scale estimate.');
+  }
+  if (value.scale.pixelsPerMeter <= 0 || value.scale.confidence < 0 || value.scale.confidence > 1) {
     throw new Error('Invalid scale estimate.');
   }
   if (!Array.isArray(value.detections) || !isNumber(value.overallConfidence)) {

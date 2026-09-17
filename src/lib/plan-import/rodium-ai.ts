@@ -1,4 +1,5 @@
 import type { ImportSource, ReconstructionResultV1 } from './types';
+import { existsSync, readFileSync } from 'node:fs';
 import { extractJson, runDetectionPipeline, runOcrAndScale, submitPipelineJob, getPipelineJob, type AskFn, type RawLabel, type ScaleResult } from './pipeline';
 
 function client() {
@@ -58,14 +59,13 @@ export function makeAsk(imageUrl: string, model = resolveRodiumModel()): AskFn {
   
   // Hardcoded Gold Standard for Few-Shot Visual Anchoring
   // Generated from a clean 500x500 2-room layout.
-  const goldStandardImageBase64 = require('fs').readFileSync('gold_standard.json') 
-    ? JSON.parse(require('fs').readFileSync('gold_standard.json')).imageBase64 
-    : '';
-  const goldStandardSvg = require('fs').readFileSync('gold_standard.json') 
-    ? JSON.parse(require('fs').readFileSync('gold_standard.json')).svg 
-    : '';
+  const goldStandard = existsSync('gold_standard.json')
+    ? JSON.parse(readFileSync('gold_standard.json', 'utf8'))
+    : null;
+  const goldStandardImageBase64 = goldStandard?.imageBase64;
+  const goldStandardSvg = goldStandard?.svg;
 
-  return async (prompt: string) => {
+  return async (prompt, format = 'json') => {
     if (!cachedBase64) {
       cachedBase64 = await fetchImageAsBase64(imageUrl);
     }
@@ -74,7 +74,7 @@ export function makeAsk(imageUrl: string, model = resolveRodiumModel()): AskFn {
     const messages: any[] = [];
     
     // If this is a wall-detection prompt, inject the Few-Shot context
-    if (prompt.includes('valid SVG <line> elements')) {
+    if (format === 'svg' && goldStandardImageBase64 && goldStandardSvg) {
       messages.push({
         role: 'user',
         content: [
@@ -110,6 +110,9 @@ export function makeAsk(imageUrl: string, model = resolveRodiumModel()): AskFn {
       model,
       messages,
     });
+    if (format === 'svg') {
+      return responseText;
+    }
     return extractJson(responseText);
   };
 }
