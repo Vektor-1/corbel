@@ -43,4 +43,3 @@ Other local-only, gitignored directories used by these scripts:
   pipeline (see `backend/`).
 - `synth/` — synthetic floor-plan generation for training data
   augmentation.
-- `RUN_B_GUIDE.md`, `COLAB.md` — run notes and Colab setup instructions.
