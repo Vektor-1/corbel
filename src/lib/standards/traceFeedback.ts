@@ -8,8 +8,9 @@ import type { FloorPlan, TraceCalibration, ValidationResult } from '@/types/desi
 export function validateTraceFeedback(
   floorPlan: FloorPlan | null,
   calibration: TraceCalibration | undefined,
+  isTraceSession = true,
 ): ValidationResult[] {
-  if (!floorPlan) return [];
+  if (!floorPlan || !isTraceSession) return [];
 
   const results: ValidationResult[] = [];
   const targetId = floorPlan.walls[0]?.id ?? floorPlan.id;

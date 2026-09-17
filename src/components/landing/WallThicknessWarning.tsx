@@ -154,11 +154,11 @@ export function WallThicknessWarning() {
       <div className="w-full lg:w-[320px] flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-[#232019] pt-6 lg:pt-0 lg:pl-6">
         <div>
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] uppercase font-semibold bg-[#232019] text-[#c9a96a] border border-amber-900/20 mb-3">
-            Standards Verification
+            Educational review
           </div>
 
           <h4 className="text-lg font-bold text-white tracking-wide mb-2">
-            Load-Bearing Criteria
+            Wall-thickness reasoning
           </h4>
 
           {/* Compliance Status Block */}
@@ -166,45 +166,45 @@ export function WallThicknessWarning() {
             <div className="rounded-lg border border-red-500/20 bg-red-950/20 p-4 mb-4">
               <div className="flex items-center gap-2 text-red-400 text-sm font-bold mb-1">
                 <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-                <span>STRUCTURAL HAZARD DETECTED</span>
+                <span>THICKNESS NEEDS REVIEW</span>
               </div>
               <p className="text-xs text-red-200/80 leading-relaxed">
-                Building standards require load-bearing walls for multi-storey buildings to have a minimum thickness of <strong>225mm</strong>.
+                This classroom example flags a 150 mm wall in a two-storey scenario for review. Confirm the actual wall role, material, loads, and applicable requirements with a qualified professional.
               </p>
             </div>
           ) : (
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-4 mb-4">
               <div className="flex items-center gap-2 text-emerald-400 text-sm font-bold mb-1">
                 <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-                <span>STRUCTURE COMPLIANT</span>
+                <span>NO CURRENT THICKNESS FLAG</span>
               </div>
               <p className="text-xs text-emerald-200/80 leading-relaxed">
-                A 150mm wall is legally sufficient for single-storey load bearing walls, subject to local structural design standards.
+                This example does not raise Corbel&apos;s selected thickness prompt. It is not a structural assessment or a statement of legal sufficiency.
               </p>
             </div>
           )}
 
           <div className="space-y-3.5 my-4">
             <div className="flex justify-between items-center text-xs pb-1.5 border-b border-[#232019]">
-              <span className="text-slate-400 font-medium">Height Limit</span>
-              <span className="font-semibold text-white">{stories === 1 ? '1 Storey (Max 3.5m)' : '2 Storeys (Max 7.0m)'}</span>
+              <span className="text-slate-400 font-medium">Scenario</span>
+              <span className="font-semibold text-white">{stories === 1 ? 'Single-storey example' : 'Two-storey example'}</span>
             </div>
             <div className="flex justify-between items-center text-xs pb-1.5 border-b border-[#232019]">
               <span className="text-slate-400 font-medium">Wall A Status</span>
               <span className={`font-semibold font-mono ${isInvalid ? 'text-red-400' : 'text-emerald-400'}`}>
-                {isInvalid ? 'NON-COMPLIANT' : 'COMPLIANT'}
+                {isInvalid ? 'REVIEW' : 'NO FLAG'}
               </span>
             </div>
             <div className="flex justify-between items-center text-xs pb-1.5 border-b border-[#232019]">
               <span className="text-slate-400 font-medium">Wall B Status</span>
-              <span className="font-semibold text-emerald-400 font-mono">COMPLIANT</span>
+              <span className="font-semibold text-emerald-400 font-mono">NO FLAG</span>
             </div>
           </div>
 
           <p className="text-xs text-slate-400 leading-relaxed bg-[#232019]/40 p-3 rounded-lg border border-[#232019]/60">
             {isInvalid 
-              ? 'Buckling risk increases exponentially on 150mm walls carrying load from upper levels. Extruded voxels simulate excessive structural stress under multi-level floor loads.'
-              : 'Gravity load on a single storey is safely distributed across both wall types. No stress concentrations are expected under standard residential design constraints.'
+              ? 'The scenario is deliberately simplified to prompt discussion of role, material, thickness, and professional structural review.'
+              : 'The absence of this prompt does not establish load capacity, stability, or regulatory approval.'
             }
           </p>
         </div>

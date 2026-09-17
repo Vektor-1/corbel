@@ -50,4 +50,9 @@ describe('image retrace feedback', () => {
       expect.objectContaining({ rule: 'review-duplicate-wall', evidence: expect.stringContaining('endpoints') }),
     ]));
   });
+
+  it('stays silent for a freehand plan that never started as an image trace', () => {
+    const freehandOpenBoundary = { ...plan, rooms: [] };
+    expect(validateTraceFeedback(freehandOpenBoundary, undefined, false)).toEqual([]);
+  });
 });
