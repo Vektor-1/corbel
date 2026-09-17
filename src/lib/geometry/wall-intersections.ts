@@ -79,6 +79,50 @@ export function insertWallWithIntersections(existingWalls: Wall[], newWall: Wall
   return [...splitExisting, ...splitWall(newWall, newCuts)];
 }
 
+/**
+ * Project a point onto a wall segment and compute its parameter (0–1).
+ * Returns null if projection falls outside segment bounds.
+ */
+function projectPointOntoWall(point: Point, wall: Wall): number | null {
+  const dx = wall.endPoint.x - wall.startPoint.x;
+  const dy = wall.endPoint.y - wall.startPoint.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared < EPSILON) return null;
+
+  const t = ((point.x - wall.startPoint.x) * dx + (point.y - wall.startPoint.y) * dy) / lengthSquared;
+
+  if (t < 0 || t > 1) return null;
+
+  return t;
+}
+
+/**
+ * Split a wall at a specific point on its body.
+ * Used when an endpoint is dragged onto an existing wall (wall-splitting feature).
+ * Returns the updated wall list with the target wall split into two segments.
+ */
+export function splitWallAtPoint(walls: Wall[], wallId: string, splitPoint: Point, tolerance: number = 20): Wall[] {
+  const wallToSplit = walls.find((w) => w.id === wallId);
+  if (!wallToSplit) return walls;
+
+  // Project the point onto the wall
+  const t = projectPointOntoWall(splitPoint, wallToSplit);
+  if (t === null) return walls;
+
+  // Avoid splitting too close to endpoints (within tolerance)
+  if (t < tolerance / 1000 || t > 1 - tolerance / 1000) {
+    return walls; // Point is at or too close to an endpoint
+  }
+
+  // Split the wall at parameter t
+  const splitPoints = [t];
+  const newWalls = splitWall(wallToSplit, splitPoints);
+
+  // Replace the original wall with its two halves, keep all other walls unchanged
+  return walls.flatMap((w) => (w.id === wallId ? newWalls : [w]));
+}
+
 export function pointAlongWall(wall: Wall, offset: number): Point {
   const dx = wall.endPoint.x - wall.startPoint.x;
   const dy = wall.endPoint.y - wall.startPoint.y;
@@ -87,6 +131,22 @@ export function pointAlongWall(wall: Wall, offset: number): Point {
     x: wall.startPoint.x + (dx / length) * offset,
     y: wall.startPoint.y + (dy / length) * offset,
   };
+}
+
+/**
+ * Inverse of `pointAlongWall`: projects an arbitrary point onto the wall's
+ * centerline and returns the offset from `startPoint`, clamped to the wall's
+ * own length. Used to keep a door/window's offset in sync when its handle is
+ * dragged off-axis (e.g. from the 3D view).
+ */
+export function projectOffsetOntoWall(wall: Wall, point: Point): number {
+  const dx = wall.endPoint.x - wall.startPoint.x;
+  const dy = wall.endPoint.y - wall.startPoint.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared < 1) return 0;
+  const t = ((point.x - wall.startPoint.x) * dx + (point.y - wall.startPoint.y) * dy) / lengthSquared;
+  const length = Math.sqrt(lengthSquared);
+  return Math.max(0, Math.min(length, t * length));
 }
 
 export function rehostWallOpening<T extends Door | Window>(

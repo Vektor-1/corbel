@@ -6,6 +6,7 @@ import {
   distanceToPoint,
   pointInBounds,
   rectangleCollision,
+  snapPlanPoint,
   snapToGrid,
 } from '../snap';
 
@@ -38,5 +39,27 @@ describe('grid snapping and geometry utilities', () => {
 
   it('calculates Euclidean point distance', () => {
     expect(distanceToPoint({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+  });
+
+  it('prefers the nearest wall endpoint over the grid so adjoining walls share an exact point', () => {
+    expect(
+      snapPlanPoint(
+        { x: 109, y: 206 },
+        { gridSize: 20, endpoints: [{ x: 100, y: 200 }], endpointTolerance: 16 }
+      )
+    ).toEqual({ point: { x: 100, y: 200 }, kind: 'endpoint' });
+  });
+
+  it('falls back to the drawing grid when no endpoint is nearby', () => {
+    expect(snapPlanPoint({ x: 109, y: 206 }, { gridSize: 20 })).toEqual({ point: { x: 100, y: 200 }, kind: 'grid' });
+  });
+
+  it('aligns a new wall with its start point when it is nearly horizontal or vertical', () => {
+    expect(
+      snapPlanPoint(
+        { x: 147, y: 108 },
+        { gridSize: 20, axisOrigin: { x: 100, y: 100 }, axisTolerance: 12 }
+      )
+    ).toEqual({ point: { x: 140, y: 100 }, kind: 'axis' });
   });
 });
