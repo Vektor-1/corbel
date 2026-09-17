@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { makeAsk } from '../src/lib/plan-import/rodium-ai';
 
 const port = 9998;
-const datasetDir = join(__dirname, '../../datasets/dataset/images/test');
+const datasetDir = join(__dirname, '../../../datasets/dataset/images/test');
 
 const server = createServer((req, res) => {
   try {

@@ -1,7 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Monorepo root: patterns apply across frontend/, backend/, and ml/.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,14 +12,14 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage/
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
@@ -34,16 +35,33 @@ yarn-error.log*
 .env*
 !.env.example
 
-# python worker caches
+# python virtual environments and caches
 __pycache__/
 *.py[cod]
+.venv/
+.venv_*/
+venv/
 
 # vercel
 .vercel
 
 # local benchmark output (regeneratable)
-/benchmark_out
+benchmark_out/
+frontend/scripts/.bench-cache/
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ml/: training code is tracked, large artifacts and datasets are not.
+# (frontend/public/models/*.onnx is a committed runtime asset, not excluded here.)
+ml/dataset
+ml/dataset_seg/
+ml/cubicasa5k_coco/
+ml/colab-checkpoints/
+ml/kaggle_download.log
+ml/runs/
+ml/g0/
+ml/synth/*.zip
+ml/*.onnx
+ml/*.pt

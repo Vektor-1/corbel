@@ -6,7 +6,7 @@ import { makeAsk } from '../src/lib/plan-import/rodium-ai';
 
 // Local image server to bypass file:// fetch restrictions
 const port = 9999;
-const datasetDir = join(__dirname, '../../datasets/dataset/images/test');
+const datasetDir = join(__dirname, '../../../datasets/dataset/images/test');
 
 const server = createServer((req, res) => {
   try {

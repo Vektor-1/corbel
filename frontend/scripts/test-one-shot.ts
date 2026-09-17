@@ -7,7 +7,7 @@ import { makeAsk } from '../src/lib/plan-import/rodium-ai';
 import { stage2_walls, type ImageMeta } from '../src/lib/plan-import/pipeline';
 
 const port = 9997;
-const datasetDir = join(__dirname, '../../datasets/dataset/images/test');
+const datasetDir = join(__dirname, '../../../datasets/dataset/images/test');
 const file = 'colorful_11260.png';
 
 const server = createServer((req, res) => {

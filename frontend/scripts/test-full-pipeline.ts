@@ -60,7 +60,7 @@ async function runFullPipelineTest() {
 
   // Step 1: Verify image dataset
   console.log('✅ Step 1: Image Dataset');
-  const testDir = path.join(__dirname, '../../datasets/dataset/images/test');
+  const testDir = path.join(__dirname, '../../../datasets/dataset/images/test');
   const images = fs.readdirSync(testDir).filter(f => f.endsWith('.png'));
   console.log(`   Found ${images.length} test images\n`);
 

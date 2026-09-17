@@ -28,7 +28,7 @@ async function testAIUpload() {
   console.log('\n🎨 AI Pipeline Image Upload Test\n');
 
   // Get test images
-  const testDir = path.join(__dirname, '../../datasets/dataset/images/test');
+  const testDir = path.join(__dirname, '../../../datasets/dataset/images/test');
   if (!fs.existsSync(testDir)) {
     console.error('❌ Test image directory not found:', testDir);
     process.exit(1);
