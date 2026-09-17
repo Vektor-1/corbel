@@ -40,7 +40,7 @@ describe("designFloorJson import", () => {
     expect(validateDesignFloorJson(source)).toBe(true);
     expect(importDesignFloorJson(source)).toMatchObject({
       id: "one-bedroom",
-      walls: [{ startPoint: { x: 0, y: 0 }, endPoint: { x: 4000, y: 0 }, thickness: 225 }],
+      walls: [{ startPoint: { x: -600, y: -450 }, endPoint: { x: 3400, y: -450 }, thickness: 225 }],
       doors: [{ wallId: "wall-1", position: { x: 1400, y: 0 }, width: 900 }],
     });
   });
@@ -88,7 +88,7 @@ describe("designFloorJson import", () => {
     expect(validateDesignFloorJson(source)).toBe(true);
     expect(importDesignFloorJson(source)).toMatchObject({
       id: "studio-plan",
-      rooms: [{ id: "room-1", vertices: source.rooms[0].verticesMm, area: 20 }],
+      rooms: [{ id: "room-1", vertices: [{ x: -250, y: -200 }, { x: 4750, y: -200 }, { x: 4750, y: 3800 }, { x: -250, y: 3800 }], area: 20 }],
       doors: [{ wallId: "wall-1", position: { x: 1000, y: 0 }, swing: "left" }],
     });
   });

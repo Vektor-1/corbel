@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { DesignObject, FloorPlan, Wall, Room, Door, Window, ValidationResult, TraceCalibration } from '@/types/design';
+import type { DesignObject, ElementGroup, FloorPlan, Point, Wall, Room, Door, Window, ValidationResult, TraceCalibration } from '@/types/design';
 import { pixelsPerMeter } from '@/lib/geometry/scale';
 import { insertWallWithIntersections, rehostWallOpening } from '@/lib/geometry/wall-intersections';
 import { cloneFloorPlan, createRedesignPlan } from '@/lib/redesign';
+import { getAllSelectableIds } from '@/lib/geometry/groups';
 
 export interface TraceImageReference {
   url: string;
@@ -23,9 +24,18 @@ interface DesignState {
   ghostOpacity: number;
   traceImage: TraceImageReference | null;
 
+  /** Backend inference job id for the current import, when it came through
+   * the self-hosted ML backend path. Null for hosted-LLM imports or once the
+   * user starts a new design. Read by the corrections-submit action to know
+   * which job to attach a correction to. */
+  lastImportJobId: string | null;
+  setLastImportJobId: (jobId: string | null) => void;
+
   // UI state
   selectedElementId: string | null;
-  currentTool: 'select' | 'wall' | 'object' | 'room' | 'door' | 'window' | 'delete';
+  /** Full multi-selection. `selectedElementId` mirrors its first entry for single-select consumers. */
+  selectedElementIds: string[];
+  currentTool: 'select' | 'wall' | 'object' | 'room' | 'door' | 'window' | 'delete' | 'scale';
   viewMode: '2d' | '3d' | 'split';
 
   // Actions
@@ -45,6 +55,21 @@ interface DesignState {
   setSelectedElement: (id: string | null) => void;
   setCurrentTool: (tool: DesignState['currentTool']) => void;
   setViewMode: (mode: DesignState['viewMode']) => void;
+
+  // Multi-selection
+  setSelection: (ids: string[]) => void;
+  toggleSelectionGroup: (ids: string[]) => void;
+  selectAll: () => void;
+  clearSelection: () => void;
+  deleteSelection: () => void;
+
+  // Grouping ("join elements together as one object")
+  groupElements: (ids: string[]) => void;
+  ungroupElements: (ids: string[]) => void;
+
+  // Bulk geometry transforms for multi-selection / groups
+  translateElements: (ids: string[], dx: number, dy: number) => void;
+  scaleElements: (ids: string[], factor: number, pivot: Point) => void;
 
   // Editing actions (all trigger history)
   addWall: (wall: Wall) => void;
@@ -80,10 +105,13 @@ export const useDesignStore = create<DesignState>(
       ghostOpacity: 0.25,
       traceImage: null,
       selectedElementId: null,
+      selectedElementIds: [],
       currentTool: 'select',
       viewMode: '2d',
+      lastImportJobId: null,
 
       setFloorPlan: (floorPlan: FloorPlan) => set({ floorPlan }),
+      setLastImportJobId: (jobId: string | null) => set({ lastImportJobId: jobId }),
       clearDesign: () =>
         set((state: DesignState) => {
           if (!state.floorPlan) return state;
@@ -101,8 +129,10 @@ export const useDesignStore = create<DesignState>(
             ghostOpacity: 0.25,
             traceImage: null,
             selectedElementId: null,
+            selectedElementIds: [],
             currentTool: 'select',
             validationResults: [],
+            lastImportJobId: null,
           };
         }),
       applyImportedFloorPlan: (floorPlan: FloorPlan) =>
@@ -111,6 +141,7 @@ export const useDesignStore = create<DesignState>(
           ghostFloorPlan: null,
           traceImage: null,
           selectedElementId: null,
+          selectedElementIds: [],
           currentTool: 'select',
           viewMode: '2d',
           validationResults: [],
@@ -127,9 +158,11 @@ export const useDesignStore = create<DesignState>(
           ghostOpacity: 0.18,
           traceImage: null,
           selectedElementId: null,
+          selectedElementIds: [],
           currentTool: 'select',
           viewMode: '2d',
           validationResults: [],
+          lastImportJobId: null,
         });
       },
       beginRedesign: (floorPlan: FloorPlan) => {
@@ -140,6 +173,7 @@ export const useDesignStore = create<DesignState>(
           traceImage: null,
           floorPlan: createRedesignPlan(original),
           selectedElementId: null,
+          selectedElementIds: [],
           currentTool: 'wall',
           viewMode: '2d',
           validationResults: [],
@@ -167,6 +201,7 @@ export const useDesignStore = create<DesignState>(
           ghostOpacity: 0.25,
           traceImage: { url: imageUrl, scale: 0.7, opacity: 0.58, blur: 2 },
           selectedElementId: null,
+          selectedElementIds: [],
           currentTool: 'wall',
           viewMode: '2d',
           validationResults: [],
@@ -182,6 +217,7 @@ export const useDesignStore = create<DesignState>(
           return {
             floorPlan: restored,
             selectedElementId: null,
+            selectedElementIds: [],
             currentTool: 'select',
             validationResults: [],
           };
@@ -224,9 +260,141 @@ export const useDesignStore = create<DesignState>(
         return calibrated;
       },
       setValidationResults: (results: ValidationResult[]) => set({ validationResults: results }),
-      setSelectedElement: (id: string | null) => set({ selectedElementId: id }),
+      setSelectedElement: (id: string | null) =>
+        set({ selectedElementId: id, selectedElementIds: id ? [id] : [] }),
       setCurrentTool: (tool: DesignState['currentTool']) => set({ currentTool: tool }),
       setViewMode: (mode: DesignState['viewMode']) => set({ viewMode: mode }),
+
+      setSelection: (ids: string[]) =>
+        set({ selectedElementIds: ids, selectedElementId: ids[0] ?? null }),
+
+      toggleSelectionGroup: (ids: string[]) =>
+        set((state: DesignState) => {
+          if (ids.length === 0) return state;
+          const allSelected = ids.every((id) => state.selectedElementIds.includes(id));
+          const next = allSelected
+            ? state.selectedElementIds.filter((id) => !ids.includes(id))
+            : Array.from(new Set([...state.selectedElementIds, ...ids]));
+          return { selectedElementIds: next, selectedElementId: next[0] ?? null };
+        }),
+
+      selectAll: () =>
+        set((state: DesignState) => {
+          const ids = getAllSelectableIds(state.floorPlan);
+          return { selectedElementIds: ids, selectedElementId: ids[0] ?? null };
+        }),
+
+      clearSelection: () => set({ selectedElementIds: [], selectedElementId: null }),
+
+      deleteSelection: () =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || state.selectedElementIds.length === 0) return state;
+          const idSet = new Set(state.selectedElementIds);
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              walls: state.floorPlan.walls.filter((w) => !idSet.has(w.id)),
+              rooms: state.floorPlan.rooms.filter((r) => !idSet.has(r.id)),
+              doors: state.floorPlan.doors.filter((d) => !idSet.has(d.id) && !idSet.has(d.wallId)),
+              windows: state.floorPlan.windows.filter((w) => !idSet.has(w.id) && !idSet.has(w.wallId)),
+              objects: (state.floorPlan.objects ?? []).filter((o) => !idSet.has(o.id)),
+              groups: (state.floorPlan.groups ?? []).filter((g) => !g.memberIds.some((m) => idSet.has(m))),
+            },
+            selectedElementIds: [],
+            selectedElementId: null,
+          };
+        }),
+
+      groupElements: (ids: string[]) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || ids.length < 2) return state;
+          // A member belongs to at most one group; regrouping lifts it out of any prior group.
+          const survivingGroups = (state.floorPlan.groups ?? []).filter(
+            (g) => !g.memberIds.some((m) => ids.includes(m))
+          );
+          const newGroup: ElementGroup = { id: `group-${crypto.randomUUID()}`, memberIds: [...ids] };
+          return {
+            floorPlan: { ...state.floorPlan, groups: [...survivingGroups, newGroup] },
+            selectedElementIds: ids,
+            selectedElementId: ids[0] ?? null,
+          };
+        }),
+
+      ungroupElements: (ids: string[]) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan) return state;
+          const groups = (state.floorPlan.groups ?? []).filter(
+            (g) => !g.memberIds.some((m) => ids.includes(m))
+          );
+          return { floorPlan: { ...state.floorPlan, groups } };
+        }),
+
+      translateElements: (ids: string[], dx: number, dy: number) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || ids.length === 0 || (dx === 0 && dy === 0)) return state;
+          const idSet = new Set(ids);
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              walls: state.floorPlan.walls.map((w) =>
+                idSet.has(w.id)
+                  ? {
+                      ...w,
+                      startPoint: { x: w.startPoint.x + dx, y: w.startPoint.y + dy },
+                      endPoint: { x: w.endPoint.x + dx, y: w.endPoint.y + dy },
+                    }
+                  : w
+              ),
+              rooms: state.floorPlan.rooms.map((r) =>
+                idSet.has(r.id)
+                  ? { ...r, vertices: r.vertices.map((v) => ({ x: v.x + dx, y: v.y + dy })) }
+                  : r
+              ),
+              objects: (state.floorPlan.objects ?? []).map((o) =>
+                idSet.has(o.id)
+                  ? { ...o, position: { x: o.position.x + dx, y: o.position.y + dy } }
+                  : o
+              ),
+            },
+          };
+        }),
+
+      scaleElements: (ids: string[], factor: number, pivot: Point) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || ids.length === 0 || !Number.isFinite(factor) || factor <= 0) return state;
+          const idSet = new Set(ids);
+          const scalePoint = (p: Point): Point => ({
+            x: pivot.x + (p.x - pivot.x) * factor,
+            y: pivot.y + (p.y - pivot.y) * factor,
+          });
+          // Doors/windows follow their host wall's new length even when only the wall
+          // (not the opening itself) is part of the scaled selection.
+          const scaledWallIds = new Set(state.floorPlan.walls.filter((w) => idSet.has(w.id)).map((w) => w.id));
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              walls: state.floorPlan.walls.map((w) =>
+                idSet.has(w.id)
+                  ? { ...w, startPoint: scalePoint(w.startPoint), endPoint: scalePoint(w.endPoint) }
+                  : w
+              ),
+              rooms: state.floorPlan.rooms.map((r) =>
+                idSet.has(r.id) ? { ...r, vertices: r.vertices.map(scalePoint) } : r
+              ),
+              objects: (state.floorPlan.objects ?? []).map((o) =>
+                idSet.has(o.id)
+                  ? { ...o, position: scalePoint(o.position), scale: o.scale * factor }
+                  : o
+              ),
+              doors: state.floorPlan.doors.map((d) =>
+                scaledWallIds.has(d.wallId) ? { ...d, position: { ...d.position, x: d.position.x * factor } } : d
+              ),
+              windows: state.floorPlan.windows.map((w) =>
+                scaledWallIds.has(w.wallId) ? { ...w, position: { ...w.position, x: w.position.x * factor } } : w
+              ),
+            },
+          };
+        }),
 
       addWall: (wall: Wall) =>
         set((state: DesignState) => {
@@ -432,6 +600,7 @@ export const useDesignStore = create<DesignState>(
       partialize: (state) => ({
         floorPlan: state.floorPlan,
         selectedElementId: state.selectedElementId,
+        selectedElementIds: state.selectedElementIds,
         currentTool: state.currentTool,
         viewMode: state.viewMode,
         // ghostFloorPlan and ghostOpacity intentionally excluded from undo history
@@ -447,7 +616,9 @@ export const useDesignStore = create<DesignState>(
           past.floorPlan.doors.length !== current.floorPlan.doors.length ||
           past.floorPlan.windows.length !== current.floorPlan.windows.length ||
           past.floorPlan.rooms.length !== current.floorPlan.rooms.length ||
+          (past.floorPlan.groups?.length ?? 0) !== (current.floorPlan.groups?.length ?? 0) ||
           past.selectedElementId !== current.selectedElementId ||
+          (past.selectedElementIds?.join(',') ?? '') !== (current.selectedElementIds?.join(',') ?? '') ||
           past.currentTool !== current.currentTool ||
           past.viewMode !== current.viewMode
         ) {

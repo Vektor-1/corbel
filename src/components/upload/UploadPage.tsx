@@ -27,8 +27,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { useDesignStore } from '@/store/designStore';
 import { reconstructFloorPlan } from '@/lib/plan-import/reconstruct';
+import { fromBackendGeometry, type OcrScaleResult } from '@/lib/plan-import/fromBackendGeometry';
 import type { ImportSource } from '@/lib/plan-import/types';
 import { waitForHostedReconstruction } from '@/lib/services/hostedImport';
+import { uploadToMlBackend, waitForMlBackendGeometry } from '@/lib/services/mlBackendImport';
 import { useFeatureFlag } from '@/lib/flags';
 import { validateUploadFile } from '@/lib/uploads/uploadPolicy';
 import { uploadPlanReference } from '@/lib/uploads/planUpload';
@@ -66,7 +68,9 @@ export default function UploadPage() {
   const searchParams = useSearchParams();
   const beginImportedEdit = useDesignStore((s) => s.beginImportedEdit);
   const beginImageTrace = useDesignStore((s) => s.beginImageTrace);
+  const setLastImportJobId = useDesignStore((s) => s.setLastImportJobId);
   const traceToLearnEnabled = useFeatureFlag('traceToLearn');
+  const mlBackendEnabled = useFeatureFlag('mlBackend');
 
   const lessonTrace = searchParams.get('mode') === 'trace' && searchParams.get('lesson') === 'two-bedroom-plan-reading';
   const [mode, setMode] = useState<Mode>(lessonTrace ? 'trace' : 'reconstruct');
@@ -169,6 +173,54 @@ export default function UploadPage() {
       notifyReconstructionFailure(toast);
     }
   }, [beginImportedEdit, file, router]);
+
+  // Self-hosted GPU backend path: reuses the same OCR/scale call and the
+  // same reconstructFloorPlan()/beginImportedEdit() as the hosted-LLM path
+  // above -- only wall/opening detection comes from a different source.
+  const runBackendReconstruct = useCallback(async () => {
+    if (!file) return;
+    setError(null);
+    setProviderProgress(null);
+    setPhase('uploading');
+    try {
+      setProviderProgress({ status: 'uploading', progress: 5 });
+      // Two independent uploads of the same file: the backend's own MinIO
+      // storage (for inference) and Corbel's existing blob/local storage
+      // (so the already-working OCR route has a URL it can fetch from).
+      const [uploadId, imageUrl] = await Promise.all([uploadToMlBackend(file), uploadPlanReference(file)]);
+      const source = await createImportSource(file, imageUrl);
+
+      setPhase('processing');
+      setProviderProgress({ status: 'running GPU inference', progress: 20 });
+      const [{ jobId, geometry }, ocrResponse] = await Promise.all([
+        waitForMlBackendGeometry(uploadId, {
+          onStatus: (status, progress) => setProviderProgress({ status, progress: Math.max(20, progress) }),
+        }),
+        fetch('/api/plan-import/ocr-scale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source }),
+        }).then(async (r) => {
+          const body = (await r.json()) as OcrScaleResult & { error?: string };
+          if (!r.ok) throw new Error(body.error ?? 'OCR/scale calibration failed.');
+          return body;
+        }),
+      ]);
+
+      const synthetic = fromBackendGeometry(source, geometry, ocrResponse);
+      const imported = reconstructFloorPlan(synthetic);
+      const blockingDiagnostic = imported.diagnostics.find((diagnostic) => diagnostic.severity === 'error');
+      if (blockingDiagnostic) throw new Error(blockingDiagnostic.message);
+      beginImportedEdit(imported.floorPlan);
+      setLastImportJobId(jobId);
+      notifyReconstructionReady(toast);
+      router.push('/editor');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Backend reconstruction failed.');
+      setPhase('failed');
+      notifyReconstructionFailure(toast);
+    }
+  }, [beginImportedEdit, file, router, setLastImportJobId]);
 
   const runTrace = useCallback(async () => {
     if (!file) return;
@@ -329,6 +381,16 @@ export default function UploadPage() {
                   <Button className="w-full" disabled={!file || (mode === 'trace' && file?.type === 'application/pdf')} onClick={mode === 'trace' ? runTrace : runReconstruct}>
                     <UploadIcon /> {mode === 'trace' ? 'Open image retrace in 2D' : 'Reconstruct with AI'}
                   </Button>
+                  {mode === 'reconstruct' && mlBackendEnabled && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled={!file}
+                      onClick={runBackendReconstruct}
+                    >
+                      <UploadIcon /> Reconstruct with self-hosted GPU backend
+                    </Button>
+                  )}
                   {mode === 'trace' && file?.type === 'application/pdf' && <p className="text-xs text-[#9c3c31]">Image retrace supports PNG, JPEG, and WebP files. Choose AI reconstruction for a PDF.</p>}
                 </div>
               )}

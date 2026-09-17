@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { validateUploadContent, validateUploadFile } from '@/lib/uploads/uploadPolicy';
 
 export const runtime = 'nodejs';
 
@@ -18,10 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided.' }, { status: 400 });
     }
 
-    const supported = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
-    if (!supported.includes(file.type)) {
-      return NextResponse.json({ error: 'Unsupported file type.' }, { status: 400 });
-    }
+    const checked = validateUploadFile(file);
+    if (!checked.ok) return NextResponse.json({ error: checked.message }, { status: 400 });
+    const content = await validateUploadContent(file);
+    if (!content.ok) return NextResponse.json({ error: content.message }, { status: 400 });
 
     const dir = join(process.cwd(), '.next', 'local-uploads');
     await mkdir(dir, { recursive: true });

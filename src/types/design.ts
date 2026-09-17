@@ -51,7 +51,8 @@ export interface Door {
   wallId: string;
   width: number; // mm
   type: 'entry' | 'internal';
-  swing: 'left' | 'right';
+  swing: 'left' | 'right'; // hinge side, along the wall
+  openDirection?: 'in' | 'out'; // which side of the wall the leaf swings toward; treated as 'in' when absent
   confidence?: number; // 0-1, from AI extraction
   source?: 'ai' | 'user';
 }
@@ -75,6 +76,12 @@ export interface DesignObject {
   scale: number;
 }
 
+/** A persistent grouping of elements (any mix of walls/rooms/doors/windows/objects) that move, scale, and delete together. */
+export interface ElementGroup {
+  id: string;
+  memberIds: string[];
+}
+
 export interface FloorPlan {
   id: string;
   name: string;
@@ -86,6 +93,8 @@ export interface FloorPlan {
   doors: Door[];
   windows: Window[];
   objects: DesignObject[];
+  /** Optional — absent on plans created before grouping existed. */
+  groups?: ElementGroup[];
   createdAt: Date;
   updatedAt: Date;
   ghostImageBase64?: string; // base64 data:image URL for AI-extracted plans

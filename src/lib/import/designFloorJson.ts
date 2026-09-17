@@ -1,4 +1,5 @@
 import type { Door, FloorPlan, MaterialType, Point, Wall, WallType, Window } from "@/types/design";
+import { centerizeFloorPlan } from "@/lib/geometry/origin";
 
 export interface DesignFloorJsonImport {
   exportVersion: number;
@@ -189,8 +190,14 @@ function legacyPlan(data: DesignFloorJsonImport): FloorPlan {
 export function importDesignFloorJson(jsonData: unknown): FloorPlan {
   const kind = getDesignFloorJsonImportKind(jsonData);
   if (!kind || !isObject(jsonData)) throw new Error("Unsupported JSON. Import requires Corbel geometry or a render brief with rooms.");
-  if (kind === "legacy-export") return legacyPlan(jsonData as unknown as DesignFloorJsonImport);
-  if (kind === "direct-geometry") return directPlan(jsonData);
-  if (kind === "canonical-export") return canonicalPlan(jsonData);
-  return approximatePlan(jsonData);
+  const plan =
+    kind === "legacy-export"
+      ? legacyPlan(jsonData as unknown as DesignFloorJsonImport)
+      : kind === "direct-geometry"
+        ? directPlan(jsonData)
+        : kind === "canonical-export"
+          ? canonicalPlan(jsonData)
+          : approximatePlan(jsonData);
+  // Imports are authored top-left-anchored; convert to the centered sheet origin.
+  return centerizeFloorPlan(plan);
 }

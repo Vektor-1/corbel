@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
+import { isSafeUploadPathname, MAX_UPLOAD_SIZE_BYTES } from '@/lib/uploads/uploadPolicy';
 
 export const runtime = 'nodejs';
 
@@ -14,15 +15,11 @@ export async function POST(request: Request) {
       body,
       request,
       onBeforeGenerateToken: async (pathname) => {
-        const normalized = pathname.toLowerCase();
-        const supported = ['.png', '.jpg', '.jpeg', '.webp', '.pdf'].some((extension) =>
-          normalized.endsWith(extension)
-        );
-        if (!supported) throw new Error('Upload a PNG, JPEG, WebP or PDF floor plan.');
+        if (!isSafeUploadPathname(pathname)) throw new Error('Upload a PNG, JPEG, WebP or PDF floor plan.');
 
         return {
           allowedContentTypes: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'],
-          maximumSizeInBytes: 50 * 1024 * 1024,
+          maximumSizeInBytes: MAX_UPLOAD_SIZE_BYTES,
           addRandomSuffix: true,
         };
       },
