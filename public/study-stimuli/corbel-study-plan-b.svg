@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Corbel controlled study plan B</title>
+  <desc id="desc">Original schematic residential plan for a controlled learning study. The right exterior wall is labelled 3.6 metres.</desc>
+  <rect width="1200" height="800" fill="#f8f5ed"/>
+  <g fill="#1b2730" font-family="Arial, sans-serif">
+    <text x="70" y="65" font-size="28" font-weight="700">CORBEL STUDY STIMULUS B</text>
+    <text x="70" y="99" font-size="18">Practice plan · scale reference and drawing cues</text>
+  </g>
+  <g fill="none" stroke="#17212b" stroke-linecap="square">
+    <path d="M150 190H900V650H150Z" stroke-width="16"/>
+    <path d="M420 190V430M420 520V650M150 430H900M660 430V650" stroke-width="12"/>
+    <!-- external entrance gap and swing -->
+    <path d="M630 650H730" stroke="#f8f5ed" stroke-width="24"/>
+    <path d="M630 650A100 100 0 0 1 730 550" stroke-width="4"/>
+    <!-- internal doors -->
+    <path d="M420 330V410M420 520V590M660 430H735" stroke="#f8f5ed" stroke-width="22"/>
+    <path d="M420 330A80 80 0 0 1 500 410M420 590A70 70 0 0 0 490 520M660 430A75 75 0 0 1 735 505" stroke-width="4"/>
+    <!-- windows -->
+    <path d="M240 190H350M770 190H850M900 270V380" stroke="#4e8ead" stroke-width="8"/>
+  </g>
+  <g fill="#17212b" font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="285" y="315" font-size="26" font-weight="700">STORE</text>
+    <text x="285" y="344" font-size="17">close this room</text>
+    <text x="540" y="315" font-size="26" font-weight="700">KITCHEN</text>
+    <text x="780" y="315" font-size="26" font-weight="700">BEDROOM</text>
+    <text x="410" y="560" font-size="30" font-weight="700">LIVING AREA</text>
+    <text x="680" y="705" font-size="17">EXTERNAL ENTRANCE</text>
+  </g>
+  <g stroke="#b4873e" fill="none" stroke-width="3">
+    <path d="M958 290V650M949 290H967M949 650H967"/>
+    <path d="M958 290l-7 12M958 290l7 12M958 650l-7-12M958 650l7-12"/>
+  </g>
+  <text x="990" y="475" fill="#7e5720" font-family="Arial, sans-serif" font-size="24" font-weight="700" transform="rotate(90 990 475)" text-anchor="middle">KNOWN WALL LENGTH: 3.6 m</text>
+  <g fill="#44515b" font-family="Arial, sans-serif" font-size="16">
+    <text x="970" y="205" font-weight="700">TASK BRIEF</text>
+    <text x="970" y="238">• right wall: sandcrete, load-bearing</text>
+    <text x="970" y="266">• use 225 mm minimum after review</text>
+    <text x="970" y="294">• use the labelled wall for calibration</text>
+    <text x="970" y="322">• do not treat this as a construction drawing</text>
+  </g>
+  <text x="70" y="755" fill="#59616a" font-family="Arial, sans-serif" font-size="14">Original Corbel research stimulus · educational use only · not a building plan</text>
+</svg>

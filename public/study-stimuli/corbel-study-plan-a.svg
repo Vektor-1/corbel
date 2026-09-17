@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Corbel controlled study plan A</title>
+  <desc id="desc">Original schematic residential plan for a controlled learning study. The top exterior wall is labelled 3.0 metres.</desc>
+  <rect width="1200" height="800" fill="#f8f5ed"/>
+  <g fill="#1b2730" font-family="Arial, sans-serif">
+    <text x="70" y="65" font-size="28" font-weight="700">CORBEL STUDY STIMULUS A</text>
+    <text x="70" y="99" font-size="18">Practice plan · scale reference and drawing cues</text>
+  </g>
+  <g fill="none" stroke="#17212b" stroke-linecap="square">
+    <path d="M170 190H920V650H170Z" stroke-width="16"/>
+    <path d="M470 190V430M470 510V650M170 430H920M700 190V430" stroke-width="12"/>
+    <!-- external entrance gap and swing -->
+    <path d="M170 510V610" stroke="#f8f5ed" stroke-width="24"/>
+    <path d="M170 610A100 100 0 0 0 270 510" stroke-width="4"/>
+    <!-- internal doors -->
+    <path d="M470 350V420M470 510V580M700 430H770" stroke="#f8f5ed" stroke-width="22"/>
+    <path d="M470 350A70 70 0 0 1 540 420M470 580A70 70 0 0 0 540 510M700 430A70 70 0 0 1 770 500" stroke-width="4"/>
+    <!-- windows -->
+    <path d="M280 190H390M760 190H870M920 290V380" stroke="#4e8ead" stroke-width="8"/>
+  </g>
+  <g fill="#17212b" font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="320" y="315" font-size="26" font-weight="700">STUDY</text>
+    <text x="320" y="344" font-size="17">close this room</text>
+    <text x="585" y="315" font-size="26" font-weight="700">KITCHEN</text>
+    <text x="810" y="315" font-size="26" font-weight="700">BEDROOM</text>
+    <text x="570" y="560" font-size="30" font-weight="700">LIVING AREA</text>
+    <text x="270" y="680" font-size="17">EXTERNAL ENTRANCE</text>
+  </g>
+  <g stroke="#b4873e" fill="none" stroke-width="3">
+    <path d="M170 142H470M170 133V151M470 133V151"/>
+    <path d="M170 142l12-7M170 142l12 7M470 142l-12-7M470 142l-12 7"/>
+  </g>
+  <text x="320" y="130" fill="#7e5720" font-family="Arial, sans-serif" font-size="24" text-anchor="middle" font-weight="700">KNOWN WALL LENGTH: 3.0 m</text>
+  <g fill="#44515b" font-family="Arial, sans-serif" font-size="16">
+    <text x="970" y="205" font-weight="700">TASK BRIEF</text>
+    <text x="970" y="238">• top wall: sandcrete, load-bearing</text>
+    <text x="970" y="266">• use 225 mm minimum after review</text>
+    <text x="970" y="294">• treat image dimensions as a tracing guide</text>
+    <text x="970" y="322">• do not treat this as a construction drawing</text>
+  </g>
+  <text x="70" y="755" fill="#59616a" font-family="Arial, sans-serif" font-size="14">Original Corbel research stimulus · educational use only · not a building plan</text>
+</svg>
