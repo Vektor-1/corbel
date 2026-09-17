@@ -1,7 +1,7 @@
 'use client';
 
 import { useDesignStore } from '@/store/designStore';
-import { Stage, Layer, Rect, Line, Circle, Text, Group, Arc, Image as KonvaImage } from 'react-konva';
+import { Stage, Layer, Rect, Line, Circle, Text, Group, Arc, Image as KonvaImage, Transformer } from 'react-konva';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import Konva from 'konva';
 import { useFeatureFlag } from '@/lib/flags';
@@ -10,13 +10,17 @@ import { computeWallFootprints, wallQuad } from '@/lib/geometry/wall-joints';
 import { millimetresPerPixel, pixelsPerMeter } from '@/lib/geometry/scale';
 import { pointAlongWall } from '@/lib/geometry/wall-intersections';
 import { polygonCentroid } from '@/lib/geometry/rooms';
+import { snapPlanPoint } from '@/lib/geometry/snap';
+import { splitWallAtPoint } from '@/lib/geometry/wall-intersections';
+import { canPlaceDoor, canPlaceWindow } from '@/lib/geometry/placement-constraints';
 import { OBJECT_CATALOG_BY_ID } from '@/lib/objects/catalog';
 import { compareFloorPlans, type MatchStatus } from '@/lib/comparison';
+import { getCombinedBounds, getElementIdsInRect, type ElementBounds } from '@/lib/geometry/element-bounds';
+import { expandGroupSelection } from '@/lib/geometry/groups';
 import type { DesignObject, Door, MaterialType, ObjectAssetId, Wall, WallType, Window } from '@/types/design';
 import { formatArea, formatLength, type AreaUnit, type LengthUnit } from '@/lib/units/measurements';
 
-const GRID_SIZE = 20;
-const SNAP_DISTANCE = 10;
+const MIN_WALL_LENGTH = 10;
 
 interface Canvas2DProps {
   defaultWallMaterial: MaterialType;
@@ -35,6 +39,8 @@ interface Canvas2DProps {
   showWallDimensions?: boolean;
   lengthUnit?: LengthUnit;
   areaUnit?: AreaUnit;
+  /** One-shot placement feedback (door/window blocked at this position). */
+  onPlacementViolation?: (violation: { message: string; rule: string; targetId: string }) => void;
 }
 
 export const Canvas2D = React.memo(function Canvas2D({
@@ -54,6 +60,7 @@ export const Canvas2D = React.memo(function Canvas2D({
   showWallDimensions = true,
   lengthUnit = 'mm',
   areaUnit = 'm²',
+  onPlacementViolation,
 }: Canvas2DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const internalStageRef = useRef<Konva.Stage>(null);
@@ -61,8 +68,17 @@ export const Canvas2D = React.memo(function Canvas2D({
   const [drawing, setDrawing] = useState(false);
   const [startPos, setStartPos] = useState<Vector2d | null>(null);
   const [wallPreview, setWallPreview] = useState<{ start: Vector2d; end: Vector2d } | null>(null);
+  const [snapIndicator, setSnapIndicator] = useState<{ pos: Vector2d; kind: import('@/lib/geometry/snap').PlanSnapKind } | null>(null);
+  const [endpointSnapKind, setEndpointSnapKind] = useState<import('@/lib/geometry/snap').PlanSnapKind | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 900, height: 600 });
   const [referenceImage, setReferenceImage] = useState<HTMLImageElement | null>(null);
+  const [angleLock, setAngleLock] = useState(false);
+  const [spacePressed, setSpacePressed] = useState(false);
+  const [middlePanning, setMiddlePanning] = useState(false);
+  const isPanning = spacePressed || middlePanning;
+  const [marquee, setMarquee] = useState<{ start: Vector2d; end: Vector2d; additive: boolean } | null>(null);
+  const transformTargetRef = useRef<Konva.Rect>(null);
+  const transformerRef = useRef<Konva.Transformer>(null);
 
   const palette = theme === 'dark'
     ? {
@@ -100,6 +116,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     floorPlan,
     currentTool,
     selectedElementId,
+    selectedElementIds,
     addWall,
     deleteWall,
     addDoor,
@@ -109,9 +126,38 @@ export const Canvas2D = React.memo(function Canvas2D({
     addObject,
     deleteObject,
     setSelectedElement,
+    setSelection,
+    toggleSelectionGroup,
+    clearSelection,
+    translateElements,
+    scaleElements,
+    updateWall,
   } = useDesignStore();
+  // The Scale tool shows resize handles for any selection size (its whole purpose);
+  // the Select tool reserves single-element clicks for existing per-element interactions
+  // (e.g. wall endpoint dragging) and only shows the group box once 2+ are selected.
+  const isSelectLikeTool = currentTool === 'select' || currentTool === 'scale';
+  const minBoundsSelection = currentTool === 'scale' ? 1 : 2;
+  const combinedSelectionBounds = useMemo(
+    () => (selectedElementIds.length >= minBoundsSelection ? getCombinedBounds(selectedElementIds, floorPlan ?? null) : null),
+    [selectedElementIds, floorPlan, minBoundsSelection]
+  );
+
+  useEffect(() => {
+    const transformer = transformerRef.current;
+    const target = transformTargetRef.current;
+    if (!transformer) return;
+    if (target && combinedSelectionBounds) {
+      transformer.nodes([target]);
+    } else {
+      transformer.nodes([]);
+    }
+    transformer.getLayer()?.batchDraw();
+  }, [combinedSelectionBounds]);
   const planPixelsPerMeter = pixelsPerMeter(floorPlan?.scale);
   const planMillimetresPerPixel = millimetresPerPixel(floorPlan?.scale);
+  const drawingGridSize = Math.max(10, Math.round(planPixelsPerMeter / 5)); // 200 mm at the active scale
+  const endpointTolerance = Math.max(12, Math.min(24, drawingGridSize * 0.8));
   const ghostMillimetresPerPixel = millimetresPerPixel(ghostFloorPlan?.scale);
   const traceToLearnEnabled = useFeatureFlag('traceToLearn');
   const walls = floorPlan?.walls;
@@ -161,6 +207,25 @@ export const Canvas2D = React.memo(function Canvas2D({
     return () => observer.disconnect();
   }, []);
 
+  // Keep the latest measured viewport size in a ref so the centering effect
+  // below always uses real dimensions, even on first render.
+  const canvasSizeRef = useRef(canvasSize);
+  useEffect(() => {
+    canvasSizeRef.current = canvasSize;
+  }, [canvasSize]);
+
+  // The plan origin (0,0) is the sheet center. Pan the stage so the origin
+  // sits at the viewport center once per plan; the user can pan freely after.
+  const centeredPlanId = useRef<string | null>(null);
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || !floorPlan) return;
+    if (centeredPlanId.current === floorPlan.id) return;
+    centeredPlanId.current = floorPlan.id;
+    const { width, height } = canvasSizeRef.current;
+    stage.position({ x: width / 2, y: height / 2 });
+  }, [floorPlan?.id]);
+
   useEffect(() => {
     if (!traceImage?.url) {
       setReferenceImage(null);
@@ -176,22 +241,104 @@ export const Canvas2D = React.memo(function Canvas2D({
     };
   }, [traceImage?.url]);
 
-  const snapToGrid = (pos: Vector2d): Vector2d => ({
-    x: Math.round(pos.x / GRID_SIZE) * GRID_SIZE,
-    y: Math.round(pos.y / GRID_SIZE) * GRID_SIZE,
-  });
+  const snapToGrid = (pos: Vector2d): Vector2d =>
+    snapPlanPoint(pos, { gridSize: drawingGridSize }).point;
 
-  const getPointerPosition = () => {
+  const snapDrawingPoint = (
+    point: Vector2d,
+    axisOrigin?: Vector2d,
+    excludeWallId?: string,
+  ): { point: Vector2d; kind: import('@/lib/geometry/snap').PlanSnapKind } => {
+    const result = snapPlanPoint(point, {
+      gridSize: drawingGridSize,
+      walls: floorPlan?.walls ?? [],
+      endpointTolerance,
+      axisOrigin,
+      axisTolerance: endpointTolerance,
+      angleLock,
+      excludeWallId,
+    });
+    return result;
+  };
+
+  /** Convert a screen-space pointer event to stage-local coordinates.
+   *  `stage.getPointerPosition()` returns canvas-pixel coords relative to the
+   *  content div, but after the stage is panned (draggable in select mode) the
+   *  canvas content is rendered offset by stage.x()/y(). We must subtract the
+   *  stage drag offset to get the correct stage-local (scene-graph) position. */
+  const stageLocalPos = (): Vector2d | null => {
     const stage = stageRef.current;
     if (!stage) return null;
-
     const pointer = stage.getPointerPosition();
     if (!pointer) return null;
+    return {
+      x: pointer.x - (stage.x() ?? 0),
+      y: pointer.y - (stage.y() ?? 0),
+    };
+  };
 
-    return snapToGrid(pointer);
+  const getPointerPosition = () => {
+    const pos = stageLocalPos();
+    return pos ? snapToGrid(pos) : null;
+  };
+
+  const getDrawingPointerPosition = (axisOrigin?: Vector2d, excludeWallId?: string) => {
+    const pos = stageLocalPos();
+    if (!pos) return null;
+    return snapDrawingPoint(pos, axisOrigin, excludeWallId);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Shift') {
+      setAngleLock(true);
+    }
+    if (e.key === ' ' && document.activeElement?.tagName !== 'INPUT') {
+      e.preventDefault();
+      setSpacePressed(true);
+    }
+  };
+
+  const handleKeyUp = (e: React.KeyboardEvent) => {
+    if (e.key === 'Shift') {
+      setAngleLock(false);
+    }
+    if (e.key === ' ') {
+      setSpacePressed(false);
+    }
+  };
+
+  /** Click-select for the active tool: shift/ctrl/cmd toggles into the multi-selection,
+   *  a plain click replaces it. Either way, clicking any grouped element expands to its whole group. */
+  const selectOnClick = (id: string, e: Konva.KonvaEventObject<MouseEvent>) => {
+    const ids = expandGroupSelection(floorPlan ?? null, [id]);
+    if (e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey) {
+      toggleSelectionGroup(ids);
+    } else {
+      setSelection(ids);
+    }
   };
 
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (e.evt.button === 1) {
+      // Middle-mouse drag pans from any tool, regardless of selection/drawing state.
+      // startDrag() is called directly (bypassing the reactive `draggable` prop) since
+      // toggling that prop inside this same handler would be one render too late for
+      // Konva's own drag-start detection on this mousedown.
+      e.evt.preventDefault();
+      setMiddlePanning(true);
+      e.target.getStage()?.startDrag(e);
+      return;
+    }
+
+    if (isPanning) return; // let the Stage's own drag pan the view (Space or middle-mouse held)
+
+    if (isSelectLikeTool && e.target === e.target.getStage()) {
+      const pos = stageLocalPos();
+      if (!pos) return;
+      setMarquee({ start: pos, end: pos, additive: e.evt.shiftKey });
+      return;
+    }
+
     if (currentTool === 'object') {
       const pos = getPointerPosition();
       if (!pos) return;
@@ -209,41 +356,88 @@ export const Canvas2D = React.memo(function Canvas2D({
       return;
     }
 
-    if (currentTool === 'select' && e.target === e.target.getStage()) {
-      setSelectedElement(null);
-      return;
-    }
-
     if (currentTool !== 'wall') return;
 
-    const pos = getPointerPosition();
-    if (!pos) return;
+    const result = getDrawingPointerPosition();
+    if (!result) return;
 
+    const pos = result.point;
     setDrawing(true);
     setStartPos(pos);
     setWallPreview({ start: pos, end: pos });
+    setSnapIndicator({ pos, kind: result.kind });
   };
 
   const handleMouseMove = () => {
-    if (!drawing || !startPos) {
-      setWallPreview(null);
+    if (marquee) {
+      const pos = stageLocalPos();
+      if (pos) setMarquee({ ...marquee, end: pos });
       return;
     }
 
-    const currentPos = getPointerPosition();
-    if (!currentPos) return;
+    if (!drawing || !startPos) {
+      setWallPreview(null);
+      setSnapIndicator(null);
+      setEndpointSnapKind(null);
+      return;
+    }
 
+    const result = getDrawingPointerPosition(startPos);
+    if (!result) return;
+
+    const currentPos = result.point;
     setWallPreview({
       start: startPos,
       end: currentPos,
     });
+    setSnapIndicator({ pos: currentPos, kind: result.kind });
+    // Track if endpoint is snapping to a wall body (for auto-split feature)
+    setEndpointSnapKind(result.kind);
+  };
+
+  /** Two-finger trackpad scroll (or a mouse wheel) pans the view; no modifier needed. */
+  const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
+    e.evt.preventDefault();
+    const stage = stageRef.current;
+    if (!stage) return;
+    stage.position({ x: stage.x() - e.evt.deltaX, y: stage.y() - e.evt.deltaY });
+    stage.batchDraw();
   };
 
   const handleMouseUp = () => {
+    if (middlePanning) {
+      setMiddlePanning(false);
+      return;
+    }
+
+    if (marquee) {
+      const rect: ElementBounds = {
+        x: Math.min(marquee.start.x, marquee.end.x),
+        y: Math.min(marquee.start.y, marquee.end.y),
+        width: Math.abs(marquee.end.x - marquee.start.x),
+        height: Math.abs(marquee.end.y - marquee.start.y),
+      };
+      const dragged = rect.width > 4 || rect.height > 4;
+      if (dragged) {
+        const hitIds = getElementIdsInRect(rect, floorPlan ?? null);
+        const ids = expandGroupSelection(floorPlan ?? null, hitIds);
+        if (marquee.additive) {
+          setSelection(Array.from(new Set([...selectedElementIds, ...ids])));
+        } else {
+          setSelection(ids);
+        }
+      } else if (!marquee.additive) {
+        clearSelection();
+      }
+      setMarquee(null);
+      return;
+    }
+
     if (!drawing || !startPos || !wallPreview) {
       setDrawing(false);
       setStartPos(null);
       setWallPreview(null);
+      setSnapIndicator(null);
       return;
     }
 
@@ -252,7 +446,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         Math.pow(wallPreview.end.y - startPos.y, 2)
     );
 
-    if (distance > SNAP_DISTANCE) {
+    if (distance > MIN_WALL_LENGTH) {
       const newWall: Wall = {
         id: `wall-${Date.now()}`,
         startPoint: startPos,
@@ -262,6 +456,8 @@ export const Canvas2D = React.memo(function Canvas2D({
         type: defaultWallType,
         height: defaultWallHeight,
       };
+      // addWall uses insertWallWithIntersections which automatically handles
+      // splitting both the new wall and existing walls at their intersections
       addWall(newWall);
       setSelectedElement(newWall.id);
     }
@@ -269,6 +465,8 @@ export const Canvas2D = React.memo(function Canvas2D({
     setDrawing(false);
     setStartPos(null);
     setWallPreview(null);
+    setSnapIndicator(null);
+    setEndpointSnapKind(null);
   };
 
   const handleWallClick = (wallId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -292,6 +490,21 @@ export const Canvas2D = React.memo(function Canvas2D({
       if (length < halfWidthPx * 2) return;
 
       if (currentTool === 'door') {
+        // Validate door placement against constraints
+        const violations = canPlaceDoor(
+          wall,
+          offset * planMillimetresPerPixel,
+          openingWidthMm,
+          floorPlan?.doors ?? [],
+          floorPlan?.windows ?? [],
+        );
+
+        const errors = violations.filter((v) => v.severity === 'error');
+        if (errors.length > 0) {
+          onPlacementViolation?.({ message: errors[0].message, rule: errors[0].rule, targetId: wall.id });
+          return;
+        }
+
         const door: Door = {
           id: `door-${Date.now()}`,
           wallId,
@@ -299,10 +512,29 @@ export const Canvas2D = React.memo(function Canvas2D({
           width: openingWidthMm,
           type: 'internal',
           swing: 'left',
+          openDirection: 'in',
         };
         addDoor(door);
         setSelectedElement(door.id);
       } else {
+        // Validate window placement against constraints
+        const violations = canPlaceWindow(
+          wall,
+          offset * planMillimetresPerPixel,
+          openingWidthMm,
+          1200, // windowHeight
+          900, // windowSillHeight
+          defaultWallHeight,
+          floorPlan?.doors ?? [],
+          floorPlan?.windows ?? [],
+        );
+
+        const errors = violations.filter((v) => v.severity === 'error');
+        if (errors.length > 0) {
+          onPlacementViolation?.({ message: errors[0].message, rule: errors[0].rule, targetId: wall.id });
+          return;
+        }
+
         const window: Window = {
           id: `window-${Date.now()}`,
           wallId,
@@ -325,7 +557,7 @@ export const Canvas2D = React.memo(function Canvas2D({
       return;
     }
 
-    setSelectedElement(wallId);
+    selectOnClick(wallId, e);
   };
 
   const handleOpeningClick = (
@@ -340,12 +572,12 @@ export const Canvas2D = React.memo(function Canvas2D({
       if (selectedElementId === openingId) setSelectedElement(null);
       return;
     }
-    if (currentTool === 'select') setSelectedElement(openingId);
+    if (isSelectLikeTool) selectOnClick(openingId, e);
   };
 
   const handleRoomClick = (roomId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
-    if (currentTool === 'select') setSelectedElement(roomId);
+    if (isSelectLikeTool) selectOnClick(roomId, e);
   };
 
   const handleObjectClick = (objectId: string, e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -357,30 +589,44 @@ export const Canvas2D = React.memo(function Canvas2D({
       return;
     }
 
-    setSelectedElement(objectId);
+    selectOnClick(objectId, e);
   };
 
+  // Grid spans the full drawing sheet centered on the plan origin, so panned
+  // areas stay gridded. Empty sheets fall back to the viewport.
+  const planWidthPx = floorPlan ? floorPlan.width / millimetresPerPixel(floorPlan.scale) : 0;
+  const planHeightPx = floorPlan ? floorPlan.height / millimetresPerPixel(floorPlan.scale) : 0;
+  const gridWidth = Math.max(canvasSize.width, planWidthPx);
+  const gridHeight = Math.max(canvasSize.height, planHeightPx);
+  const gridLeft = -gridWidth / 2;
+  const gridTop = -gridHeight / 2;
+  const gridRight = gridWidth / 2;
+  const gridBottom = gridHeight / 2;
+
   const gridLines = [];
-  for (let x = 0; x <= canvasSize.width; x += GRID_SIZE) {
+  for (let x = gridLeft; x <= gridRight; x += drawingGridSize) {
     gridLines.push(
-      <Line key={`v-${x}`} points={[x, 0, x, canvasSize.height]} stroke={palette.grid} strokeWidth={1} opacity={0.65} />
+      <Line key={`v-${x}`} points={[x, gridTop, x, gridBottom]} stroke={palette.grid} strokeWidth={1} opacity={0.65} />
     );
   }
-  for (let y = 0; y <= canvasSize.height; y += GRID_SIZE) {
+  for (let y = gridTop; y <= gridBottom; y += drawingGridSize) {
     gridLines.push(
-      <Line key={`h-${y}`} points={[0, y, canvasSize.width, y]} stroke={palette.grid} strokeWidth={1} opacity={0.65} />
+      <Line key={`h-${y}`} points={[gridLeft, y, gridRight, y]} stroke={palette.grid} strokeWidth={1} opacity={0.65} />
     );
   }
 
   const roomElements = (floorPlan?.rooms ?? []).map((room) => {
     const centroid = polygonCentroid(room.vertices);
-    const isSelected = room.id === selectedElementId;
+    const isSelected = selectedElementIds.includes(room.id);
 
     return (
       <Group
         key={room.id}
         onMouseDown={(event) => {
-          event.cancelBubble = true;
+          // Let the Object tool's placement click through — a room's fill would
+          // otherwise swallow it, making it impossible to place furniture inside
+          // any closed room.
+          if (currentTool !== 'object') event.cancelBubble = true;
         }}
         onClick={(event) => handleRoomClick(room.id, event)}
       >
@@ -428,7 +674,7 @@ export const Canvas2D = React.memo(function Canvas2D({
 
     const width = asset.dimensions[0] * 100 * object.scale;
     const depth = asset.dimensions[2] * 100 * object.scale;
-    const isSelected = object.id === selectedElementId;
+    const isSelected = selectedElementIds.includes(object.id);
 
     return (
       <Group
@@ -437,7 +683,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         y={object.position.y}
         rotation={(object.rotation * 180) / Math.PI}
         onMouseDown={(event) => {
-          event.cancelBubble = true;
+          if (currentTool !== 'object') event.cancelBubble = true;
         }}
         onClick={(event) => handleObjectClick(object.id, event)}
       >
@@ -473,7 +719,8 @@ export const Canvas2D = React.memo(function Canvas2D({
   });
 
   const wallElements = floorPlan?.walls.map((wall) => {
-    const isSelected = wall.id === selectedElementId;
+    const isSelected = selectedElementIds.includes(wall.id);
+    const canEditEndpoints = isSelected && currentTool === 'select';
     const footprint = footprints.get(wall.id);
     if (!footprint) return null;
 
@@ -497,8 +744,42 @@ export const Canvas2D = React.memo(function Canvas2D({
           shadowOpacity={isSelected ? 0.45 : 0}
           onClick={(event) => handleWallClick(wall.id, event)}
         />
-        <Circle x={wall.startPoint.x} y={wall.startPoint.y} radius={2.5} fill={palette.handle} opacity={0.9} />
-        <Circle x={wall.endPoint.x} y={wall.endPoint.y} radius={2.5} fill={palette.handle} opacity={0.9} />
+        <Circle
+          x={wall.startPoint.x}
+          y={wall.startPoint.y}
+          radius={canEditEndpoints ? 7 : 2.5}
+          fill={palette.handle}
+          stroke={canEditEndpoints ? palette.selection : undefined}
+          strokeWidth={canEditEndpoints ? 2 : 0}
+          opacity={canEditEndpoints ? 1 : 0.9}
+          draggable={canEditEndpoints}
+          onClick={(event) => handleWallClick(wall.id, event)}
+          onDragStart={(event) => {
+            event.cancelBubble = true;
+          }}
+          onDragEnd={(event) => {
+            event.cancelBubble = true;
+            updateWall(wall.id, { startPoint: snapDrawingPoint({ x: event.target.x(), y: event.target.y() }, undefined, wall.id).point });
+          }}
+        />
+        <Circle
+          x={wall.endPoint.x}
+          y={wall.endPoint.y}
+          radius={canEditEndpoints ? 7 : 2.5}
+          fill={palette.handle}
+          stroke={canEditEndpoints ? palette.selection : undefined}
+          strokeWidth={canEditEndpoints ? 2 : 0}
+          opacity={canEditEndpoints ? 1 : 0.9}
+          draggable={canEditEndpoints}
+          onClick={(event) => handleWallClick(wall.id, event)}
+          onDragStart={(event) => {
+            event.cancelBubble = true;
+          }}
+          onDragEnd={(event) => {
+            event.cancelBubble = true;
+            updateWall(wall.id, { endPoint: snapDrawingPoint({ x: event.target.x(), y: event.target.y() }, undefined, wall.id).point });
+          }}
+        />
         {showWallDimensions && (
           <Text
             x={centerX - 28}
@@ -528,18 +809,32 @@ export const Canvas2D = React.memo(function Canvas2D({
       ? { x: center.x - direction.x * halfWidth, y: center.y - direction.y * halfWidth }
       : { x: center.x + direction.x * halfWidth, y: center.y + direction.y * halfWidth };
     const closedAngle = door.swing === 'left' ? angle : angle + Math.PI;
-    const openAngle = angle + Math.PI / 2;
+    const openDirection = door.openDirection ?? 'in';
+    const openAngle = angle + (openDirection === 'out' ? -Math.PI / 2 : Math.PI / 2);
+    // Konva's Arc always sweeps its local 0deg->angle(90deg) range and passes
+    // its own `clockwise` prop straight through as the native canvas
+    // arc()'s `counterclockwise` argument -- so clockwise=true, combined
+    // with that fixed increasing local sweep, tells the browser to go the
+    // LONG way around (270deg) rather than the short 90deg (confirmed by
+    // reading node_modules/konva/lib/shapes/Arc.js directly; this was a
+    // latent bug in the pre-existing swing='right' rendering too, just
+    // never exposed before openDirection made side-by-side comparison
+    // possible). Always sweeping "clockwise=false" (the short way) and
+    // choosing which of the two 90deg-apart boundary angles to start
+    // rotation at sidesteps the bug entirely, for all 4 combinations.
+    const arcDelta = ((openAngle - closedAngle + Math.PI) % (2 * Math.PI)) - Math.PI;
+    const arcRotation = arcDelta > 0 ? closedAngle : openAngle;
     const leafEnd = {
       x: hinge.x + Math.cos(openAngle) * width,
       y: hinge.y + Math.sin(openAngle) * width,
     };
-    const isSelected = selectedElementId === door.id;
+    const isSelected = selectedElementIds.includes(door.id);
 
     return (
       <Group
         key={door.id}
         onMouseDown={(event) => {
-          event.cancelBubble = true;
+          if (currentTool !== 'object') event.cancelBubble = true;
         }}
         onClick={(event) => handleOpeningClick(door.id, 'door', event)}
       >
@@ -564,8 +859,8 @@ export const Canvas2D = React.memo(function Canvas2D({
           innerRadius={Math.max(1, width - 1)}
           outerRadius={width}
           angle={90}
-          rotation={(closedAngle * 180) / Math.PI}
-          clockwise={door.swing === 'right'}
+          rotation={(arcRotation * 180) / Math.PI}
+          clockwise={false}
           fill={isSelected ? palette.selection : palette.door}
           opacity={0.75}
         />
@@ -588,7 +883,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     const halfWidth = width / 2;
     const direction = { x: Math.cos(angle), y: Math.sin(angle) };
     const normal = { x: -direction.y, y: direction.x };
-    const isSelected = selectedElementId === window.id;
+    const isSelected = selectedElementIds.includes(window.id);
     const color = isSelected ? palette.selection : palette.window;
     const endpoints = (normalOffset: number) => [
       center.x - direction.x * halfWidth + normal.x * normalOffset,
@@ -601,7 +896,7 @@ export const Canvas2D = React.memo(function Canvas2D({
       <Group
         key={window.id}
         onMouseDown={(event) => {
-          event.cancelBubble = true;
+          if (currentTool !== 'object') event.cancelBubble = true;
         }}
         onClick={(event) => handleOpeningClick(window.id, 'window', event)}
       >
@@ -618,9 +913,78 @@ export const Canvas2D = React.memo(function Canvas2D({
     );
   });
 
+  const getSnapIndicatorStyle = (kind: import('@/lib/geometry/snap').PlanSnapKind) => {
+    const baseSize = 8;
+    switch (kind) {
+      case 'endpoint':
+        return { size: baseSize + 2, color: '#e74c3c', shape: 'square' }; // Red square
+      case 'midpoint':
+        return { size: baseSize, color: '#f39c12', shape: 'triangle' }; // Orange triangle
+      case 'crossing':
+        return { size: baseSize, color: '#9b59b6', shape: 'x' }; // Purple X
+      case 'angle':
+        return { size: baseSize, color: '#3498db', shape: 'tick' }; // Blue tick
+      case 'wall':
+        return { size: baseSize, color: '#1abc9c', shape: 'diamond' }; // Cyan diamond
+      case 'axis':
+        return { size: baseSize - 1, color: '#95a5a6', shape: 'plus' }; // Gray plus
+      default:
+        return { size: baseSize - 2, color: '#7f8c8d', shape: 'dot' }; // Grid (dark gray dot)
+    }
+  };
+
   const previewQuad = wallPreview
     ? wallQuad(wallPreview.start, wallPreview.end, defaultWallThickness / planMillimetresPerPixel / 2)
     : null;
+
+  const snapIndicatorRender = snapIndicator ? (() => {
+    const { size, color, shape } = getSnapIndicatorStyle(snapIndicator.kind);
+    const { x, y } = snapIndicator.pos;
+
+    switch (shape) {
+      case 'square':
+        return <Rect x={x - size / 2} y={y - size / 2} width={size} height={size} stroke={color} strokeWidth={1.5} />;
+      case 'triangle':
+        return (
+          <Line
+            points={[x, y - size / 2, x + size / 2, y + size / 2, x - size / 2, y + size / 2, x, y - size / 2]}
+            stroke={color}
+            strokeWidth={1.5}
+          />
+        );
+      case 'x':
+        return (
+          <>
+            <Line points={[x - size / 2, y - size / 2, x + size / 2, y + size / 2]} stroke={color} strokeWidth={1.5} />
+            <Line points={[x - size / 2, y + size / 2, x + size / 2, y - size / 2]} stroke={color} strokeWidth={1.5} />
+          </>
+        );
+      case 'tick':
+        return (
+          <>
+            <Line points={[x - size / 2, y, x, y + size / 2]} stroke={color} strokeWidth={1.5} />
+            <Line points={[x, y + size / 2, x + size / 2, y - size / 4]} stroke={color} strokeWidth={1.5} />
+          </>
+        );
+      case 'diamond':
+        return (
+          <Line
+            points={[x, y - size / 2, x + size / 2, y, x, y + size / 2, x - size / 2, y, x, y - size / 2]}
+            stroke={color}
+            strokeWidth={1.5}
+          />
+        );
+      case 'plus':
+        return (
+          <>
+            <Line points={[x - size / 2, y, x + size / 2, y]} stroke={color} strokeWidth={1.5} />
+            <Line points={[x, y - size / 2, x, y + size / 2]} stroke={color} strokeWidth={1.5} />
+          </>
+        );
+      default: // dot
+        return <Circle x={x} y={y} radius={size / 2} stroke={color} strokeWidth={1} />;
+    }
+  })() : null;
 
   const previewWall = wallPreview ? (
     <>
@@ -670,24 +1034,31 @@ export const Canvas2D = React.memo(function Canvas2D({
     : null;
 
   return (
-    <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[var(--editor-canvas)]">
+    <div
+      ref={containerRef}
+      className="relative h-full w-full overflow-hidden bg-[var(--editor-canvas)]"
+      onKeyDown={handleKeyDown}
+      onKeyUp={handleKeyUp}
+      tabIndex={0}
+    >
       <Stage
         ref={stageRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        draggable={currentTool === 'select'}
+        draggable={isPanning}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
       >
         <Layer>
-          <Rect x={0} y={0} width={canvasSize.width} height={canvasSize.height} fill={palette.canvas} />
+          <Rect x={gridLeft} y={gridTop} width={gridWidth} height={gridHeight} fill={palette.canvas} listening={false} />
           {traceImage && referenceImage && traceImage.opacity > 0 && (
             <KonvaImage
               image={referenceImage}
-              x={(canvasSize.width - referenceWidth) / 2}
-              y={(canvasSize.height - referenceHeight) / 2}
+              x={-referenceWidth / 2}
+              y={-referenceHeight / 2}
               width={referenceWidth}
               height={referenceHeight}
               opacity={traceImage.opacity}
@@ -801,8 +1172,80 @@ export const Canvas2D = React.memo(function Canvas2D({
           {doorElements}
           {windowElements}
           {previewWall}
-          <Circle x={24} y={24} radius={3} fill={palette.selection} opacity={0.9} />
-          <Text x={34} y={19} text="0,0" fontSize={10} fontFamily="ui-monospace, monospace" fill={palette.label} opacity={0.8} />
+          {snapIndicatorRender}
+
+          {marquee && (
+            <Rect
+              x={Math.min(marquee.start.x, marquee.end.x)}
+              y={Math.min(marquee.start.y, marquee.end.y)}
+              width={Math.abs(marquee.end.x - marquee.start.x)}
+              height={Math.abs(marquee.end.y - marquee.start.y)}
+              fill={palette.selection}
+              opacity={0.12}
+              stroke={palette.selection}
+              strokeWidth={1}
+              dash={[4, 4]}
+              listening={false}
+            />
+          )}
+
+          {isSelectLikeTool && combinedSelectionBounds && (
+            <>
+              <Rect
+                ref={transformTargetRef}
+                x={combinedSelectionBounds.x}
+                y={combinedSelectionBounds.y}
+                width={combinedSelectionBounds.width}
+                height={combinedSelectionBounds.height}
+                fill="transparent"
+                stroke={palette.selection}
+                strokeWidth={1.5}
+                dash={[6, 4]}
+                draggable
+                onDragEnd={(event) => {
+                  const node = event.target;
+                  const dx = node.x() - combinedSelectionBounds.x;
+                  const dy = node.y() - combinedSelectionBounds.y;
+                  translateElements(selectedElementIds, dx, dy);
+                  node.position({ x: combinedSelectionBounds.x, y: combinedSelectionBounds.y });
+                }}
+                onTransformEnd={() => {
+                  const node = transformTargetRef.current;
+                  if (!node) return;
+                  const factor = node.scaleX();
+                  if (Math.abs(factor - 1) < 0.001) {
+                    node.scaleX(1);
+                    node.scaleY(1);
+                    return;
+                  }
+                  const oldX = combinedSelectionBounds.x;
+                  const oldY = combinedSelectionBounds.y;
+                  const newX = node.x();
+                  const newY = node.y();
+                  // Solve p' = pivot + (p - pivot) * factor for the invariant (fixed) corner,
+                  // using the top-left corner's known before/after positions.
+                  const pivotX = Math.abs(1 - factor) < 1e-6 ? oldX : (newX - oldX * factor) / (1 - factor);
+                  const pivotY = Math.abs(1 - factor) < 1e-6 ? oldY : (newY - oldY * factor) / (1 - factor);
+                  scaleElements(selectedElementIds, factor, { x: pivotX, y: pivotY });
+                  node.scaleX(1);
+                  node.scaleY(1);
+                  node.position({ x: oldX, y: oldY });
+                }}
+              />
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled={false}
+                keepRatio
+                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+                borderStroke={palette.selection}
+                anchorStroke={palette.selection}
+                anchorFill={palette.handle}
+              />
+            </>
+          )}
+
+          <Circle x={0} y={0} radius={3} fill={palette.selection} opacity={0.9} />
+          <Text x={8} y={-14} text="0,0" fontSize={10} fontFamily="ui-monospace, monospace" fill={palette.label} opacity={0.8} />
         </Layer>
       </Stage>
 

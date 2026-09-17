@@ -4,12 +4,14 @@ import { useEffect } from 'react';
 import { useDesignStore } from '@/store/designStore';
 
 export function useKeyboardShortcuts() {
-  const { setCurrentTool } = useDesignStore();
+  const { setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection } =
+    useDesignStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifier = isMac ? e.metaKey : e.ctrlKey;
+      const isTyping = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA';
 
       if (modifier && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -17,6 +19,18 @@ export function useKeyboardShortcuts() {
       } else if ((modifier && e.key === 'z' && e.shiftKey) || (modifier && e.key === 'y')) {
         e.preventDefault();
         (useDesignStore as any).temporal.getState().redo();
+      } else if (modifier && e.key.toLowerCase() === 'a' && !isTyping) {
+        e.preventDefault();
+        selectAll();
+      } else if (modifier && e.key.toLowerCase() === 'g' && e.shiftKey && !isTyping) {
+        e.preventDefault();
+        ungroupElements(selectedElementIds);
+      } else if (modifier && e.key.toLowerCase() === 'g' && !isTyping) {
+        e.preventDefault();
+        if (selectedElementIds.length >= 2) groupElements(selectedElementIds);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping && selectedElementIds.length > 0) {
+        e.preventDefault();
+        deleteSelection();
       } else if (e.key === 'd' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         setCurrentTool('door');
@@ -32,6 +46,9 @@ export function useKeyboardShortcuts() {
       } else if (e.key === 'o' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         setCurrentTool('object');
+      } else if (e.key === 'r' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        setCurrentTool('scale');
       } else if (e.key === 's' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         setCurrentTool('select');
@@ -42,5 +59,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setCurrentTool]);
+  }, [setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection]);
 }

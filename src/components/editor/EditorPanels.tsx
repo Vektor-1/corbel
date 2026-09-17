@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { EditorPanel } from '@/components/ui/editor-panel';
 import { FieldLabel, Input, Select } from '@/components/ui/field';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import { citationForRule } from '@/lib/standards/citations';
 import type {
   DesignObject,
   Door,
@@ -139,6 +141,10 @@ export function SelectedWallInspector({
         </FieldLabel>
       </div>
 
+      <p className="mt-3 rounded-md bg-[var(--editor-info-soft)] px-2.5 py-2 text-[11px] leading-4 text-[var(--editor-info)]">
+        In Plan view, select this wall and drag either highlighted endpoint to reshape it. Endpoints snap to the drawing grid.
+      </p>
+
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-[var(--editor-border)] pt-3 text-[11px]">
         <div className="flex justify-between gap-2">
           <dt className="text-[var(--editor-text-subtle)]">Length</dt>
@@ -153,6 +159,13 @@ export function SelectedWallInspector({
       <p className={cn('mt-3 rounded-md px-2.5 py-2 text-[11px] leading-4', primaryIssue ? 'bg-[var(--editor-warning-soft)] text-[var(--editor-warning)]' : 'bg-[var(--editor-success-soft)] text-[var(--editor-success)]')}>
         {getSuggestion(primaryIssue, wall)}
       </p>
+
+      {primaryIssue && (
+        <p className="mt-2 rounded-md bg-[var(--editor-info-soft)] px-2.5 py-2 text-[10px] leading-3 text-[var(--editor-info)]">
+          <span className="font-semibold">Citation: </span>
+          {citationForRule(primaryIssue.rule) || 'No citation available for this rule'}
+        </p>
+      )}
     </EditorPanel>
   );
 }
@@ -201,6 +214,12 @@ export function SelectedDoorInspector({
           <Select value={door.swing} onChange={(event) => onUpdate({ swing: event.target.value as Door['swing'] })}>
             <option value="left">Left</option>
             <option value="right">Right</option>
+          </Select>
+        </FieldLabel>
+        <FieldLabel label="Swing direction">
+          <Select value={door.openDirection ?? 'in'} onChange={(event) => onUpdate({ openDirection: event.target.value as Door['openDirection'] })}>
+            <option value="in">In</option>
+            <option value="out">Out</option>
           </Select>
         </FieldLabel>
       </div>
@@ -359,6 +378,71 @@ export function SelectedObjectInspector({
   );
 }
 
+/** Bulk actions + a precise scale field for a multi-element selection (2 or more elements, grouped or not). */
+export function MultiSelectInspector({
+  count,
+  isGroup,
+  canGroup,
+  onGroup,
+  onUngroup,
+  onDelete,
+  onScale,
+}: {
+  count: number;
+  isGroup: boolean;
+  /** Grouping only makes sense for 2+ elements; hide the Group/Ungroup action otherwise. */
+  canGroup: boolean;
+  onGroup: () => void;
+  onUngroup: () => void;
+  onDelete: () => void;
+  onScale: (percent: number) => void;
+}) {
+  const [scalePercent, setScalePercent] = useState(100);
+
+  return (
+    <EditorPanel
+      title={`${count} element${count === 1 ? '' : 's'} selected`}
+      description={isGroup ? 'Grouped — moves and scales as one object' : 'Drag the dashed box to move, corners to resize'}
+      action={<span className="rounded bg-[var(--editor-accent-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--editor-accent-text)]">Selection</span>}
+    >
+      <div className="grid grid-cols-2 gap-1.5">
+        {canGroup && (
+          isGroup ? (
+            <Button variant="ghost" size="sm" className="col-span-2 justify-start" onClick={onUngroup}>
+              Ungroup
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" className="col-span-2 justify-start" onClick={onGroup}>
+              Group into one object
+            </Button>
+          )
+        )}
+        <FieldLabel label="Scale" unit="%">
+          <Input
+            type="number"
+            min={10}
+            max={400}
+            step={5}
+            value={scalePercent}
+            onChange={(event) => setScalePercent(Number(event.target.value) || 100)}
+          />
+        </FieldLabel>
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-end"
+          onClick={() => onScale(scalePercent)}
+        >
+          Apply scale
+        </Button>
+        <Button variant="ghost" size="sm" className="col-span-2 justify-start text-[var(--editor-danger)]" onClick={onDelete}>
+          Delete selection
+        </Button>
+      </div>
+    </EditorPanel>
+  );
+}
+
 export function ValidationPanel({
   results,
   hasGeometry,
@@ -417,6 +501,7 @@ export function ValidationPanel({
 function FeedbackItem({ result, onSelectElement }: { result: ValidationResult; onSelectElement?: (id: string) => void }) {
   const [hintOpen, setHintOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const citation = citationForRule(result.rule);
   const title = result.rule.replace(/-/g, ' ');
 
   return (
@@ -427,6 +512,7 @@ function FeedbackItem({ result, onSelectElement }: { result: ValidationResult; o
           <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', result.type === 'error' ? 'bg-[var(--editor-danger)]' : result.type === 'warning' ? 'bg-[var(--editor-warning)]' : 'bg-[var(--editor-info)]')} />
         </div>
         <p className="mt-1 text-[11px] leading-4 text-[var(--editor-text-subtle)]">{result.message}</p>
+        {citation && <p className="mt-1 text-[10px] text-[var(--editor-text-muted)] italic">Reference: {citation}</p>}
       </button>
       {(result.remediation || result.evidence) && (
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px]">

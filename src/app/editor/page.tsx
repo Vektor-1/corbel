@@ -68,6 +68,7 @@ export default function EditorPage() {
     const needsMigration =
       !Array.isArray(floorPlan.objects) ||
       !Array.isArray(floorPlan.rooms) ||
+      !Array.isArray(floorPlan.groups) ||
       floorPlan.doors.some((door) => !door.swing) ||
       floorPlan.windows.some((window) => typeof window.sillHeight !== 'number');
 
@@ -76,6 +77,7 @@ export default function EditorPage() {
         ...floorPlan,
         objects: Array.isArray(floorPlan.objects) ? floorPlan.objects : [],
         rooms: Array.isArray(floorPlan.rooms) ? floorPlan.rooms : [],
+        groups: Array.isArray(floorPlan.groups) ? floorPlan.groups : [],
         doors: floorPlan.doors.map((door) => ({ ...door, swing: door.swing ?? 'left' })),
         windows: floorPlan.windows.map((window) => ({
           ...window,
@@ -88,7 +90,7 @@ export default function EditorPage() {
   useEffect(() => {
     setValidationResults([
       ...validateFloorPlan(floorPlan),
-      ...validateTraceFeedback(floorPlan, traceImage?.calibration),
+      ...validateTraceFeedback(floorPlan, traceImage?.calibration, traceImage !== null),
     ]);
   }, [floorPlan, traceImage?.calibration, setValidationResults]);
 
