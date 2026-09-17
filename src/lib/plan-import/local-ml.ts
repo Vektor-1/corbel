@@ -27,24 +27,31 @@ function getSession(): Promise<ort.InferenceSession> {
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/';
     sessionPromise = ort.InferenceSession.create(MODEL_URL, {
       executionProviders: ['wasm'],
+    }).catch((error) => {
+      sessionPromise = null;
+      throw error;
     });
   }
   return sessionPromise;
 }
 
-async function loadImageBitmap(source: File | Blob | string): Promise<ImageBitmap> {
+export async function loadImageBitmap(source: File | Blob | string): Promise<ImageBitmap> {
   if (typeof source === 'string') {
     const res = await fetch(source);
+    if (!res.ok) throw new Error(`Failed to fetch plan image (${res.status}).`);
     const blob = await res.blob();
     return createImageBitmap(blob);
   }
   return createImageBitmap(source);
 }
 
-interface Letterbox {
-  scale: number;
+export interface Letterbox {
+  scaleX: number;
+  scaleY: number;
   padX: number;
   padY: number;
+  width: number;
+  height: number;
 }
 
 // Resize into a square canvas preserving aspect ratio (YOLO "letterbox"),
@@ -57,8 +64,8 @@ function preprocess(bitmap: ImageBitmap, enhance = true): { tensor: Float32Array
   if (!ctx) throw new Error('Canvas 2D context unavailable.');
 
   const scale = Math.min(INPUT_SIZE / bitmap.width, INPUT_SIZE / bitmap.height);
-  const scaledW = Math.round(bitmap.width * scale);
-  const scaledH = Math.round(bitmap.height * scale);
+  const scaledW = Math.max(1, Math.round(bitmap.width * scale));
+  const scaledH = Math.max(1, Math.round(bitmap.height * scale));
   const padX = Math.floor((INPUT_SIZE - scaledW) / 2);
   const padY = Math.floor((INPUT_SIZE - scaledH) / 2);
 
@@ -78,17 +85,30 @@ function preprocess(bitmap: ImageBitmap, enhance = true): { tensor: Float32Array
     tensor[plane * 2 + i] = inferencePixels[i * 4 + 2] / 255; // B
   }
 
-  return { tensor, letterbox: { scale, padX, padY } };
+  return { tensor, letterbox: {
+    scaleX: scaledW / bitmap.width, scaleY: scaledH / bitmap.height,
+    padX, padY, width: bitmap.width, height: bitmap.height,
+  } };
 }
 
 // YOLOv8 ONNX output: [1, 4 + numClasses, numAnchors] = [1, 7, 8400].
 // Each anchor column is [cx, cy, w, h, classScore0, classScore1, classScore2].
-function decode(output: ort.Tensor, letterbox: Letterbox, confThreshold: number): RawBox[] {
+export function decodeDetections(
+  output: { dims: readonly number[]; data: ArrayLike<number> },
+  letterbox: Letterbox,
+  confThreshold: number
+): RawBox[] {
   const dims = output.dims; // [1, 7, 8400]
-  const numAttrs = dims[1];
+  if (dims.length !== 3 || dims[0] !== 1 || dims[1] !== 4 + CLASS_NAMES.length ||
+      !Number.isInteger(dims[2]) || dims[2] <= 0 || output.data.length !== dims[1] * dims[2]) {
+    throw new Error('Unsupported detector output: expected [1, 7, anchors] for wall, door and window.');
+  }
+  if (!Number.isFinite(confThreshold) || confThreshold < 0 || confThreshold > 1) {
+    throw new Error('Detection confidence threshold must be between 0 and 1.');
+  }
   const numAnchors = dims[2];
-  const data = output.data as Float32Array;
-  const numClasses = numAttrs - 4;
+  const data = output.data;
+  const numClasses = CLASS_NAMES.length;
 
   const boxes: RawBox[] = [];
 
@@ -97,7 +117,7 @@ function decode(output: ort.Tensor, letterbox: Letterbox, confThreshold: number)
     let bestScore = 0;
     for (let c = 0; c < numClasses; c++) {
       const score = data[(4 + c) * numAnchors + a];
-      if (score > bestScore) {
+      if (Number.isFinite(score) && score <= 1 && score > bestScore) {
         bestScore = score;
         bestClass = c;
       }
@@ -108,12 +128,14 @@ function decode(output: ort.Tensor, letterbox: Letterbox, confThreshold: number)
     const cy = data[1 * numAnchors + a];
     const w = data[2 * numAnchors + a];
     const h = data[3 * numAnchors + a];
+    if (![cx, cy, w, h].every(Number.isFinite) || w <= 0 || h <= 0) continue;
 
     // Undo letterbox: model space -> original image space.
-    const x0 = (cx - w / 2 - letterbox.padX) / letterbox.scale;
-    const y0 = (cy - h / 2 - letterbox.padY) / letterbox.scale;
-    const x1 = (cx + w / 2 - letterbox.padX) / letterbox.scale;
-    const y1 = (cy + h / 2 - letterbox.padY) / letterbox.scale;
+    const x0 = Math.max(0, (cx - w / 2 - letterbox.padX) / letterbox.scaleX);
+    const y0 = Math.max(0, (cy - h / 2 - letterbox.padY) / letterbox.scaleY);
+    const x1 = Math.min(letterbox.width, (cx + w / 2 - letterbox.padX) / letterbox.scaleX);
+    const y1 = Math.min(letterbox.height, (cy + h / 2 - letterbox.padY) / letterbox.scaleY);
+    if (x1 <= x0 || y1 <= y0) continue;
 
     boxes.push({ cls: CLASS_NAMES[bestClass], confidence: bestScore, x0, y0, x1, y1 });
   }
@@ -163,19 +185,21 @@ export async function detectLocalMl(
   const iouThreshold = options?.iouThreshold ?? 0.45;
 
   const bitmap = await loadImageBitmap(source);
-  // The filter is opt-in until it improves the frozen held-out benchmark.
-  const { tensor, letterbox } = preprocess(bitmap, options?.enhanceImage === true);
+  try {
+    // The filter is opt-in until it improves the frozen held-out benchmark.
+    const { tensor, letterbox } = preprocess(bitmap, options?.enhanceImage === true);
 
-  const session = await getSession();
-  const inputTensor = new ort.Tensor('float32', tensor, [1, 3, INPUT_SIZE, INPUT_SIZE]);
-  const inputName = session.inputNames[0];
-  const outputs = await session.run({ [inputName]: inputTensor });
-  const output = outputs[session.outputNames[0]];
+    const session = await getSession();
+    const inputTensor = new ort.Tensor('float32', tensor, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+    const inputName = session.inputNames[0];
+    const outputs = await session.run({ [inputName]: inputTensor });
+    const output = outputs[session.outputNames[0]];
 
-  const rawBoxes = decode(output, letterbox, confThreshold);
-  const boxes = nonMaxSuppression(rawBoxes, iouThreshold);
+    const rawBoxes = decodeDetections({ dims: output.dims, data: output.data as Float32Array }, letterbox, confThreshold);
+    const boxes = nonMaxSuppression(rawBoxes, iouThreshold);
 
-  const result = { boxes, imageWidth: bitmap.width, imageHeight: bitmap.height };
-  bitmap.close();
-  return result;
+    return { boxes, imageWidth: bitmap.width, imageHeight: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
 }
