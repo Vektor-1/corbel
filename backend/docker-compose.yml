@@ -1,0 +1,39 @@
+services:
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080
+    env_file: ["${CORBEL_ENV_FILE:-.env}"]
+    ports: ["8080:8080"]
+    depends_on: [postgres, redis, minio]
+    volumes:
+      - ./models:/models:ro
+      - ./model-artifacts:/model-artifacts:ro
+  worker:
+    build: .
+    command: python -m app.worker
+    env_file: ["${CORBEL_ENV_FILE:-.env}"]
+    depends_on: [postgres, redis, minio]
+    volumes:
+      - ./models:/models:ro
+      - ./model-artifacts:/model-artifacts:ro
+    gpus: all
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: corbel
+      POSTGRES_USER: corbel
+      POSTGRES_PASSWORD: change-me
+    volumes: [postgres-data:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: corbel-minio
+      MINIO_ROOT_PASSWORD: replace-with-a-long-random-secret
+    volumes: [minio-data:/data]
+    ports: ["9001:9001"]
+volumes:
+  postgres-data:
+  minio-data:

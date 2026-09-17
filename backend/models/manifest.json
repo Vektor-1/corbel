@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "activeAlias": "ensemble-g0-yolo-v1",
+  "manifests": {
+    "ensemble-g0-yolo-v1": {
+      "id": "ensemble-g0-yolo-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-wall-yolo-openings-v1",
+      "vectorizerVersion": "server-vectorizer-v1"
+    },
+    "ensemble-g0-tta-shadow-v9": {
+      "id": "ensemble-g0-tta-shadow-v9",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-tta-wall-yolo-openings-v9",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "tta": { "version": "d4-axis-tta-v1", "transforms": ["identity", "hflip", "vflip", "rot180"] }
+    },
+    "ensemble-g0-maskrefine-shadow-v1": {
+      "id": "ensemble-g0-maskrefine-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-wall-yolo-openings-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 3, "minThicknessPxForSmoothing": 6 }
+    },
+    "ensemble-g0-maskrefine-k5-shadow-v5": {
+      "id": "ensemble-g0-maskrefine-k5-shadow-v5",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-k5-wall-yolo-openings-v5",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 5, "minThicknessPxForSmoothing": 10 }
+    },
+    "ensemble-g0-maskrefine-contour-shadow-v7": {
+      "id": "ensemble-g0-maskrefine-contour-shadow-v7",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-contour-wall-yolo-openings-v7",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "contour-smooth-v3", "mode": "contour-smooth-v3", "kernelSizePx": 3, "boundarySmoothingSigmaPx": 1.2, "minThicknessPxForSmoothing": 6 }
+    },
+    "ensemble-g0-maskrefine-looser-shadow-v6": {
+      "id": "ensemble-g0-maskrefine-looser-shadow-v6",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-looser-wall-yolo-openings-v6",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 3, "minThicknessPxForSmoothing": 4 }
+    },
+    "ensemble-g0-maskrefine-directional-shadow-v2": {
+      "id": "ensemble-g0-maskrefine-directional-shadow-v2",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-directional-wall-yolo-openings-v2",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "directional-protected-v2", "mode": "directional-protected-v2", "kernelSizePx": 3, "minThicknessPxForSmoothing": 6, "topologyProtectionPx": 2 }
+    },
+    "ensemble-g0-maskrefine-runc-shadow-v3": {
+      "id": "ensemble-g0-maskrefine-runc-shadow-v3",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-runc.onnx", "sha256": "a6743a50e5844d4bc27c0117cdb37d44f628771971e69fbda484b2318877446b", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-runc-wall-openings-v3",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 3, "minThicknessPxForSmoothing": 6 }
+    },
+    "ensemble-g0-yolo-g1-topology-v1": {
+      "id": "ensemble-g0-yolo-g1-topology-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-topology-yolo-openings-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "verification": { "maxCentrelineDistancePx": 3, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12 }
+    },
+    "ensemble-g0-yolo-g1.5-render-verify-v1": {
+      "id": "ensemble-g0-yolo-g1.5-render-verify-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-topology-yolo-openings-render-verify-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-yolo-g1.6-tiled-shadow-v1": {
+      "id": "ensemble-g0-yolo-g1.6-tiled-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-tiled-topology-yolo-openings-render-verify-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-yolorc-shadow-v1": {
+      "id": "ensemble-g0-yolorc-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-runc.onnx", "sha256": "a6743a50e5844d4bc27c0117cdb37d44f628771971e69fbda484b2318877446b", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-wall-yolo-openings-runc-v1",
+      "vectorizerVersion": "server-vectorizer-v1"
+    },
+    "ensemble-g0-yolore-shadow-v1": {
+      "id": "ensemble-g0-yolore-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-rune.onnx", "sha256": "acdc81a7c59dc4a965602f1a22db365e7e5d246600cb5b1176c692fe9d8ecc18", "inputSize": 1280, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-wall-yolo-openings-rune-v1",
+      "vectorizerVersion": "server-vectorizer-v1"
+    },
+    "ensemble-g0-yolo-g1.7-reconcile-shadow-v1": {
+      "id": "ensemble-g0-yolo-g1.7-reconcile-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-tiled-topology-reconcile-yolo-openings-render-verify-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "reconciliation": { "version": "evidence-gated-wall-reconcile-v1", "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxThicknessRatioDelta": 0.35, "junctionGuardPx": 3, "maxBridgeGapPx": 10, "minimumBridgeSupport": 0.7, "maxSourceEdgeDistancePx": 2, "sourceEdgeWeight": 0.2 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-yolorc-g1.8-reconcile-shadow-v1": {
+      "id": "ensemble-g0-yolorc-g1.8-reconcile-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-runc.onnx", "sha256": "a6743a50e5844d4bc27c0117cdb37d44f628771971e69fbda484b2318877446b", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-tiled-topology-reconcile-yolorc-openings-render-verify-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "reconciliation": { "version": "evidence-gated-wall-reconcile-v1", "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxThicknessRatioDelta": 0.35, "junctionGuardPx": 3, "maxBridgeGapPx": 10, "minimumBridgeSupport": 0.7, "maxSourceEdgeDistancePx": 2, "sourceEdgeWeight": 0.2 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-yolorc-g1.9-topology-shadow-v1": {
+      "id": "ensemble-g0-yolorc-g1.9-topology-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-runc.onnx", "sha256": "a6743a50e5844d4bc27c0117cdb37d44f628771971e69fbda484b2318877446b", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-topology-yolorc-openings-render-verify-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-yolore-g1.7-reconcile-shadow-v1": {
+      "id": "ensemble-g0-yolore-g1.7-reconcile-shadow-v1",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-rune.onnx", "sha256": "acdc81a7c59dc4a965602f1a22db365e7e5d246600cb5b1176c692fe9d8ecc18", "inputSize": 1280, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-tiled-topology-reconcile-yolore-openings-render-verify-v1",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "reconciliation": { "version": "evidence-gated-wall-reconcile-v1", "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxThicknessRatioDelta": 0.35, "junctionGuardPx": 3, "maxBridgeGapPx": 10, "minimumBridgeSupport": 0.7, "maxSourceEdgeDistancePx": 2, "sourceEdgeWeight": 0.2 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-maskrefine-yolore-g1.7-reconcile-shadow-v4": {
+      "id": "ensemble-g0-maskrefine-yolore-g1.7-reconcile-shadow-v4",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-rune.onnx", "sha256": "acdc81a7c59dc4a965602f1a22db365e7e5d246600cb5b1176c692fe9d8ecc18", "inputSize": 1280, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-maskrefine-tiled-topology-reconcile-yolore-openings-render-verify-v4",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 3, "minThicknessPxForSmoothing": 6 },
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "reconciliation": { "version": "evidence-gated-wall-reconcile-v1", "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxThicknessRatioDelta": 0.35, "junctionGuardPx": 3, "maxBridgeGapPx": 10, "minimumBridgeSupport": 0.7, "maxSourceEdgeDistancePx": 2, "sourceEdgeWeight": 0.2 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0-tta-maskrefine-yolore-g1.7-reconcile-shadow-v10": {
+      "id": "ensemble-g0-tta-maskrefine-yolore-g1.7-reconcile-shadow-v10",
+      "g0": { "path": "corbel-seg-g0.onnx", "sha256": "31b7651aa1fa084880d5e38e09ebe11b92af7321b9b43572049ef167fcdea217", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-rune.onnx", "sha256": "acdc81a7c59dc4a965602f1a22db365e7e5d246600cb5b1176c692fe9d8ecc18", "inputSize": 1280, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0-tta-maskrefine-tiled-topology-reconcile-yolore-openings-render-verify-v10",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "tta": { "version": "d4-axis-tta-v1", "transforms": ["identity", "hflip", "vflip", "rot180"] },
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 3, "minThicknessPxForSmoothing": 6 },
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "reconciliation": { "version": "evidence-gated-wall-reconcile-v1", "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxThicknessRatioDelta": 0.35, "junctionGuardPx": 3, "maxBridgeGapPx": 10, "minimumBridgeSupport": 0.7, "maxSourceEdgeDistancePx": 2, "sourceEdgeWeight": 0.2 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    },
+    "ensemble-g0retrain-yolo-shadow-v8": {
+      "id": "ensemble-g0retrain-yolo-shadow-v8",
+      "g0": { "path": "corbel-seg-g0-retrain-v8.onnx", "sha256": "008540c0326f34ccc5dc2f9988695df5746c22056cd582e951a414200bfb53b1", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings.onnx", "sha256": "226844a2eb7486fdef178d4c20d00a5a9b239f209d52e3f43fe21e65316dd28c", "inputSize": 640, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0retrain-wall-yolo-openings-v8",
+      "vectorizerVersion": "server-vectorizer-v1"
+    },
+    "ensemble-g0retrain-maskrefine-yolore-g1.7-reconcile-shadow-v8": {
+      "id": "ensemble-g0retrain-maskrefine-yolore-g1.7-reconcile-shadow-v8",
+      "g0": { "path": "corbel-seg-g0-retrain-v8.onnx", "sha256": "008540c0326f34ccc5dc2f9988695df5746c22056cd582e951a414200bfb53b1", "inputSize": 640, "threshold": 0.5 },
+      "yolo": { "path": "corbel-yolo-openings-rune.onnx", "sha256": "acdc81a7c59dc4a965602f1a22db365e7e5d246600cb5b1176c692fe9d8ecc18", "inputSize": 1280, "confidenceThreshold": 0.25, "iouThreshold": 0.45 },
+      "fusionVersion": "g0retrain-maskrefine-tiled-topology-reconcile-yolore-openings-render-verify-v8",
+      "vectorizerVersion": "server-vectorizer-v1",
+      "maskRefinement": { "version": "adaptive-thickness-smooth-v1", "kernelSizePx": 3, "minThicknessPxForSmoothing": 6 },
+      "tiling": { "version": "source-tile-blend-v1", "tileSizePx": 1280, "overlapPx": 256, "blendWeight": 0.7 },
+      "topology": { "version": "deterministic-topology-v1", "junctionSnapPx": 4, "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxGapPx": 3, "maxThicknessRatioDelta": 0.35, "minLogicalWallLengthPx": 3 },
+      "reconciliation": { "version": "evidence-gated-wall-reconcile-v1", "maxCollinearAngleDeg": 5, "maxLineOffsetPx": 3, "maxThicknessRatioDelta": 0.35, "junctionGuardPx": 3, "maxBridgeGapPx": 10, "minimumBridgeSupport": 0.7, "maxSourceEdgeDistancePx": 2, "sourceEdgeWeight": 0.2 },
+      "verification": { "maxCentrelineDistancePx": 3, "maxSourceEdgeDistancePx": 2, "minimumSupport": 0.7, "maxUnsupportedShortWallPx": 12, "wallEvidenceThreshold": 0.35, "sourceEdgeWeight": 0.2 }
+    }
+  }
+}
