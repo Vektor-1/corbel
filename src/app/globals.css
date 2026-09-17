@@ -106,6 +106,141 @@
   -webkit-backdrop-filter: none;
 }
 
+/* Invisible to layout on desktop -- its children (the left selection panel
+   and the right Outline/Library/Feedback column) position themselves
+   independently via their own absolute positioning. On mobile this becomes
+   the single merged bottom sheet (see the max-width:767px block below). */
+.corbel-editor .editor-panels-group {
+  display: contents;
+}
+
+/* The identity island (top-left) has no width cap of its own -- at
+   "narrow desktop" widths well above the 767px mobile breakpoint below
+   (confirmed broken in the 900-1050px range), its full content (plan
+   name + Draft badge + unit select) grows wide enough to collide with
+   the horizontally-centered view-switcher pill, visibly clipping the
+   unit selector. Shedding the name/badge (the least essential part --
+   the unit selector must stay reachable) earlier, well before the full
+   mobile layout kicks in, keeps the two islands clear of each other
+   without waiting for the 767px breakpoint. */
+@media (max-width: 1200px) {
+  .corbel-editor .editor-identity-island .editor-desktop-meta {
+    display: none;
+  }
+}
+
+/* The desktop editor keeps several tools visible at once. On a narrow
+   touch screen, the canvas remains primary and secondary controls become
+   intentionally disclosed rather than overlapping it. Also triggers on a
+   short viewport (e.g. a landscape phone, ~390-430px tall but 700-900px
+   wide -- comfortably past the 767px width check alone) since the desktop
+   layout's fixed `top-[4.75rem]`/`bottom-14` panel offsets need real
+   vertical room that a landscape phone doesn't have either. */
+@media (max-width: 767px), (max-height: 500px) {
+  .corbel-editor .editor-identity-island {
+    left: 0.5rem;
+    top: 0.5rem;
+    gap: 0.5rem;
+    padding-left: 0.75rem;
+    padding-right: 0.5rem;
+  }
+
+  .corbel-editor .editor-desktop-meta,
+  .corbel-editor .editor-status-hint,
+  .corbel-editor .editor-health {
+    display: none;
+  }
+
+  .corbel-editor .editor-view-island {
+    left: auto;
+    right: 0.5rem;
+    top: 3.75rem;
+    transform: none;
+  }
+
+  .corbel-editor .editor-actions {
+    right: 0.5rem;
+    top: 0.5rem;
+  }
+
+  .corbel-editor .editor-actions .editor-island {
+    height: 2.75rem;
+  }
+
+  .corbel-editor .editor-mobile-secondary {
+    display: none;
+  }
+
+  .corbel-editor .editor-actions .editor-action-menu {
+    top: 3.25rem;
+    width: min(18rem, calc(100vw - 1rem));
+  }
+
+  .corbel-editor .editor-tool-dock {
+    bottom: 0.5rem;
+    max-width: calc(100vw - 1rem);
+    padding: 0.25rem;
+    overflow-x: auto;
+    /* Preserves the 44px (2.75rem) WCAG touch-target size on every button even
+       on the narrowest phones, rather than shrinking targets to force a fit --
+       the dock scrolls horizontally instead on a screen too narrow for all 9
+       items at full size. */
+  }
+
+  .corbel-editor .editor-tool-dock button {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  /* Desktop keeps the selection-config panel (left) and the Outline/Library/
+     Feedback islands (right) as independent floating cards. There isn't room
+     for two separate floating columns plus a bottom-center dock on a phone
+     screen, so on mobile .editor-panels-group (normally `display: contents`,
+     i.e. invisible to layout) becomes the single scrollable bottom sheet,
+     and its children fall back to normal document flow inside it -- same
+     components, same state, just one shared sheet instead of two floating
+     columns. Order follows DOM order: selection config first (when present),
+     then Outline, then Library (only when nothing is selected), then
+     Feedback. */
+  .corbel-editor .editor-panels-group {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: auto 0 0 0;
+    max-height: min(62dvh, 34rem);
+    overflow-y: auto;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--editor-glass);
+    border-top: 1px solid var(--editor-glass-border);
+    backdrop-filter: blur(14px) saturate(1.05);
+    -webkit-backdrop-filter: blur(14px) saturate(1.05);
+  }
+
+  .corbel-editor .editor-left-panel,
+  .corbel-editor .editor-right-panels {
+    position: static;
+    width: auto;
+    height: auto;
+    max-height: none;
+    inset: auto;
+  }
+
+  .corbel-editor .editor-side-panel {
+    max-height: none;
+    flex: none;
+    border-radius: 0.5rem;
+    background: var(--editor-surface-muted);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .corbel-editor .editor-panels-group button,
+  .corbel-editor .editor-action-menu button {
+    min-height: 2.75rem;
+  }
+}
+
 .corbel-editor ::selection {
   background: var(--editor-accent-soft);
   color: var(--editor-accent-text);
@@ -164,7 +299,7 @@ html[data-corbel-editor="dark"] {
    Accessibility: focus-visible + reduced motion contract
    ─────────────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #c9a96a;
+  outline: 2px solid var(--ring, #c9a96a);
   outline-offset: 3px;
   border-radius: 2px;
 }
@@ -173,9 +308,9 @@ html[data-corbel-editor="dark"] {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    /* Stop decorative animation without globally erasing meaningful state changes. */
+    animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

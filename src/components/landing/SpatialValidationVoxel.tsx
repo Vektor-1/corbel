@@ -75,15 +75,15 @@ export function SpatialValidationVoxel() {
     >
       <div className="flex-1 flex flex-col justify-center">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4 w-fit uppercase tracking-widest font-mono">
-          GS 1207:2018 // Section 4.1
+          Classroom boundary example
         </div>
-        <h3 className="text-xl font-bold text-[#ece7da] mb-3">Spatial Area Compliance</h3>
+        <h3 className="text-xl font-bold text-[#ece7da] mb-3">Spatial boundary practice</h3>
         <p className="text-[#c4bda9] mb-4 leading-relaxed">
-          Corbel computes enclosed loops dynamically. When you close a room boundary, the system lifts it and verifies the minimum usable floor space.
+          Corbel computes enclosed loops dynamically. When you close a room boundary, the system can show an illustrative area prompt; it does not verify usable floor space or statutory compliance.
         </p>
         <div className="flex items-center gap-3 text-xs text-[#a39a89] bg-[#12110e]/40 p-3 rounded-lg border border-[#2c2921]">
           <span className={`h-2.5 w-2.5 rounded-full ${isValidated ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-          <span>{isValidated ? 'Classroom zone complies: 12.0m² >= 9.0m² minimum' : 'Evaluating room perimeter...'}</span>
+          <span>{isValidated ? 'Illustrative classroom area: 12.0m² (review against the applicable brief)' : 'Evaluating room perimeter...'}</span>
         </div>
       </div>
       <div 

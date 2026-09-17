@@ -278,8 +278,8 @@ export default function Home() {
             Start learning <span style={{ color: GOLD }}>by building</span>
           </h2>
           <p className="text-sm sm:text-base mb-10 max-w-xl mx-auto leading-relaxed" style={{ color: '#a3adba' }}>
-            Draw a floor plan, watch it extrude into 3D, and see it checked against
-            the Ghana Building Code in real time — free, in your browser, right now.
+            Draw a floor plan, inspect it in 3D, and work through selected educational
+            checks grounded in the project&apos;s documented references — free in your browser.
           </p>
           <Link
             href="/editor"

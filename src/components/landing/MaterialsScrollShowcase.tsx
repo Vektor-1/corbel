@@ -18,22 +18,22 @@ const STEPS = [
   {
     n: '01',
     title: 'Voxel Block Inspector',
-    tag: 'GS 1207:2018',
-    desc: 'Hover coordinates to read block strength, density, and standards compliance.',
+    tag: 'Reference prompt',
+    desc: 'Hover coordinates to inspect illustrative block properties and reference notes.',
     C: VoxelBlockInspector,
   },
   {
     n: '02',
-    title: 'Load-Bearing Wall Compliance',
-    tag: 'GS 1207:2018 §5',
+    title: 'Load-Bearing Wall Review',
+    tag: 'Wall review prompt',
     desc: 'Toggle storey count and watch thin walls (150mm) get flagged under load.',
     C: WallThicknessWarning,
   },
   {
     n: '03',
     title: 'Volume & Boundary Enforcement',
-    tag: 'GS 1207:2018 §4',
-    desc: 'Close a perimeter and watch walls stack to define a compliant volume.',
+    tag: 'Boundary practice',
+    desc: 'Close a perimeter and inspect how walls define an enclosed volume.',
     C: SpatialValidationVoxel,
   },
 ];

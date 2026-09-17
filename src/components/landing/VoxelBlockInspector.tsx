@@ -212,7 +212,7 @@ export function VoxelBlockInspector() {
         </div>
 
         <div className="mt-6 pt-4 border-t border-[#232019] text-[10px] text-slate-500">
-          * Materials compliant with building regulations based on the spatial structural planning guidelines.
+          * Illustrative material information for classroom discussion; verify current sources and project-specific requirements independently.
         </div>
       </div>
     </div>

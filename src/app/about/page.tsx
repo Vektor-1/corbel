@@ -25,11 +25,14 @@ export default function About() {
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-white mb-4">Built for Ghana</h2>
           <p className="text-slate-300 mb-4">
-            Corbel incorporates Ghana Building Code (GS 1207:2018) and National Building Regulations (L.I. 1630),
-            with materials and practices grounded in Ghanaian construction reality—including sandcrete, laterite blocks,
-            and documented performance data from local research.
+            Corbel uses selected educational references to Ghana Building Code (GS 1207:2018) and National Building Regulations (L.I. 1630).
+            Its current checks cover only the rules made visible in the editor; they are prompts for learning and review, not a complete code implementation or approval service.
           </p>
         </section>
+
+        <p className="border-l-2 border-amber-400 bg-slate-800 p-4 text-sm leading-relaxed text-slate-300">
+          Corbel does not replace an architect, engineer, statutory authority, or qualified tutor. Verify any construction decision against the applicable current source and professional advice.
+        </p>
 
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-white mb-4">Open Source</h2>
