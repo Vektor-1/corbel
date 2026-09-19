@@ -923,8 +923,19 @@ export function Canvas3DContainer({ theme }: { theme: 'light' | 'dark' }) {
     );
   }
 
+  const openingCount = floorPlan.doors.length + floorPlan.windows.length;
+
   return (
-    <div className="relative h-full w-full bg-[var(--editor-canvas)]">
+    <div
+      className="relative h-full w-full bg-[var(--editor-canvas)]"
+      tabIndex={0}
+      role="group"
+      aria-label={`3D view of the floor plan: ${floorPlan.walls.length} ${
+        floorPlan.walls.length === 1 ? 'wall' : 'walls'
+      }, ${floorPlan.rooms.length} ${floorPlan.rooms.length === 1 ? 'room' : 'rooms'}, ${openingCount} ${
+        openingCount === 1 ? 'opening' : 'openings'
+      }. Drag to orbit the camera; the 2D view and the Outline panel are the reliable way to select and edit elements without a mouse.`}
+    >
       <Canvas shadows dpr={[1, 2]}>
         <SceneContent theme={theme} transformMode={transformMode} />
       </Canvas>

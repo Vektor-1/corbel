@@ -698,6 +698,8 @@ export function EditorWithCanvas() {
                     variant="ghost"
                     size="icon"
                     onClick={() => setCurrentTool(id)}
+                    aria-pressed={currentTool === id}
+                    aria-label={label}
                     className={cn(
                       'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]',
                       currentTool === id &&

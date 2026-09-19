@@ -395,28 +395,39 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {(phase === 'uploading' || phase === 'processing') && (
-                <div className="mt-5">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Loader2 className="animate-spin" size={16} />
-                    {phase === 'uploading'
-                      ? 'Uploading image…'
-                      : providerProgress
-                        ? `AI provider: ${providerProgress.status} (${providerProgress.progress}%)`
-                        : 'Submitting reconstruction to the configured AI provider…'}
-                  </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e6dfd2]">
+              {(phase === 'uploading' || phase === 'processing') && (() => {
+                const progressLabel = phase === 'uploading'
+                  ? 'Uploading image…'
+                  : providerProgress
+                    ? `AI provider: ${providerProgress.status} (${providerProgress.progress}%)`
+                    : 'Submitting reconstruction to the configured AI provider…';
+                const progressPercent = phase === 'uploading' ? 15 : Math.max(20, Math.min(95, providerProgress?.progress ?? 20));
+                return (
+                  <div className="mt-5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Loader2 className="animate-spin" size={16} />
+                      {progressLabel}
+                    </div>
                     <div
-                      className="h-full bg-[#8a6b3f] transition-all"
-                      style={{ width: `${phase === 'uploading' ? 15 : Math.max(20, Math.min(95, providerProgress?.progress ?? 20))}%` }}
-                    />
+                      className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e6dfd2]"
+                      role="progressbar"
+                      aria-label={progressLabel}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={progressPercent}
+                    >
+                      <div
+                        className="h-full bg-[#8a6b3f] transition-all"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {phase === 'failed' && error && (
                 <div className="mt-4 space-y-3">
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">{error}</div>
+                  <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">{error}</div>
                   <Button variant="outline" className="w-full" onClick={reset}>
                     Try again
                   </Button>

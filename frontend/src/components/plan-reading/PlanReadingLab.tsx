@@ -418,7 +418,9 @@ function LessonGuide() {
         {TWO_BEDROOM_LESSON.map((step) => (
           <div key={step.id} className="border-b" style={{ borderColor: '#d1ccc4' }}>
             <button
+              type="button"
               onClick={() => setExpanded(expanded === step.id ? null : step.id)}
+              aria-expanded={expanded === step.id}
               className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-[#e6e0d8] transition-colors"
             >
               <div className="flex items-center gap-2">
