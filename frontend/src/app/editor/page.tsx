@@ -1,7 +1,7 @@
 'use client';
 
 import { EditorWithCanvas } from '@/components/editor/EditorWithCanvas';
-import { validateFloorPlan } from '@/lib/standards/validation';
+import { validateFloorPlan } from '@/lib/standards';
 import { validateTraceFeedback } from '@/lib/standards/traceFeedback';
 import { loadDesignSnapshot, saveDesignSnapshot } from '@/lib/persistence/designSnapshot';
 import { useDesignStore } from '@/store/designStore';

@@ -3,6 +3,7 @@
 
 import type { FloorPlan, MaterialType, ValidationResult } from '@/types/design';
 import { wallThicknessRequirements } from './materials';
+import { GHANA_THRESHOLDS, type CodeThresholds } from './thresholds';
 
 const storyKeyMap = {
   1: 'oneStory',
@@ -58,14 +59,16 @@ export const validateWallThickness = (
 export const validateSpanThickness = (
   wallId: string,
   thickness: number,
-  wallLength: number
+  wallLength: number,
+  thresholds: CodeThresholds = GHANA_THRESHOLDS
 ): ValidationResult | null => {
+  const limit = thresholds.maxSpanToThicknessRatio;
   const ratio = wallLength / thickness;
-  if (ratio > 30) {
+  if (ratio > limit) {
     return {
       id: `validation-${wallId}-span`,
       type: 'warning',
-      message: `Wall span-to-thickness ratio is ${ratio.toFixed(1)}:1, above Corbel's 30:1 review threshold.`,
+      message: `Wall span-to-thickness ratio is ${ratio.toFixed(1)}:1, above Corbel's ${limit}:1 review threshold.`,
       remediation: 'Shorten the unsupported run, increase wall thickness, or discuss the structural approach with your tutor.',
       targetId: wallId,
       rule: 'span-thickness-ratio-high',
@@ -80,13 +83,15 @@ export const validateSpanThickness = (
  */
 export const validateOpeningSize = (
   openingId: string,
-  openingWidth: number
+  openingWidth: number,
+  thresholds: CodeThresholds = GHANA_THRESHOLDS
 ): ValidationResult | null => {
-  if (openingWidth > 2000) {
+  const limit = thresholds.maxOpeningWidthMm;
+  if (openingWidth > limit) {
     return {
       id: `validation-${openingId}`,
       type: 'warning',
-      message: `Opening width ${openingWidth}mm is above Corbel's 2000mm review threshold.`,
+      message: `Opening width ${openingWidth}mm is above Corbel's ${limit}mm review threshold.`,
       remediation: 'Check whether the opening needs additional structural support with your tutor or a qualified professional.',
       targetId: openingId,
       rule: 'opening-oversized',
@@ -102,15 +107,10 @@ export const validateOpeningSize = (
 export const validateRoomLayout = (
   roomId: string,
   area: number,
-  roomType: string
+  roomType: string,
+  thresholds: CodeThresholds = GHANA_THRESHOLDS
 ): ValidationResult | null => {
-  const minimumAreas: Record<string, number> = {
-    bedroom: 9,
-    kitchen: 6,
-    bathroom: 3,
-    living: 12,
-    dining: 8,
-  };
+  const minimumAreas = thresholds.minimumRoomAreaM2;
 
   const normalizedRoomType = roomType.trim().toLowerCase();
   const minArea = minimumAreas[normalizedRoomType];
@@ -127,78 +127,4 @@ export const validateRoomLayout = (
   }
 
   return null;
-};
-
-/**
- * Run all validation rules on a floor plan
- */
-export const validateFloorPlan = (floorPlan: FloorPlan | null): ValidationResult[] => {
-  if (!floorPlan) return [];
-
-  const results: ValidationResult[] = [];
-
-  floorPlan.walls.forEach((wall) => {
-    const thicknessResult = validateWallThickness(
-      wall.id,
-      wall.material,
-      wall.thickness,
-      wall.type === 'loadBearing',
-      1
-    );
-
-    if (thicknessResult) results.push(thicknessResult);
-
-    const wallLength = Math.sqrt(
-      Math.pow(wall.endPoint.x - wall.startPoint.x, 2) +
-        Math.pow(wall.endPoint.y - wall.startPoint.y, 2)
-    );
-
-    const spanResult = validateSpanThickness(wall.id, wall.thickness, wallLength);
-    if (spanResult) results.push(spanResult);
-  });
-
-  floorPlan.doors.forEach((door) => {
-    const doorResult = validateOpeningSize(door.id, door.width);
-    if (doorResult) results.push(doorResult);
-
-    const host = floorPlan.walls.find((wall) => wall.id === door.wallId);
-    const hostLength = host ? Math.hypot(host.endPoint.x - host.startPoint.x, host.endPoint.y - host.startPoint.y) : 0;
-    const halfWidth = door.width / 10 / 2;
-    if (!host || door.position.x - halfWidth < 0 || door.position.x + halfWidth > hostLength) {
-      results.push({
-        id: `validation-${door.id}-host`,
-        type: 'error',
-        message: 'Door must fit completely within its host wall.',
-        remediation: 'Move the door away from the wall end, reduce its width, or attach it to a longer wall.',
-        targetId: door.id,
-        rule: 'opening-host-fit',
-      });
-    }
-  });
-
-  floorPlan.windows.forEach((window) => {
-    const windowResult = validateOpeningSize(window.id, window.width);
-    if (windowResult) results.push(windowResult);
-
-    const host = floorPlan.walls.find((wall) => wall.id === window.wallId);
-    const hostLength = host ? Math.hypot(host.endPoint.x - host.startPoint.x, host.endPoint.y - host.startPoint.y) : 0;
-    const halfWidth = window.width / 10 / 2;
-    if (!host || window.position.x - halfWidth < 0 || window.position.x + halfWidth > hostLength) {
-      results.push({
-        id: `validation-${window.id}-host`,
-        type: 'error',
-        message: 'Window must fit completely within its host wall.',
-        remediation: 'Move the window away from the wall end, reduce its width, or attach it to a longer wall.',
-        targetId: window.id,
-        rule: 'opening-host-fit',
-      });
-    }
-  });
-
-  floorPlan.rooms.forEach((room) => {
-    const roomResult = validateRoomLayout(room.id, room.area, room.type ?? room.name);
-    if (roomResult) results.push(roomResult);
-  });
-
-  return results;
 };

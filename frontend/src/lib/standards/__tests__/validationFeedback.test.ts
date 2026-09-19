@@ -4,8 +4,8 @@ import {
   validateRoomLayout,
   validateSpanThickness,
   validateWallThickness,
-  validateFloorPlan,
 } from '../validation';
+import { validateFloorPlan } from '..';
 
 describe('student-facing validation feedback', () => {
   it('pairs a wall thickness finding with an actionable correction', () => {
