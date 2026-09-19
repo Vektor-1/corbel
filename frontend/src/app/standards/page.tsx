@@ -10,7 +10,7 @@ export default function Standards() {
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <SiteHeader />
 
-      <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <h1 className="mb-8 text-4xl font-bold" style={{ color: INK }}>Ghana building references</h1>
 
         <p className="mb-8 border-l-2 p-4 text-sm leading-relaxed" style={{ borderColor: GOLD, backgroundColor: CARD_BG, color: MUTED }}>

@@ -40,6 +40,7 @@ const NAV_TABS = [
 export default function Home() {
   return (
     <main
+      id="main-content"
       className="min-h-screen font-sans antialiased pb-20 sm:pb-16"
       style={{ backgroundColor: PAPER, color: INK }}
     >

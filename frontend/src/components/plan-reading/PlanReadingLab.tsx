@@ -273,10 +273,10 @@ function TutorChat() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bot className="size-5" style={{ color: GOLD }} />
-          {/* This widget mounts alongside the page's own <h1> ("Learn to read
-              architectural plans"), so its own heading is an <h2> rather than
-              a second <h1> -- otherwise heading-based screen-reader navigation
-              sees two competing top-level headings on one page. */}
+          {/* This widget mounts alongside the page's own h1 heading ("Learn to
+              read architectural plans"), so its own heading is an h2 rather
+              than a second h1 -- otherwise heading-based screen-reader
+              navigation sees two competing top-level headings on one page. */}
           <h2 className="text-2xl font-bold">Plan Reading Tutor</h2>
         </div>
         <span className="font-mono text-xs uppercase tracking-wider px-2 py-1 rounded" style={{
@@ -450,7 +450,7 @@ function LessonGuide() {
 
 export function PlanReadingLab() {
   return (
-    <main className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
+    <main id="main-content" className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <header className="border-b-2" style={{ borderColor: INK }}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <Link href="/" className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.08em]">

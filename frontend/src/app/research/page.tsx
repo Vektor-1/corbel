@@ -108,7 +108,7 @@ export default function ResearchPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f2efe7] px-6 py-8 text-[#26221a]">
+    <main id="main-content" className="min-h-screen bg-[#f2efe7] px-6 py-8 text-[#26221a]">
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex items-center justify-between">
           <div>

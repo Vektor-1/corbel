@@ -440,10 +440,18 @@ export function EditorWithCanvas() {
 
   return (
     <TooltipProvider delay={300}>
-      <div
+      {/* A main landmark and a real (visually-hidden) h1 heading -- the editor
+          previously had neither, so a screen-reader user landing on this
+          route via the skip link (see app/layout.tsx) got no page landmark
+          and no orientation. Changing the root element's tag from `div` to
+          `main` changes nothing about layout: same classes, same positioning
+          context for every absolutely-positioned island inside it. */}
+      <main
+        id="main-content"
         className="corbel-editor relative h-screen w-screen overflow-hidden bg-[var(--editor-canvas)] text-[var(--editor-text)]"
         data-theme={theme}
       >
+        <h1 className="sr-only">Corbel floor plan editor</h1>
         <PortraitLockOverlay />
 
         {/* ── Canvas layer: the workspace owns the full viewport ── */}
@@ -1186,7 +1194,7 @@ export function EditorWithCanvas() {
           onDismiss={spotlight.dismiss}
           onReview={spotlight.review}
         />
-      </div>
+      </main>
     </TooltipProvider>
   );
 }

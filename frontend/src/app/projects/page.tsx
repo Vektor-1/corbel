@@ -7,7 +7,7 @@ export default function Projects() {
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <SiteHeader action={{ href: '/editor', label: 'New Project' }} />
 
-      <main className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <h1 className="mb-8 text-4xl font-bold" style={{ color: INK }}>My Projects</h1>
 
         <div className="border-2 p-12 text-center" style={{ borderColor: INK, backgroundColor: '#f2efe7' }}>

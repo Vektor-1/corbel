@@ -57,7 +57,7 @@ export function PlanReadingAssessment() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6" style={{ background: PAPER, color: INK }}>
+    <main id="main-content" className="min-h-screen px-4 py-8 sm:px-6" style={{ background: PAPER, color: INK }}>
       <section className="mx-auto max-w-2xl border-2 p-5 sm:p-7" style={{ borderColor: INK, background: '#f2efe7' }}>
         <p className="font-mono text-xs uppercase tracking-[0.14em]" style={{ color: '#795b20' }}>{phase === 'pre' ? 'Pre-task assessment' : 'Post-task assessment'}</p>
         <h1 className="mt-2 text-3xl font-bold">Plan-reading check</h1>

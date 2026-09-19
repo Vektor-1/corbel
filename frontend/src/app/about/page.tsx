@@ -9,7 +9,7 @@ export default function About() {
     <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
       <SiteHeader />
 
-      <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+      <main id="main-content" className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
         <h1 className="mb-8 text-4xl font-bold" style={{ color: INK }}>About Corbel</h1>
 
         <section className="mb-12">
