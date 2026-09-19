@@ -261,6 +261,27 @@ describe('AccessibleDraftingPanel', () => {
     });
   });
 
+  describe('field-to-status association', () => {
+    it('every coordinate/width/offset input is described by the shared status message', () => {
+      renderPanel();
+
+      const fields = [
+        screen.getByRole('textbox', { name: /start x/i }),
+        screen.getByRole('textbox', { name: /start y/i }),
+        screen.getByRole('textbox', { name: /end x/i }),
+        screen.getByRole('textbox', { name: /end y/i }),
+        screen.getByRole('textbox', { name: /width/i }),
+        screen.getByRole('textbox', { name: /centre offset/i }),
+      ];
+      const status = screen.getByText(/coordinate drafting is available/i);
+
+      for (const field of fields) {
+        expect(field.getAttribute('aria-describedby')).toBe(status.id);
+      }
+      expect(status.id).toBeTruthy();
+    });
+  });
+
   describe('aria-live status updates', () => {
     it('status message updates live as form interactions occur', async () => {
       const { onAddWall } = renderPanel();
