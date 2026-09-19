@@ -46,14 +46,13 @@ const ENGINE_PATHS = [
 const ENGINE_EXCEPTIONS = ['lib/standards/traceFeedback.ts'];
 
 /**
- * The teaching layer: lessons, scoring, adaptive tutoring, the study protocol,
+ * The teaching layer: adaptive tutoring, the study protocol,
  * and the redesign rubric (which grades a student's edit against a baseline --
  * a pedagogical judgement, not a geometric fact like lib/comparison/match.ts).
  */
 const EDU_PATHS = [
   'lib/learning',
   'lib/study',
-  'lib/plan-reading',
   'lib/comparison/rubric.ts',
   'lib/standards/traceFeedback.ts',
 ];

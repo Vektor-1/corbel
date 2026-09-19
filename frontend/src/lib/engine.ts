@@ -1,7 +1,7 @@
 /**
  * The public surface of Corbel's reconstruction and validation engine, as
  * distinct from the teaching layer built on top of it (lib/learning,
- * lib/study, lib/plan-reading, lib/comparison/rubric).
+ * lib/study, lib/comparison/rubric).
  *
  * Nothing under here imports education code -- enforced by
  * lib/__tests__/engine-boundary.test.ts -- so this file states what a

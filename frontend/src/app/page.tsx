@@ -34,7 +34,6 @@ const NAV_TABS = [
   { label: 'Capabilities', href: '#capabilities' },
   { label: 'Materials', href: '#materials' },
   { label: 'Standards', href: '/standards' },
-  { label: 'Learn', href: '/learn' },
 ];
 
 export default function Home() {
@@ -109,7 +108,6 @@ export default function Home() {
                     <ArrowUpRight className="w-4 h-4" style={{ color: INK }} />
                   </span>
                 </Link>
-                <Link href="/learn" className="inline-flex items-center px-4 py-3.5 text-sm font-semibold underline decoration-2 underline-offset-4 hover:opacity-70" style={{ color: INK }}>Read the tutorials</Link>
               </div>
             </div>
 
@@ -306,7 +304,6 @@ export default function Home() {
           <div className="flex gap-6 text-[10px] font-semibold uppercase tracking-wider">
             <Link href="/about" className="hover:opacity-70 transition-opacity" style={{ color: INK }}>About</Link>
             <Link href="/standards" className="hover:opacity-70 transition-opacity" style={{ color: INK }}>Standards</Link>
-            <Link href="/learn" className="hover:opacity-70 transition-opacity" style={{ color: INK }}>Tutorials</Link>
           </div>
 
           <div className="text-[10px] font-mono">Open Source | MIT License</div>

@@ -46,13 +46,3 @@ describe('the editor route has a landmark and a heading', () => {
     expect(editor).toMatch(/<h1[^>]*>Corbel floor plan editor<\/h1>/);
   });
 });
-
-describe('/learn has exactly one <h1>', () => {
-  // Regression guard for the duplicate-h1 bug: PlanReadingLab.tsx's own page
-  // heading and the embedded TutorChat widget's heading rendered together.
-  it('PlanReadingLab.tsx declares exactly one <h1>', () => {
-    const lab = read('components/plan-reading/PlanReadingLab.tsx');
-    const h1Matches = lab.match(/<h1\b/g) ?? [];
-    expect(h1Matches).toHaveLength(1);
-  });
-});

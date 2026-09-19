@@ -1,6 +1,6 @@
 /**
- * Corbel's marketing/teaching-surface brand palette: the ink/paper/gold system
- * used on the landing page and its offshoots (`/learn`, `/assessment`).
+ * Corbel's marketing-surface brand palette: the ink/paper/gold system
+ * used on the landing page and its offshoots.
  *
  * This is a plain constants module, not CSS custom properties. Every current
  * consumer needs a real hex string rather than a `var(--x)` reference --
@@ -16,7 +16,7 @@
  * deliberately different surfaces (marketing/teaching vs. the drafting tool).
  *
  * A related, deliberate choice: pages that use this palette (landing, about,
- * standards, projects, learn, assessment) style directly against INK/PAPER/GOLD
+ * standards, projects) style directly against INK/PAPER/GOLD
  * rather than `components/ui/*`. Those primitives' CVA variants (`bg-primary`,
  * `border-border`, ...) are wired to the shadcn tokens in globals.css, which
  * the editor route repoints at its own palette via `html[data-corbel-editor]`

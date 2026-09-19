@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { AlertTriangle, EyeOff, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
@@ -88,7 +87,6 @@ export function TraceReferenceControls({
       ) : (
         <div className="mb-3 rounded-md bg-[var(--editor-warning-soft)] px-2 py-1.5 text-[10px] leading-4 text-[var(--editor-warning)]">
           <p>Select a traced wall and set one known length to make measurements reliable.</p>
-          <Link href="/learn" className="mt-1 inline-block font-semibold underline decoration-current/50 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent)]">Practise scale reading</Link>
         </div>
       )}
 
