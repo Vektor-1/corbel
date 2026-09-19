@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RotateCw, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -16,6 +16,8 @@ const QUERY = '(max-width: 767px) and (orientation: portrait)';
 export function PortraitLockOverlay() {
   const [isPortraitPhone, setIsPortraitPhone] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const dismissButtonRef = useRef<HTMLButtonElement>(null);
+  const open = isPortraitPhone && !dismissed;
 
   useEffect(() => {
     const mql = window.matchMedia(QUERY);
@@ -28,13 +30,30 @@ export function PortraitLockOverlay() {
     return () => mql.removeEventListener('change', handleChange);
   }, []);
 
-  if (!isPortraitPhone || dismissed) return null;
+  // This visually blocks the whole editor, but until focus is actually moved
+  // in and kept here, Tab still reaches the (invisible-behind-it) editor
+  // controls underneath -- a real trap for a keyboard user, not just a visual
+  // one. There's exactly one focusable element, so both halves of the fix are
+  // simple: focus it on open, and re-focus it if Tab/Shift+Tab ever tries to
+  // leave (which, with one element, is every Tab press).
+  useEffect(() => {
+    if (open) dismissButtonRef.current?.focus();
+  }, [open]);
+
+  if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-[var(--editor-bg)] px-8 text-center"
       role="dialog"
+      aria-modal="true"
       aria-label="Rotate your device"
+      onKeyDown={(event) => {
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          dismissButtonRef.current?.focus();
+        }
+      }}
     >
       <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]">
         <Smartphone className="h-8 w-8 rotate-90" />
@@ -44,7 +63,7 @@ export function PortraitLockOverlay() {
       <p className="max-w-xs text-sm text-[var(--editor-text-muted)]">
         Corbel works best in landscape — rotate your device to continue comfortably.
       </p>
-      <Button variant="secondary" size="sm" onClick={() => setDismissed(true)}>
+      <Button ref={dismissButtonRef} variant="secondary" size="sm" onClick={() => setDismissed(true)}>
         Got it, continue anyway
       </Button>
     </div>

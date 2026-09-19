@@ -213,6 +213,21 @@ export function ValidationSpotlight({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Focus the card on the rising edge only (spotlight session just opened),
+  // not on every subsequent issue -- Next/Prev/auto-advance-through-similar
+  // navigation happens while the user is already mid-flow (often mid-edit in
+  // "reviewing", where a property input elsewhere may be focused), and
+  // yanking focus back to the card on each of those would fight the fix step
+  // this dialog exists to support. A first appearance, by contrast, is a
+  // genuinely new thing landing on screen that a keyboard/screen-reader user
+  // has had no chance yet to notice.
+  const wasVisible = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (visible && issue && !wasVisible.current) cardRef.current?.focus();
+    wasVisible.current = visible && issue !== null;
+  }, [visible, issue]);
+
   if (!visible || !issue) return null;
 
   const severityColor =
@@ -297,9 +312,23 @@ export function ValidationSpotlight({
         />
       )}
 
-      {/* Tooltip card — keyed by issue so AnimatePresence can slide between issues. */}
+      {/* Tooltip card — keyed by issue so AnimatePresence can slide between issues.
+          Deliberately non-modal: unlike PortraitLockOverlay, this coachmark is
+          meant to stay open WHILE the user edits the spotlit element via the
+          canvas or a property panel elsewhere (the "reviewing" / fix-verify
+          flow below), so there is no aria-modal and no focus trap here -- either
+          would block the very interaction this dialog exists to support. Its
+          Escape/Arrow/Enter handling is intentionally a window-level listener
+          rather than dialog-scoped, for the same reason: it must keep working
+          no matter where focus currently is. tabIndex={-1} + the focus effect
+          above make the card itself a programmatic focus target on first
+          appearance without adding it to the normal Tab order. aria-live
+          announces it (and any later content change within the same card) to
+          screen readers that would otherwise never discover it. */}
       <motion.div
         key={issue.id}
+        ref={cardRef}
+        tabIndex={-1}
         className="pointer-events-auto absolute rounded-2xl border p-4 shadow-2xl"
         initial={{ opacity: 0, y: 10, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -316,6 +345,8 @@ export function ValidationSpotlight({
         }}
         role="dialog"
         aria-label={resolved ? 'Issue resolved' : 'Design issue'}
+        aria-live="polite"
+        aria-atomic="true"
       >
         <div className="flex items-start justify-between gap-2">
           <div
