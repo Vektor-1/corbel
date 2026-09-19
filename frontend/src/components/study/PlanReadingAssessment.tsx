@@ -6,9 +6,7 @@ import { Download, FileCheck2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { assessmentCsv, assessmentResponse, assessmentStorageKey, parseAssessmentResponses, PLAN_READING_ASSESSMENTS, type AssessmentPhase, type AssessmentResponse } from '@/lib/study/planReadingAssessment';
 import { useStudyCondition } from '@/lib/study/condition';
-
-const INK = '#000f1d';
-const PAPER = '#f7f7f7';
+import { GOLD, INK, PAPER } from '@/lib/brand';
 
 export function PlanReadingAssessment() {
   const searchParams = useSearchParams();
@@ -71,7 +69,7 @@ export function PlanReadingAssessment() {
           <fieldset className="mt-3">
             <legend className="font-semibold leading-relaxed">{question.prompt}</legend>
             <div className="mt-4 grid gap-2">
-              {question.choices.map((choice) => <label key={choice.id} className="flex cursor-pointer gap-3 border-2 p-3 text-sm hover:bg-white" style={{ borderColor: selected === choice.id ? '#c9a96a' : INK }}>
+              {question.choices.map((choice) => <label key={choice.id} className="flex cursor-pointer gap-3 border-2 p-3 text-sm hover:bg-white" style={{ borderColor: selected === choice.id ? GOLD : INK }}>
                 <input type="radio" name={question.id} value={choice.id} checked={selected === choice.id} onChange={() => setSelected(choice.id)} />
                 <span>{choice.label}</span>
               </label>)}

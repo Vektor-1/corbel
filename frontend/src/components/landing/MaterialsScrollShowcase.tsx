@@ -7,11 +7,10 @@ import { animate } from 'animejs';
 import { VoxelBlockInspector } from './VoxelBlockInspector';
 import { WallThicknessWarning } from './WallThicknessWarning';
 import { SpatialValidationVoxel } from './SpatialValidationVoxel';
+import { GOLD, INK } from '@/lib/brand';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const INK = '#000f1d';
-const GOLD = '#c9a96a';
 const INACTIVE = '#c9c2b0';
 
 const STEPS = [

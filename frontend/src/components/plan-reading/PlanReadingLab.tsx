@@ -16,10 +16,8 @@ import { useDesignStore } from '@/store/designStore';
 import { validateUploadFile } from '@/lib/uploads/uploadPolicy';
 import { uploadPlanReference } from '@/lib/uploads/planUpload';
 import type { TutorMessage } from '@/lib/plan-reading/types';
+import { GOLD, INK, PAPER } from '@/lib/brand';
 
-const INK = '#000f1d';
-const PAPER = '#f7f7f7';
-const GOLD = '#c9a96a';
 const BLUE = '#2b638c';
 
 type TutorStatus = 'checking' | 'available' | 'unavailable';
@@ -157,14 +155,14 @@ function PlanReadingTask() {
 
 function PlanDiagram() {
   return (
-    <div className="relative overflow-hidden border-2 p-3 sm:p-6" style={{ borderColor: INK, backgroundColor: '#f2efe7', backgroundImage: 'linear-gradient(#c9a96a22 1px, transparent 1px), linear-gradient(90deg, #c9a96a22 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+    <div className="relative overflow-hidden border-2 p-3 sm:p-6" style={{ borderColor: INK, backgroundColor: '#f2efe7', backgroundImage: `linear-gradient(${GOLD}22 1px, transparent 1px), linear-gradient(90deg, ${GOLD}22 1px, transparent 1px)`, backgroundSize: '24px 24px' }}>
       <div className="absolute left-3 top-3 z-10 bg-[#000f1d] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#f7f7f7]">Study plan · not to scale</div>
       <svg viewBox="0 0 700 480" className="mt-7 h-auto w-full" role="group" aria-label="Simple two-bedroom floor plan with labelled rooms and an entrance at the bottom">
-        <rect x="80" y="40" width="540" height="365" fill="#f7f7f7" stroke={INK} strokeWidth="10" />
+        <rect x="80" y="40" width="540" height="365" fill={PAPER} stroke={INK} strokeWidth="10" />
         <path d="M80 235H620M300 40V405M475 40V235M475 320V405" fill="none" stroke={INK} strokeWidth="8" />
-        <path d="M80 405H160" fill="none" stroke="#f7f7f7" strokeWidth="14" />
+        <path d="M80 405H160" fill="none" stroke={PAPER} strokeWidth="14" />
         <path d="M160 405 A80 80 0 0 1 80 325" fill="none" stroke={INK} strokeWidth="3" />
-        <path d="M300 125H370M300 320H370M475 235H545" fill="none" stroke="#f7f7f7" strokeWidth="12" />
+        <path d="M300 125H370M300 320H370M475 235H545" fill="none" stroke={PAPER} strokeWidth="12" />
         <path d="M300 125 A70 70 0 0 1 370 195M300 320 A70 70 0 0 0 370 250M475 235 A70 70 0 0 1 545 305" fill="none" stroke={INK} strokeWidth="3" />
         <path d="M170 40V58M410 40V58" stroke={GOLD} strokeWidth="4" />
         <path d="M170 55H410" stroke={GOLD} strokeWidth="3" />

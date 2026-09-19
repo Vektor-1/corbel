@@ -4,6 +4,7 @@ import { MaterialsScrollShowcase } from '@/components/landing/MaterialsScrollSho
 import { ScrollReveal } from '@/components/landing/ScrollReveal';
 import { TaglineReveal } from '@/components/landing/TaglineReveal';
 import { Box, Ruler, CheckCircle2, ChevronRight, Layers, ArrowUpRight } from 'lucide-react';
+import { GOLD, INK, PAPER } from '@/lib/brand';
 
 /**
  * Layout system measured from https://overflow.sui.io/ (Webflow, TWK Everett,
@@ -26,10 +27,7 @@ import { Box, Ruler, CheckCircle2, ChevronRight, Layers, ArrowUpRight } from 'lu
  *    adaptation, not present in the source, declared here).
  */
 
-const INK = '#000f1d';
-const PAPER = '#f7f7f7';
 const PAPER_MUTED = '#efefef';
-const GOLD = '#c9a96a';
 
 const NAV_TABS = [
   { label: 'Overview', href: '#overview' },
