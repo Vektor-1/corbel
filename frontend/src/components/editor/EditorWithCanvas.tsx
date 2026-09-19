@@ -88,6 +88,7 @@ export function EditorWithCanvas() {
   useKeyboardShortcuts();
 
   const canvasStageRef = useRef<import('konva/lib/Stage').Stage | null>(null);
+  const inspectorToggleButtonRef = useRef<HTMLButtonElement | null>(null);
 
   function handleSave() {
     const { floorPlan } = useDesignStore.getState();
@@ -154,6 +155,7 @@ export function EditorWithCanvas() {
   const [objectQuery, setObjectQuery] = useState('');
   const [objectCategory, setObjectCategory] = useState<'all' | ObjectCategory>('all');
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [shouldFocusInspectorToggle, setShouldFocusInspectorToggle] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [diffMode, setDiffMode] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
@@ -382,6 +384,24 @@ export function EditorWithCanvas() {
     setInterventionStatus('active');
   }, [adaptiveLearning.active?.definition.id, adaptiveLearning.active?.targetId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'i' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setInspectorOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (shouldFocusInspectorToggle && inspectorToggleButtonRef.current) {
+      inspectorToggleButtonRef.current.focus();
+      setShouldFocusInspectorToggle(false);
+    }
+  }, [shouldFocusInspectorToggle]);
+
   const adaptiveIntervention = adaptiveLearning.active ? {
     misconceptionId: adaptiveLearning.active.definition.id,
     misconceptionLabel: adaptiveLearning.active.definition.title,
@@ -451,6 +471,16 @@ export function EditorWithCanvas() {
         className="corbel-editor relative h-screen w-screen overflow-hidden bg-[var(--editor-canvas)] text-[var(--editor-text)]"
         data-theme={theme}
       >
+        <button
+          type="button"
+          onClick={() => {
+            setInspectorOpen(true);
+            setShouldFocusInspectorToggle(true);
+          }}
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-[var(--editor-accent-soft)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--editor-accent-text)]"
+        >
+          Skip to accessible drafting tools
+        </button>
         <h1 className="sr-only">Corbel floor plan editor</h1>
         <PortraitLockOverlay />
 
@@ -587,9 +617,12 @@ export function EditorWithCanvas() {
             )}
             <Tooltip>
               <TooltipTrigger
-                render={<Button variant="ghost" size="icon-sm" onClick={() => setInspectorOpen((open) => !open)}>{inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}</Button>}
+                render={<Button ref={inspectorToggleButtonRef} variant="ghost" size="icon-sm" onClick={() => setInspectorOpen((open) => !open)}>{inspectorOpen ? <PanelRightClose /> : <PanelRightOpen />}</Button>}
               />
-              <TooltipContent>{inspectorOpen ? 'Hide inspector' : 'Show inspector'}</TooltipContent>
+              <TooltipContent>
+                {inspectorOpen ? 'Hide inspector' : 'Show inspector'}
+                <span className="ml-2 font-mono text-[10px] opacity-60">i</span>
+              </TooltipContent>
             </Tooltip>
             <Separator orientation="vertical" className="mx-1 !h-4 bg-[var(--editor-border)]" />
             <Button
