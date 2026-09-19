@@ -191,6 +191,7 @@
 
   .corbel-editor .editor-desktop-meta,
   .corbel-editor .editor-status-hint,
+  .corbel-editor .editor-chat-panel,
   .corbel-editor .editor-health {
     display: none;
   }

@@ -57,6 +57,7 @@ import { TraceReferenceControls } from './TraceReferenceControls';
 import { DraftingSequencePanel } from './DraftingSequencePanel';
 import { PortraitLockOverlay } from './PortraitLockOverlay';
 import { AccessibleDraftingPanel } from './AccessibleDraftingPanel';
+import { PlanChatPanel } from './PlanChatPanel';
 import { Canvas3DContainer } from '../viewer/Canvas3D';
 import {
   ComplianceScore,
@@ -1187,6 +1188,9 @@ export function EditorWithCanvas() {
             )}
           </div>
         </div>
+
+        {/* ── Bottom left · AI chat panel ── */}
+        <PlanChatPanel />
 
         {/* ── Bottom left · status hint ── */}
         <div className="editor-status-hint editor-island absolute bottom-4 left-4 flex h-8 max-w-[min(32rem,calc(50vw-11rem))] items-center rounded-full px-3.5 text-[11px] text-[var(--editor-text-subtle)]">
