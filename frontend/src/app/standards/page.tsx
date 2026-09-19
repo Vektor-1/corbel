@@ -1,54 +1,53 @@
 import Link from 'next/link';
+import { SiteHeader } from '@/components/layout/SiteHeader';
+import { GOLD, INK, PAPER } from '@/lib/brand';
+
+const MUTED = '#4a5561';
+const CARD_BG = '#f2efe7';
 
 export default function Standards() {
   return (
-    <div className="min-h-screen bg-slate-900">
-      <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-          <Link href="/" className="text-2xl font-bold text-white hover:text-blue-400">
-            Corbel
-          </Link>
-        </div>
-      </nav>
+    <div className="min-h-screen" style={{ backgroundColor: PAPER, color: INK }}>
+      <SiteHeader />
 
       <main className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-        <h1 className="text-4xl font-bold text-white mb-8">Ghana building references</h1>
+        <h1 className="mb-8 text-4xl font-bold" style={{ color: INK }}>Ghana building references</h1>
 
-        <p className="mb-8 border-l-2 border-amber-400 bg-slate-800 p-4 text-sm leading-relaxed text-slate-300">
+        <p className="mb-8 border-l-2 p-4 text-sm leading-relaxed" style={{ borderColor: GOLD, backgroundColor: CARD_BG, color: MUTED }}>
           This page is an educational reference list, not a reproduced code book or compliance service. Corbel implements selected classroom review prompts only; consult the current primary source and qualified professionals for a real project.
         </p>
 
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-8 mb-12">
-          <h2 className="text-2xl font-bold text-white mb-4">References</h2>
-          <ul className="space-y-4 text-slate-300">
+        <div className="mb-12 border-2 p-8" style={{ borderColor: INK, backgroundColor: CARD_BG }}>
+          <h2 className="mb-4 text-2xl font-bold" style={{ color: INK }}>References</h2>
+          <ul className="space-y-4" style={{ color: MUTED }}>
             <li>
-              <strong>Ghana Building Code (GS 1207:2018)</strong>
+              <strong style={{ color: INK }}>Ghana Building Code (GS 1207:2018)</strong>
               <p>Part 7: Housing and Small Buildings</p>
             </li>
             <li>
-              <strong>National Building Regulations 1996 (L.I. 1630)</strong>
+              <strong style={{ color: INK }}>National Building Regulations 1996 (L.I. 1630)</strong>
               <p>Legal instrument governing building safety, materials, and procedures</p>
             </li>
           </ul>
         </div>
 
         <section className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-6">Illustrative material notes</h2>
+          <h2 className="mb-6 text-2xl font-bold" style={{ color: INK }}>Illustrative material notes</h2>
 
           <div className="space-y-6">
             {/* Sandcrete */}
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-white mb-3">Sandcrete Blocks</h3>
-              <ul className="space-y-2 text-slate-300 text-sm">
+            <div className="border-2 p-6" style={{ borderColor: INK, backgroundColor: CARD_BG }}>
+              <h3 className="mb-3 text-xl font-bold" style={{ color: INK }}>Sandcrete Blocks</h3>
+              <ul className="space-y-2 text-sm" style={{ color: MUTED }}>
                 <li>Use the current cited source and project specification to verify strength, dimensions, and suitability.</li>
                 <li>Corbel&apos;s editor exposes material, role, thickness, and height for educational review.</li>
               </ul>
             </div>
 
             {/* Laterite */}
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-white mb-3">Laterite Blocks</h3>
-              <ul className="space-y-2 text-slate-300 text-sm">
+            <div className="border-2 p-6" style={{ borderColor: INK, backgroundColor: CARD_BG }}>
+              <h3 className="mb-3 text-xl font-bold" style={{ color: INK }}>Laterite Blocks</h3>
+              <ul className="space-y-2 text-sm" style={{ color: MUTED }}>
                 <li>Material performance depends on mix, manufacture, testing, and project conditions.</li>
                 <li>Discuss sustainability and local availability with a qualified tutor rather than inferring structural suitability from this prototype.</li>
               </ul>
@@ -57,10 +56,10 @@ export default function Standards() {
         </section>
 
         <section className="mb-12">
-          <h2 className="text-2xl font-bold text-white mb-6">Design-review prompts</h2>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4 text-slate-300">
+          <h2 className="mb-6 text-2xl font-bold" style={{ color: INK }}>Design-review prompts</h2>
+          <div className="space-y-4 border-2 p-6" style={{ borderColor: INK, backgroundColor: CARD_BG, color: MUTED }}>
             <p>
-              <strong>Ask before approving a room:</strong>
+              <strong style={{ color: INK }}>Ask before approving a room:</strong>
             </p>
             <ul className="ml-6 space-y-2 text-sm">
               <li>• Is the intended activity and occupancy stated in the brief?</li>
@@ -69,7 +68,7 @@ export default function Standards() {
             </ul>
 
             <p className="mt-6">
-              <strong>Corbel&apos;s current boundary:</strong>
+              <strong style={{ color: INK }}>Corbel&apos;s current boundary:</strong>
             </p>
             <ul className="ml-6 space-y-2 text-sm">
               <li>• Room area and opening feedback are limited educational prompts.</li>
@@ -78,8 +77,8 @@ export default function Standards() {
           </div>
         </section>
 
-        <div className="mt-16 pt-8 border-t border-slate-700">
-          <Link href="/" className="text-blue-400 hover:text-blue-300">
+        <div className="mt-16 border-t pt-8" style={{ borderColor: INK }}>
+          <Link href="/" className="font-semibold hover:opacity-70" style={{ color: GOLD }}>
             ← Back to Home
           </Link>
         </div>
