@@ -273,7 +273,11 @@ function TutorChat() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bot className="size-5" style={{ color: GOLD }} />
-          <h1 className="text-2xl font-bold">Plan Reading Tutor</h1>
+          {/* This widget mounts alongside the page's own <h1> ("Learn to read
+              architectural plans"), so its own heading is an <h2> rather than
+              a second <h1> -- otherwise heading-based screen-reader navigation
+              sees two competing top-level headings on one page. */}
+          <h2 className="text-2xl font-bold">Plan Reading Tutor</h2>
         </div>
         <span className="font-mono text-xs uppercase tracking-wider px-2 py-1 rounded" style={{
           color: status === 'available' ? '#24613a' : '#795b20',

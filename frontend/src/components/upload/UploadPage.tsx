@@ -300,7 +300,7 @@ export default function UploadPage() {
                   <Icon size={16} className={mode === id ? 'text-[#8a6b3f]' : 'text-[#a39a89]'} />
                   {label}
                 </div>
-                <p className="mt-1 text-xs text-[#817969]">{desc}</p>
+                <p className="mt-1 text-xs text-[#655e52]">{desc}</p>
               </button>
             );
           })}
@@ -311,7 +311,7 @@ export default function UploadPage() {
           <section className="overflow-hidden rounded-2xl border border-[#d7d0c2] bg-white/80 shadow-sm">
             <div className="border-b border-[#e3ddd2] px-5 py-4">
               <h2 className="text-sm font-semibold">Source photo</h2>
-              <p className="mt-1 text-xs text-[#817969]">
+              <p className="mt-1 text-xs text-[#655e52]">
                 {mode === 'reconstruct'
                   ? 'A hand-drawn or printed floor plan for AI detection and editable reconstruction.'
                   : 'An image reference to place beneath the 2D canvas while you redraw it manually.'}
@@ -336,7 +336,7 @@ export default function UploadPage() {
                 <div className="relative flex max-w-lg flex-col items-center rounded-xl border border-[#d7d0c2] bg-white px-8 py-16 text-center shadow-sm">
                   <FileImage className="h-8 w-8 text-[#8a6b3f]" />
                   <span className="mt-4 text-sm font-medium">PDF plan ready for AI reconstruction</span>
-                  <span className="mt-1 text-xs text-[#817969]">{file.name}</span>
+                  <span className="mt-1 text-xs text-[#655e52]">{file.name}</span>
                   {phase === 'idle' && (
                     <button
                       type="button"
@@ -356,7 +356,7 @@ export default function UploadPage() {
                 >
                   <FileImage className="h-8 w-8 text-[#8a6b3f]" />
                   <span className="mt-4 text-sm font-medium">Drag and drop, or click to choose a file</span>
-                  <span className="mt-1 text-xs text-[#817969]">{mode === 'trace' ? 'PNG, JPEG, or WebP' : 'PNG, JPEG, WebP, or PDF'} — up to 25 MB</span>
+                  <span className="mt-1 text-xs text-[#655e52]">{mode === 'trace' ? 'PNG, JPEG, or WebP' : 'PNG, JPEG, WebP, or PDF'} — up to 25 MB</span>
                   <input
                     type="file"
                     accept={mode === 'trace' ? 'image/png,image/jpeg,image/webp' : 'image/png,image/jpeg,image/webp,application/pdf'}

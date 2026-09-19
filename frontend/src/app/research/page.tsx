@@ -140,12 +140,12 @@ export default function ResearchPage() {
                 <ListRowSkeleton />
               </>
             )}
-            {candidates?.length === 0 && <p className="px-5 py-6 text-sm text-[#817969]">No pending corrections.</p>}
+            {candidates?.length === 0 && <p className="px-5 py-6 text-sm text-[#655e52]">No pending corrections.</p>}
             {candidates?.map((candidate) => (
               <div key={candidate.id} className="flex items-center justify-between px-5 py-4">
                 <div>
                   <p className="text-sm font-medium">Correction {candidate.id.slice(0, 8)}</p>
-                  <p className="mt-0.5 text-xs text-[#817969]">
+                  <p className="mt-0.5 text-xs text-[#655e52]">
                     Job {candidate.jobId.slice(0, 8)} · {new Date(candidate.createdAt).toLocaleString()}
                   </p>
                 </div>
@@ -182,7 +182,7 @@ export default function ResearchPage() {
                       <p className="text-sm font-medium">
                         {manifest.id} {active && <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">ACTIVE</span>}
                       </p>
-                      <p className="mt-0.5 text-xs text-[#817969]">
+                      <p className="mt-0.5 text-xs text-[#655e52]">
                         {manifest.fusionVersion} · {manifest.vectorizerVersion}
                       </p>
                     </div>

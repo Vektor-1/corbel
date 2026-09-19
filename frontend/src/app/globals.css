@@ -77,7 +77,13 @@
   --editor-border-strong: #a99a83;
   --editor-text: #29241d;
   --editor-text-muted: #5d5447;
-  --editor-text-subtle: #7d7363;
+  /* Darkened from #7d7363: at that value this failed WCAG AA (4.09:1 on
+     --editor-canvas, 4.47:1 on --editor-surface, both below the 4.5:1
+     minimum for normal-size text) despite being the default secondary-label
+     colour used at 10-11px throughout the editor chrome. #716859 clears AA
+     against both (4.82:1 / 5.26:1) with a small margin. The dark theme's
+     equivalent already passed (5.01:1) and is untouched. */
+  --editor-text-subtle: #716859;
   --editor-accent: #975d36;
   --editor-accent-hover: #7c4829;
   --editor-accent-soft: #f0ddc7;
