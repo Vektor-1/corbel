@@ -2,8 +2,10 @@ import { deriveRoomsFromWalls } from '@/lib/geometry/rooms';
 import { insertWallWithIntersections, rehostWallOpening } from '@/lib/geometry/wall-intersections';
 import { centerizeFloorPlan } from '@/lib/geometry/origin';
 import type { Door, FloorPlan, Point, Wall, Window } from '@/types/design';
+import { mergeCollinearWalls, pointAtRatio, ratioAlongWall } from './mergeWalls';
 import type {
   DetectedLabel,
+  DetectedWall,
   ImportDiagnostic,
   PlanImportResult,
   ReconstructionResultV1,
@@ -72,19 +74,27 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
   }
 
   const accepted = result.detections.filter((detection) => detection.accepted !== false);
-  const rawWalls: Wall[] = accepted
-    .filter((detection) => detection.kind === 'wall')
-    .map((detection) => ({
-      id: detection.id,
-      startPoint: transformPoint(detection.start, result.scale.pixelsPerMeter),
-      endPoint: transformPoint(detection.end, result.scale.pixelsPerMeter),
-      thickness: detection.thicknessMm ?? 225,
-      material: 'sandcrete',
-      type: detection.role ?? 'loadBearing',
-      height: 2700,
-      confidence: detection.confidence,
-      source: 'ai' as const,
-    }));
+
+  // Vectorised plans arrive with straight walls broken into collinear fragments.
+  // Rejoining them here rather than in the backend covers every import provider.
+  const detectedWalls = accepted.filter(
+    (detection): detection is DetectedWall => detection.kind === 'wall'
+  );
+  const { walls: mergedWalls, remap, mergedCount } = mergeCollinearWalls(detectedWalls);
+  const detectedById = new Map(detectedWalls.map((wall) => [wall.id, wall]));
+  const mergedById = new Map(mergedWalls.map((wall) => [wall.id, wall]));
+
+  const rawWalls: Wall[] = mergedWalls.map((detection) => ({
+    id: detection.id,
+    startPoint: transformPoint(detection.start, result.scale.pixelsPerMeter),
+    endPoint: transformPoint(detection.end, result.scale.pixelsPerMeter),
+    thickness: detection.thicknessMm ?? 225,
+    material: 'sandcrete',
+    type: detection.role ?? 'loadBearing',
+    height: 2700,
+    confidence: detection.confidence,
+    source: 'ai' as const,
+  }));
 
   let walls: Wall[] = [];
   for (const wall of rawWalls) walls = insertWallWithIntersections(walls, wall);
@@ -94,14 +104,26 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
 
   for (const detection of accepted) {
     if (detection.kind !== 'door' && detection.kind !== 'window') continue;
-    const sourceWall = rawWalls.find((wall) => wall.id === detection.wallId);
+    const hostId = remap.get(detection.wallId) ?? detection.wallId;
+    const sourceWall = rawWalls.find((wall) => wall.id === hostId);
     if (!sourceWall) continue;
 
     const sourceLength = Math.hypot(
       sourceWall.endPoint.x - sourceWall.startPoint.x,
       sourceWall.endPoint.y - sourceWall.startPoint.y
     );
-    const position = { x: Math.max(0, Math.min(1, detection.offsetRatio)) * sourceLength, y: 0 };
+
+    // An offset ratio is relative to the wall it was detected on, so when that wall
+    // was absorbed into a longer one the ratio has to be re-measured against the
+    // survivor -- otherwise every opening slides toward the start of its new host.
+    const detectedHost = mergedById.get(hostId);
+    const originalWall = detectedById.get(detection.wallId);
+    const clampedRatio = Math.max(0, Math.min(1, detection.offsetRatio));
+    const ratio =
+      detectedHost && originalWall && hostId !== detection.wallId
+        ? ratioAlongWall(detectedHost, pointAtRatio(originalWall, clampedRatio))
+        : clampedRatio;
+    const position = { x: ratio * sourceLength, y: 0 };
 
     if (detection.kind === 'door') {
       const door: Door = {
@@ -160,6 +182,15 @@ export function reconstructFloorPlan(result: ReconstructionResultV1): PlanImport
   const centeredPlan = centerizeFloorPlan(floorPlan);
 
   const diagnostics = buildDiagnostics(result);
+  if (mergedCount > 0) {
+    diagnostics.push({
+      id: 'walls-merged',
+      severity: 'info',
+      message: `Rejoined ${mergedCount} fragmented wall ${
+        mergedCount === 1 ? 'segment' : 'segments'
+      } into straight runs. Check any wall that should have a gap.`,
+    });
+  }
   if (walls.length === 0) {
     diagnostics.push({ id: 'no-walls', severity: 'error', message: 'No accepted walls were reconstructed.' });
   }
