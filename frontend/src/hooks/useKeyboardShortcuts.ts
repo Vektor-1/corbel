@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useDesignStore } from '@/store/designStore';
 
 export function useKeyboardShortcuts() {
-  const { setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection } =
+  const { setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection, translateElements } =
     useDesignStore();
 
   useEffect(() => {
@@ -31,6 +31,17 @@ export function useKeyboardShortcuts() {
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping && selectedElementIds.length > 0) {
         e.preventDefault();
         deleteSelection();
+      } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isTyping && selectedElementIds.length > 0) {
+        e.preventDefault();
+        // Step size: 10 units normally; 100 units with Shift (matches GRID_SIZE in src/lib/geometry/snap.ts)
+        const step = e.shiftKey ? 100 : 10;
+        let dx = 0;
+        let dy = 0;
+        if (e.key === 'ArrowUp') dy = -step;
+        else if (e.key === 'ArrowDown') dy = step;
+        else if (e.key === 'ArrowLeft') dx = -step;
+        else if (e.key === 'ArrowRight') dx = step;
+        translateElements(selectedElementIds, dx, dy);
       } else if (e.key === 'd' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         setCurrentTool('door');
@@ -59,5 +70,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection]);
+  }, [setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection, translateElements]);
 }
