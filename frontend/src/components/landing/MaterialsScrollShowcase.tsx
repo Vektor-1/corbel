@@ -3,7 +3,6 @@
 import React, { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { animate } from 'animejs';
 import { VoxelBlockInspector } from './VoxelBlockInspector';
 import { WallThicknessWarning } from './WallThicknessWarning';
 import { SpatialValidationVoxel } from './SpatialValidationVoxel';
@@ -40,8 +39,10 @@ const STEPS = [
 /**
  * Scroll-choreographed replacement for the horizontal filmstrip. GSAP
  * ScrollTrigger pins the left index while the three live (heerich-rendered)
- * sandbox panels scroll past on the right; anime.js drives the discrete
- * number/label state change each time a panel crosses the activation line.
+ * sandbox panels scroll past on the right, and also drives the discrete
+ * number/label state change each time a panel crosses the activation line
+ * (previously a second animation library, anime.js, for this one tween --
+ * dropped as a dependency once gsap.to() was confirmed to do the same job).
  * Respects prefers-reduced-motion: no pin, no build-in stagger, everything
  * simply visible.
  */
@@ -59,11 +60,13 @@ export function MaterialsScrollShowcase() {
       const activate = (i: number) => {
         numberRefs.current.forEach((el, idx) => {
           if (!el) return;
-          animate(el, {
+          gsap.to(el, {
             color: idx === i ? GOLD : INACTIVE,
             scale: idx === i ? 1.15 : 1,
-            duration: prefersReducedMotion ? 1 : 320,
-            ease: 'outQuad',
+            // animejs's duration was milliseconds; gsap's is seconds. 'outQuad'
+            // is animejs's ease naming for what gsap calls 'power1.out'.
+            duration: (prefersReducedMotion ? 1 : 320) / 1000,
+            ease: 'power1.out',
           });
         });
         labelRefs.current.forEach((el, idx) => {
