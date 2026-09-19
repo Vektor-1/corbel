@@ -17,6 +17,7 @@ import { validateUploadFile } from '@/lib/uploads/uploadPolicy';
 import { uploadPlanReference } from '@/lib/uploads/planUpload';
 import type { TutorMessage } from '@/lib/plan-reading/types';
 import { GOLD, INK, PAPER } from '@/lib/brand';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const BLUE = '#2b638c';
 
@@ -96,7 +97,22 @@ function PlanReadingTask() {
     URL.revokeObjectURL(url);
   }
 
-  if (!ready) return <div className="border-2 p-4 text-sm" style={{ borderColor: INK }}>Loading your practice activity…</div>;
+  if (!ready) {
+    // Mirrors the loaded task card's shape (label + heading + progress marker on
+    // the right) so the page doesn't jump once localStorage progress resolves.
+    return (
+      <div className="border-2 p-4 sm:p-5" style={{ borderColor: INK }} aria-label="Loading your practice activity">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-5 w-64" />
+          </div>
+          <Skeleton className="h-4 w-12" />
+        </div>
+        <Skeleton className="mt-4 h-4 w-3/4" />
+      </div>
+    );
+  }
 
   return (
     <section aria-labelledby="plan-task-heading" className="border-2 p-4 sm:p-5" style={{ borderColor: INK, backgroundColor: '#f2efe7' }}>

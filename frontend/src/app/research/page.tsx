@@ -15,6 +15,20 @@ import { toast } from 'sonner';
 import { ArrowLeft, Check, RefreshCw, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+
+/** Mirrors the shape of a loaded candidate/manifest row, so the list doesn't jump. */
+function ListRowSkeleton() {
+  return (
+    <div className="flex items-center justify-between px-5 py-4">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-56" />
+      </div>
+      <Skeleton className="h-8 w-20" />
+    </div>
+  );
+}
 
 interface TrainingCandidate {
   id: string;
@@ -119,7 +133,13 @@ export default function ResearchPage() {
             <h2 className="text-sm font-semibold">Pending training candidates</h2>
           </div>
           <div className="divide-y divide-[#e3ddd2]">
-            {candidates === null && <p className="px-5 py-6 text-sm text-[#817969]">Loading…</p>}
+            {candidates === null && (
+              <>
+                <ListRowSkeleton />
+                <ListRowSkeleton />
+                <ListRowSkeleton />
+              </>
+            )}
             {candidates?.length === 0 && <p className="px-5 py-6 text-sm text-[#817969]">No pending corrections.</p>}
             {candidates?.map((candidate) => (
               <div key={candidate.id} className="flex items-center justify-between px-5 py-4">
@@ -147,7 +167,12 @@ export default function ResearchPage() {
             <h2 className="text-sm font-semibold">Model manifests</h2>
           </div>
           <div className="divide-y divide-[#e3ddd2]">
-            {manifests === null && <p className="px-5 py-6 text-sm text-[#817969]">Loading…</p>}
+            {manifests === null && (
+              <>
+                <ListRowSkeleton />
+                <ListRowSkeleton />
+              </>
+            )}
             {manifests &&
               Object.values(manifests.manifests).map((manifest) => {
                 const active = manifest.id === manifests.activeAlias;
