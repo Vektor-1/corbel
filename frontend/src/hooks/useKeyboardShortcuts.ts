@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useDesignStore } from '@/store/designStore';
 
 export function useKeyboardShortcuts() {
-  const { setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection, translateElements } =
+  const { setCurrentTool, cycleSnapMode, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection, duplicateSelection, translateElements } =
     useDesignStore();
 
   useEffect(() => {
@@ -22,6 +22,9 @@ export function useKeyboardShortcuts() {
       } else if (modifier && e.key.toLowerCase() === 'a' && !isTyping) {
         e.preventDefault();
         selectAll();
+      } else if (modifier && e.key.toLowerCase() === 'd' && !isTyping && selectedElementIds.length > 0) {
+        e.preventDefault();
+        duplicateSelection();
       } else if (modifier && e.key.toLowerCase() === 'g' && e.shiftKey && !isTyping) {
         e.preventDefault();
         ungroupElements(selectedElementIds);
@@ -63,6 +66,9 @@ export function useKeyboardShortcuts() {
       } else if (e.key === 's' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
         e.preventDefault();
         setCurrentTool('select');
+      } else if (e.key === 'g' && !e.ctrlKey && !e.metaKey && !isTyping) {
+        e.preventDefault();
+        cycleSnapMode();
       } else if (e.key === 'Escape') {
         setCurrentTool('select');
       }
@@ -70,5 +76,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setCurrentTool, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection, translateElements]);
+  }, [setCurrentTool, cycleSnapMode, selectAll, selectedElementIds, groupElements, ungroupElements, deleteSelection, duplicateSelection, translateElements]);
 }
