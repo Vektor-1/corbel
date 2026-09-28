@@ -1,9 +1,11 @@
 'use client';
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   BoxSelect,
+  Copy,
+  Command,
   ChevronDown,
   Diff,
   DoorOpen,
@@ -58,6 +60,9 @@ import { DraftingSequencePanel } from './DraftingSequencePanel';
 import { PortraitLockOverlay } from './PortraitLockOverlay';
 import { AccessibleDraftingPanel } from './AccessibleDraftingPanel';
 import { PlanChatPanel } from './PlanChatPanel';
+import { DesignReviewPanel } from './DesignReviewPanel';
+import { ConstructionAwarePanel } from './ConstructionAwarePanel';
+import { BuildingStructurePanel } from './BuildingStructurePanel';
 import { Canvas3DContainer } from '../viewer/Canvas3D';
 import {
   ComplianceScore,
@@ -72,8 +77,12 @@ import {
 } from './EditorPanels';
 import type { MaterialType, ObjectAssetId, ObjectCategory, Room, WallType } from '@/types/design';
 import { formatArea, type AreaUnit, type LengthUnit } from '@/lib/units/measurements';
-import { pixelsPerMeter } from '@/lib/geometry/scale';
+import { millimetresPerPixel, pixelsPerMeter } from '@/lib/geometry/scale';
 import { getCombinedBounds } from '@/lib/geometry/element-bounds';
+import { clearDesignSnapshot } from '@/lib/persistence/designSnapshot';
+import { findEditorCommands, registerEditorCommands } from '@/lib/editor/commandRegistry';
+import { buildingModelFor } from '@/lib/building/model';
+import { generateElevation } from '@/lib/building/elevation';
 
 const viewOptions = [
   { value: '2d', label: 'Plan' },
@@ -146,6 +155,11 @@ export function EditorWithCanvas() {
     const confirmed = window.confirm('Clear this design? All walls, rooms, doors, windows, objects, and reference plans will be removed.');
     if (!confirmed) return;
     useDesignStore.getState().clearDesign();
+    try {
+      clearDesignSnapshot(window.localStorage);
+    } catch {
+      // Clearing the active document remains available when storage is unavailable.
+    }
   }
 
   const [defaultWallMaterial, setDefaultWallMaterial] = useState<MaterialType>('sandcrete');
@@ -163,6 +177,9 @@ export function EditorWithCanvas() {
   const [showRoomLabels, setShowRoomLabels] = useState(true);
   const [showWallDimensions, setShowWallDimensions] = useState(true);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
+  const [traceImageSize, setTraceImageSize] = useState<{ width: number; height: number } | null>(null);
   const [displayOpen, setDisplayOpen] = useState(false);
   const [interventionStatus, setInterventionStatus] = useState<'active' | 'task-complete' | 'retry-ready' | 'verified'>('active');
   const [lengthUnit, setLengthUnit] = useState<LengthUnit>('mm');
@@ -173,16 +190,20 @@ export function EditorWithCanvas() {
   const adaptiveLearningEnabled = useFeatureFlag('adaptiveLearning');
   const threeDPreviewEnabled = useFeatureFlag('threeDPreview');
   const studyCondition = useStudyCondition();
+  const getCanvasSnapshot = () => canvasStageRef.current?.toDataURL({ pixelRatio: 1 });
+  const handleReferenceImageSize = useCallback((size: { width: number; height: number } | null) => setTraceImageSize(size), []);
 
   const {
     floorPlan,
     currentTool,
+    snapMode,
     selectedElementId,
     selectedElementIds,
     viewMode,
     ghostFloorPlan,
     ghostOpacity,
     setCurrentTool,
+    cycleSnapMode,
     setViewMode,
     setSelectedElement,
     setSelection,
@@ -190,6 +211,7 @@ export function EditorWithCanvas() {
     groupElements,
     ungroupElements,
     deleteSelection,
+    duplicateSelection,
     scaleElements,
     addWall,
     addDoor,
@@ -207,7 +229,80 @@ export function EditorWithCanvas() {
     setTraceImage,
     calibrateTraceFromWall,
     validationResults,
+    setBuildingModel,
+    assignElementsToLayer,
   } = useDesignStore();
+
+  const exportSheet = (sheetId: string) => {
+    if (!floorPlan) return;
+    const model = buildingModelFor(floorPlan);
+    const sheet = model.sheets.find((candidate) => candidate.id === sheetId);
+    if (!sheet) return;
+    const snapshot = getCanvasSnapshot();
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      toast.error('Allow pop-ups to create a printable sheet.');
+      return;
+    }
+    popup.opener = null;
+    const title = `${floorPlan.name} — ${sheet.name}`.replace(/[<>&]/g, '');
+    popup.document.write(`<!doctype html><html><head><title>${title}</title><style>@page{size:${sheet.size};margin:12mm}body{font-family:ui-sans-serif,system-ui,sans-serif;color:#182127}header{display:flex;justify-content:space-between;border-bottom:1px solid #aeb8c2;padding-bottom:6mm;margin-bottom:7mm}.sheet-title{font-size:18pt;font-weight:700;margin:0}p{margin:2mm 0;color:#53606a;font-size:9pt}.drawing{border:1px solid #aeb8c2;min-height:160mm;display:flex;align-items:center;justify-content:center}.drawing img{max-width:100%;max-height:158mm;object-fit:contain}footer{display:flex;justify-content:space-between;margin-top:5mm;font-size:8pt;color:#53606a}@media print{body{margin:0}}</style></head><body><header><div><div class="sheet-title">${title}</div><p>${model.stories.find((story) => story.id === model.activeStoryId)?.name ?? 'Ground floor'} · ${sheet.scaleLabel}</p></div><p>Corbel · Sheet-ready plan</p></header><div class="drawing">${snapshot ? `<img src="${snapshot}" alt="${floorPlan.name} drawing" />` : '<p>Open this sheet from Plan view to include the drawing.</p>'}</div><footer><span>${sheet.size} · ${sheet.scaleLabel}</span><span>${new Date().toLocaleDateString()}</span></footer><script>window.print()</script></body></html>`);
+    popup.document.close();
+  };
+
+  const previewSection = (sectionId: string) => {
+    if (!floorPlan) return;
+    const section = buildingModelFor(floorPlan).sections.find((candidate) => candidate.id === sectionId);
+    if (!section) return;
+    const elevation = generateElevation(floorPlan, section);
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      toast.error('Allow pop-ups to preview the elevation.');
+      return;
+    }
+    popup.opener = null;
+    const maxHeight = Math.max(...elevation.walls.map((wall) => wall.height), 3000);
+    const drawing = elevation.walls.map((wall) => {
+      const x = 40 + wall.distance;
+      const height = (wall.height / maxHeight) * 220;
+      return `<g><rect x="${x}" y="${260 - height}" width="${Math.max(16, wall.width / 10)}" height="${height}" fill="#d7dde2" stroke="#53606a"/><text x="${x}" y="278" font-size="10">${wall.wallId}</text><text x="${x}" y="${250 - height}" font-size="9">${wall.height} mm · ${wall.openingCount} openings</text></g>`;
+    }).join('');
+    const title = `${floorPlan.name} — ${elevation.label}`.replace(/[<>&]/g, '');
+    popup.document.write(`<!doctype html><html><head><title>${title}</title><style>body{font-family:ui-sans-serif,system-ui,sans-serif;color:#182127;margin:32px}.title{font-size:22px;font-weight:700}p{color:#53606a}svg{width:100%;border:1px solid #aeb8c2;background:#fafbfc}@media print{body{margin:12mm}}</style></head><body><div class="title">${title}</div><p>Generated elevation · cut length ${Math.round(elevation.length)} plan units</p><svg viewBox="0 0 ${Math.max(520, elevation.length + 100)} 310" role="img" aria-label="${elevation.label} generated elevation"><line x1="20" y1="260" x2="${Math.max(500, elevation.length + 60)}" y2="260" stroke="#182127"/>${drawing || '<text x="30" y="120" font-size="14">No walls cross this section line.</text>'}</svg><script>window.print()</script></body></html>`);
+    popup.document.close();
+  };
+
+  const traceFitScale = useMemo(() => {
+    if (!floorPlan || !traceImageSize || traceImageSize.width <= 0 || traceImageSize.height <= 0) return undefined;
+    const mmPerPixel = millimetresPerPixel(floorPlan.scale);
+    return Math.max(0.1, Math.min(4, Math.min((floorPlan.width / mmPerPixel) / traceImageSize.width, (floorPlan.height / mmPerPixel) / traceImageSize.height) * 0.92));
+  }, [floorPlan, traceImageSize]);
+
+  useEffect(() => registerEditorCommands([
+    { id: 'tool.select', label: 'Select tool', keywords: ['pointer', 'selection'], shortcut: 'S', run: () => setCurrentTool('select') },
+    { id: 'tool.wall', label: 'Draw wall', keywords: ['build', 'line'], shortcut: 'W', run: () => setCurrentTool('wall') },
+    { id: 'tool.door', label: 'Place door', keywords: ['opening'], shortcut: 'D', run: () => setCurrentTool('door') },
+    { id: 'tool.window', label: 'Place window', keywords: ['opening'], shortcut: 'N', run: () => setCurrentTool('window') },
+    { id: 'selection.duplicate', label: 'Duplicate selection', shortcut: '⌘D', enabled: () => selectedElementIds.length > 0, run: duplicateSelection },
+    { id: 'selection.delete', label: 'Delete selection', shortcut: '⌫', enabled: () => selectedElementIds.length > 0, run: deleteSelection },
+    { id: 'snap.cycle', label: 'Cycle snap mode', keywords: ['grid', 'lines', 'angles'], shortcut: 'G', run: cycleSnapMode },
+    { id: 'view.inspector', label: inspectorOpen ? 'Hide inspector' : 'Show inspector', shortcut: 'I', run: () => setInspectorOpen((open) => !open) },
+  ]), [cycleSnapMode, deleteSelection, duplicateSelection, inspectorOpen, selectedElementIds.length, setCurrentTool]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setCommandOpen((open) => !open);
+        setCommandQuery('');
+      }
+      if (event.key === 'Escape') setCommandOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const visibleCommands = commandOpen ? findEditorCommands(commandQuery).slice(0, 9) : [];
 
   const tools = [
     { id: 'select', label: 'Select', icon: Pointer },
@@ -484,6 +579,17 @@ export function EditorWithCanvas() {
         </button>
         <h1 className="sr-only">Corbel floor plan editor</h1>
         <PortraitLockOverlay />
+        {commandOpen && (
+          <div className="absolute inset-0 z-50 flex items-start justify-center bg-black/20 px-4 pt-[12vh]" onMouseDown={() => setCommandOpen(false)}>
+            <div className="editor-island w-full max-w-md rounded-xl p-2 shadow-2xl" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="flex items-center gap-2 border-b border-[var(--editor-border)] px-2 pb-2"><Command className="size-4 text-[var(--editor-text-muted)]" /><input autoFocus value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} placeholder="Search commands…" className="min-w-0 flex-1 bg-transparent text-sm text-[var(--editor-text)] outline-none placeholder:text-[var(--editor-text-subtle)]" /></div>
+              <div className="mt-1 max-h-72 overflow-y-auto">
+                {visibleCommands.map((command) => <button key={command.id} type="button" onClick={() => { command.run(); setCommandOpen(false); }} className="flex min-h-10 w-full items-center justify-between rounded-lg px-2.5 text-left text-xs text-[var(--editor-text)] hover:bg-[var(--editor-surface-muted)]"><span>{command.label}</span><span className="font-mono text-[10px] text-[var(--editor-text-subtle)]">{command.shortcut}</span></button>)}
+                {visibleCommands.length === 0 && <p className="px-2.5 py-4 text-xs text-[var(--editor-text-subtle)]">No matching commands.</p>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Canvas layer: the workspace owns the full viewport ── */}
         <div className="absolute inset-0 flex">
@@ -511,6 +617,7 @@ export function EditorWithCanvas() {
                 showWallDimensions={showWallDimensions}
                 lengthUnit={lengthUnit}
                 areaUnit={areaUnit}
+                onReferenceImageSize={handleReferenceImageSize}
                 onPlacementViolation={(violation) =>
                   spotlight.pushTransient({
                     id: `placement-${Date.now()}`,
@@ -534,7 +641,7 @@ export function EditorWithCanvas() {
                   </div>
                 }
               >
-                <Canvas3DContainer theme={theme} />
+                <Canvas3DContainer theme={theme} lengthUnit={lengthUnit} />
               </Suspense>
             </div>
           )}
@@ -677,6 +784,9 @@ export function EditorWithCanvas() {
                 <p className="text-[10px] text-[var(--editor-text-subtle)]">File and session tools</p>
               </div>
               <Button variant="ghost" size="sm" className="w-full justify-start text-[var(--editor-text-muted)]" onClick={exportLearningRecord}><Download />Export study record</Button>
+              {selectedElementIds.length > 0 && (
+                <Button variant="ghost" size="sm" className="mt-1 w-full justify-start" onClick={duplicateSelection}><Copy />Duplicate selection <span className="ml-auto font-mono text-[10px] text-[var(--editor-text-subtle)]">⌘D</span></Button>
+              )}
               {traceToLearnEnabled && (
                 <>
                   <Separator className="my-2 bg-[var(--editor-border)]" />
@@ -753,6 +863,13 @@ export function EditorWithCanvas() {
           <Separator orientation="vertical" className="mx-0.5 !h-6 bg-[var(--editor-border)]" />
           <Tooltip>
             <TooltipTrigger
+              render={<Button variant="ghost" size="sm" onClick={cycleSnapMode} className="gap-1 px-2 text-[10px] text-[var(--editor-text-subtle)]"><Grid3X3 className="size-3.5" />Snap: {snapMode === 'lines' ? 'Lines' : snapMode === 'angles' ? 'Angles' : snapMode === 'off' ? 'Off' : 'Grid'}</Button>}
+            />
+            <TooltipContent>Cycle snap mode <span className="ml-2 font-mono text-[10px] opacity-60">G</span></TooltipContent>
+          </Tooltip>
+          <Separator orientation="vertical" className="mx-0.5 !h-6 bg-[var(--editor-border)]" />
+          <Tooltip>
+            <TooltipTrigger
               render={
                 <Button
                   variant="ghost"
@@ -797,6 +914,19 @@ export function EditorWithCanvas() {
                         wall={selectedWall}
                         results={selectedWallResults}
                         onUpdate={(updates) => updateWall(selectedWall.id, updates)}
+                        scale={floorPlan?.scale ?? 100}
+                        walls={floorPlan?.walls ?? []}
+                        constraints={buildingModelFor(floorPlan).constraints}
+                        onSaveConstraint={(kind, wallId, referenceWallId) => {
+                          const model = buildingModelFor(floorPlan);
+                          const withoutExisting = model.constraints.filter((constraint) => constraint.wallId !== wallId);
+                          setBuildingModel({ constraints: [...withoutExisting, { id: `constraint-${crypto.randomUUID()}`, kind, wallId, referenceWallId }] });
+                        }}
+                        onAddDimensions={(wallId) => {
+                          const model = buildingModelFor(floorPlan);
+                          if (model.dimensions.some((dimension) => dimension.wallId === wallId && dimension.kind === 'length')) return;
+                          setBuildingModel({ dimensions: [...model.dimensions, { id: `dimension-${crypto.randomUUID()}`, wallId, kind: 'length', offset: 24 }, { id: `dimension-${crypto.randomUUID()}`, wallId, kind: 'angle', offset: 38 }] });
+                        }}
                       />
                       <ValidationPanel
                         results={selectedWallResults}
@@ -874,7 +1004,50 @@ export function EditorWithCanvas() {
                     onCalibrate={(knownLengthMm) => calibrateTraceFromWall(selectedWall?.id ?? '', knownLengthMm)}
                     onReviewScaleIssue={() => focusIssueTarget(traceScaleIssue?.targetId ?? null)}
                     onUpdateWallThickness={(thickness) => selectedWall && updateWall(selectedWall.id, { thickness })}
+                    fitScale={traceFitScale}
+                    onFitReference={traceFitScale ? () => updateTraceImage({ scale: traceFitScale }) : undefined}
                   />
+                </ScrollArea>
+              </div>
+            )}
+
+            {inspectorOpen && floorPlan && (
+              <div className="editor-side-panel editor-island flex max-h-[34rem] flex-none flex-col overflow-hidden rounded-xl">
+                <ScrollArea className="min-h-0 flex-1">
+                  <BuildingStructurePanel
+                    floorPlan={floorPlan}
+                    selection={selectedElementIds}
+                    onUpdate={setBuildingModel}
+                    onAssignSelection={assignElementsToLayer}
+                    onApplyView={(view) => {
+                      canvasStageRef.current?.position(view.position);
+                      canvasStageRef.current?.scale({ x: view.zoom, y: view.zoom });
+                      canvasStageRef.current?.batchDraw();
+                    }}
+                    onSaveView={(name) => {
+                      const model = buildingModelFor(floorPlan);
+                      const stage = canvasStageRef.current;
+                      setBuildingModel({ namedViews: [...model.namedViews, { id: `view-${crypto.randomUUID()}`, name: name.trim() || 'Working view', position: stage?.position() ?? { x: 0, y: 0 }, zoom: stage?.scaleX() ?? 1 }] });
+                    }}
+                    onExportSheet={exportSheet}
+                    onPreviewSection={previewSection}
+                  />
+                </ScrollArea>
+              </div>
+            )}
+
+            {inspectorOpen && floorPlan && (
+              <div className="editor-side-panel editor-island flex max-h-72 flex-none flex-col overflow-hidden rounded-xl">
+                <ScrollArea className="min-h-0 flex-1">
+                  <DesignReviewPanel floorPlan={floorPlan} baseline={ghostFloorPlan} results={validationResults} onFocus={focusIssueTarget} />
+                </ScrollArea>
+              </div>
+            )}
+
+            {inspectorOpen && floorPlan && (
+              <div className="editor-side-panel editor-island flex max-h-80 flex-none flex-col overflow-hidden rounded-xl">
+                <ScrollArea className="min-h-0 flex-1">
+                  <ConstructionAwarePanel floorPlan={floorPlan} results={validationResults} onFocus={focusIssueTarget} />
                 </ScrollArea>
               </div>
             )}
@@ -1190,7 +1363,7 @@ export function EditorWithCanvas() {
         </div>
 
         {/* ── Bottom left · AI chat panel ── */}
-        <PlanChatPanel />
+        <PlanChatPanel getCanvasSnapshot={getCanvasSnapshot} />
 
         {/* ── Bottom left · status hint ── */}
         <div className="editor-status-hint editor-island absolute bottom-4 left-4 flex h-8 max-w-[min(32rem,calc(50vw-11rem))] items-center rounded-full px-3.5 text-[11px] text-[var(--editor-text-subtle)]">

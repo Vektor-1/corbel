@@ -21,6 +21,8 @@ interface TraceReferenceControlsProps {
   onCalibrate: (knownLengthMm: number) => boolean;
   onReviewScaleIssue: () => void;
   onUpdateWallThickness: (thickness: number) => void;
+  fitScale?: number;
+  onFitReference?: () => void;
 }
 
 /** Persistent controls for an image-first trace. Kept outside the overflow menu
@@ -34,6 +36,8 @@ export function TraceReferenceControls({
   onCalibrate,
   onReviewScaleIssue,
   onUpdateWallThickness,
+  fitScale,
+  onFitReference,
 }: TraceReferenceControlsProps) {
   const [knownLength, setKnownLength] = useState('3');
   const [unit, setUnit] = useState<CalibrationUnit>('m');
@@ -127,8 +131,13 @@ export function TraceReferenceControls({
       )}
 
       <div className="mt-3 space-y-2.5 border-t border-[var(--editor-border)] pt-3">
+        {onFitReference && typeof fitScale === 'number' && (
+          <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onFitReference}>
+            <Ruler /> Fit image to plan · {fitScale.toFixed(2)}×
+          </Button>
+        )}
         <FieldLabel label={`Image display size · ${reference.scale.toFixed(2)}×`}>
-          <input type="range" min={0.25} max={1.5} step={0.05} value={reference.scale} onChange={(event) => onUpdate({ scale: Number(event.target.value) })} className="w-full accent-[var(--editor-accent)]" aria-label="Reference image display size" />
+          <input type="range" min={0.1} max={4} step={0.05} value={reference.scale} onChange={(event) => onUpdate({ scale: Number(event.target.value) })} className="w-full accent-[var(--editor-accent)]" aria-label="Reference image display size" />
         </FieldLabel>
         <FieldLabel label={`Blur · ${reference.blur}px`}>
           <input type="range" min={0} max={12} step={1} value={reference.blur} onChange={(event) => onUpdate({ blur: Number(event.target.value) })} className="w-full accent-[var(--editor-accent)]" aria-label="Reference image blur" />

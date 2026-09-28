@@ -7,14 +7,18 @@ import { loadDesignSnapshot, saveDesignSnapshot } from '@/lib/persistence/design
 import { useDesignStore } from '@/store/designStore';
 import { useEffect, useRef } from 'react';
 import { initBrowserSDK } from '@/lib/api/browser-sdk';
+import { recordEditorMetric } from '@/lib/observability/editorMetrics';
+import { isSuspiciousSnapshotWipe } from '@/lib/persistence/snapshotGuard';
 import type { FloorPlan } from '@/types/design';
 
 export default function EditorPage() {
   const { floorPlan, ghostFloorPlan, ghostOpacity, traceImage, setFloorPlan, setGhostFloorPlan, setGhostOpacity, setTraceImage, beginImageTrace, setValidationResults } = useDesignStore();
   const initialized = useRef(false);
+  const lastSavedPlan = useRef<FloorPlan | null>(null);
 
   useEffect(() => {
     initBrowserSDK();
+    recordEditorMetric('editor.initialized');
   }, []);
 
   useEffect(() => {
@@ -39,6 +43,11 @@ export default function EditorPage() {
           setGhostFloorPlan(snapshot.ghostFloorPlan);
           setGhostOpacity(snapshot.ghostOpacity);
           setTraceImage(snapshot.traceImage);
+          recordEditorMetric('editor.snapshot.loaded', {
+            walls: snapshot.floorPlan.walls.length,
+            rooms: snapshot.floorPlan.rooms.length,
+            openings: snapshot.floorPlan.doors.length + snapshot.floorPlan.windows.length,
+          });
           return;
         }
       } catch {
@@ -88,19 +97,34 @@ export default function EditorPage() {
   }, [floorPlan, setFloorPlan]);
 
   useEffect(() => {
-    setValidationResults([
+    const startedAt = performance.now();
+    const results = [
       ...validateFloorPlan(floorPlan),
       ...validateTraceFeedback(floorPlan, traceImage?.calibration, traceImage !== null),
-    ]);
+    ];
+    setValidationResults(results);
+    recordEditorMetric('editor.validation.completed', {
+      results: results.length,
+      walls: floorPlan?.walls.length ?? 0,
+    }, performance.now() - startedAt);
   }, [floorPlan, traceImage?.calibration, setValidationResults]);
 
   useEffect(() => {
     if (!initialized.current || !floorPlan) return;
-    try {
-      saveDesignSnapshot(window.localStorage, floorPlan, ghostFloorPlan, ghostOpacity, traceImage);
-    } catch {
-      // Quota/private-mode errors should not interrupt design work.
+    if (isSuspiciousSnapshotWipe(lastSavedPlan.current, floorPlan)) {
+      recordEditorMetric('editor.snapshot.failed', { reason: 'suspicious-wipe' });
+      return;
     }
+    const timeout = window.setTimeout(() => {
+      try {
+        saveDesignSnapshot(window.localStorage, floorPlan, ghostFloorPlan, ghostOpacity, traceImage);
+        lastSavedPlan.current = floorPlan;
+        recordEditorMetric('editor.snapshot.saved', { walls: floorPlan.walls.length });
+      } catch {
+        recordEditorMetric('editor.snapshot.failed');
+      }
+    }, 500);
+    return () => window.clearTimeout(timeout);
   }, [floorPlan, ghostFloorPlan, ghostOpacity, traceImage]);
 
   return <EditorWithCanvas />;
