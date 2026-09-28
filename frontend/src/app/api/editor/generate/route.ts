@@ -4,7 +4,13 @@ import { generateFloorPlanFromPrompt } from '@/lib/plan-import/chatGenerate';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  return NextResponse.json({ available: Boolean(process.env.RODIUM_AI_API_KEY) });
+  return NextResponse.json({
+    available: Boolean(process.env.RODIUM_AI_API_KEY || process.env.AGENT_ROUTER_API_KEY),
+    providers: {
+      rodium: Boolean(process.env.RODIUM_AI_API_KEY),
+      agentRouter: Boolean(process.env.AGENT_ROUTER_API_KEY),
+    },
+  });
 }
 
 export async function POST(request: Request) {
