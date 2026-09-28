@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-REPO_ROOT = Path(__file__).resolve().parents[2]  # .../project
+REPO_ROOT = Path(__file__).resolve().parents[3]  # .../project
 sys.path.insert(0, str(REPO_ROOT / "ml"))
 
 from vectorize import _point_to_segment_dist, vectorize_mask_rgb  # noqa: E402
