@@ -1,656 +1,76 @@
 'use client';
 
 import { Canvas, useThree } from '@react-three/fiber';
-import { GizmoHelper, GizmoViewport, OrbitControls, PerspectiveCamera, TransformControls, useGLTF } from '@react-three/drei';
+import { GizmoHelper, GizmoViewport, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { useEffect, useMemo, useState } from 'react';
 import { useDesignStore } from '@/store/designStore';
-import { computeWallFootprints, type WallFootprint } from '@/lib/geometry/wall-joints';
+import type { ColorPreset } from '@/store/designStore';
+import { computeWallFootprints } from '@/lib/geometry/wall-joints';
 import { pixelsPerMeter } from '@/lib/geometry/scale';
-import { createWallBrush, computeOpeningBrushes, evaluateWallWithOpenings } from '@/lib/geometry/wall-openings';
-import { projectOffsetOntoWall } from '@/lib/geometry/wall-intersections';
-import * as THREE from 'three';
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { getPlanBounds } from '@/lib/viewer/plan-bounds';
+import { fitCameraToRoom } from '@/lib/viewer/camera-framing';
+import { environments } from '@/lib/viewer/theme';
+import type { Shading, ViewerTheme } from '@/lib/viewer/theme';
+import { WallMesh } from './renderers/WallMesh';
+import { DoorMesh } from './renderers/DoorMesh';
+import { WindowMesh } from './renderers/WindowMesh';
+import { Roof } from './renderers/Roof';
+import { Floor } from './renderers/Floor';
+import { AxisDragHandle, OpeningAxisHandle } from './renderers/AxisDragHandle';
+import { ObjectInstance, type ObjectTransformMode } from './renderers/FurnitureObject';
 import { OBJECT_CATALOG_BY_ID } from '@/lib/objects/catalog';
 import { cn } from '@/lib/cn';
+import { getWallMetrics, getDoorMetrics, getWindowMetrics, getObjectMetrics, type ElementMetrics } from '@/lib/geometry/element-metrics';
+import { HoverMetricsHud } from './HoverMetricsHud';
+import type { LengthUnit } from '@/lib/units/measurements';
 
-import type { ObjectAsset, Wall, Door, Window } from '@/types/design';
+import type { Door, Window, FloorPlan } from '@/types/design';
 
-/** Move/rotate/scale mode for the selected furniture object's 3D gizmo (Blender-style G/R/S). */
-type ObjectTransformMode = 'translate' | 'rotate' | 'scale' | null;
+function resolveHoveredMetrics(
+  floorPlan: FloorPlan,
+  hoveredElementId: string | null,
+  pixelsPerMetre: number,
+): ElementMetrics | null {
+  if (!hoveredElementId) return null;
 
-// Wall/opening colours vary by theme -- the light-mode daylight tones read
-// as flatly wrong (too bright, wrong colour temperature) against a dark
-// background, the same reason `environments` below already varies its
-// floor/background colours per theme.
-const materials = {
-  light: {
-    loadBearing: '#c7bda6',
-    partition: '#9d968a',
-    doorEntry: '#6f4e33',
-    doorInternal: '#8a6a4b',
-    windowGlass: '#9fb6bd',
-  },
-  dark: {
-    loadBearing: '#5c5647',
-    partition: '#454138',
-    doorEntry: '#3a2b1d',
-    doorInternal: '#4a3826',
-    windowGlass: '#5c7079',
-  },
-} as const;
+  const wall = floorPlan.walls.find((w) => w.id === hoveredElementId);
+  if (wall) return getWallMetrics(wall, pixelsPerMetre);
 
-const EMPTY_DOORS: Door[] = [];
-const EMPTY_WINDOWS: Window[] = [];
-
-// Lighting values live alongside the other per-theme visuals here rather
-// than as a parallel config structure. `hemi*` drives a hemisphereLight
-// (sky colour from above, ground colour from below) -- a standard, cheap
-// arch-viz technique for a more natural outdoor-lit look than flat
-// ambient light alone.
-const environments = {
-  light: {
-    background: '#ece8de',
-    floor: '#dcd6c9',
-    gridMajor: '#a89f8d',
-    gridMinor: '#ccc5b5',
-    ambientColor: '#fff6e8',
-    ambientIntensity: 0.45,
-    hemiSkyColor: '#dce8f5',
-    hemiGroundColor: '#c9bfa8',
-    hemiIntensity: 0.5,
-    directionalColor: '#ffedd0',
-    directionalIntensity: 1.15,
-    pointColor: '#dbe7f0',
-    pointIntensity: 0.25,
-  },
-  dark: {
-    background: '#141310',
-    floor: '#211f1a',
-    gridMajor: '#4d4839',
-    gridMinor: '#2c2921',
-    ambientColor: '#aab4c2',
-    ambientIntensity: 0.35,
-    hemiSkyColor: '#2a3038',
-    hemiGroundColor: '#1a1712',
-    hemiIntensity: 0.4,
-    directionalColor: '#c9d4e0',
-    directionalIntensity: 0.85,
-    pointColor: '#3a4550',
-    pointIntensity: 0.2,
-  },
-} as const;
-
-// ============================================================================
-// ARCHITECTURE LAYER: Walls, openings, roof
-// Coordinate system: 2D plan (x, z) → 3D (x, y, z) with rotation
-// ============================================================================
-
-export interface PlanBounds {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-  centerX: number;
-  centerZ: number;
-  width: number;
-  depth: number;
-  diagonal: number;
-}
-
-/** Room footprint bounds in world (metres) space, from plan-pixel wall
- * endpoints. Shared by Roof (sizing/positioning the roof plane) and the
- * camera-framing/orbit-limit logic in SceneContent, so both agree on the
- * same room extent instead of computing it independently. */
-function getPlanBounds(walls: Wall[], pixelsPerMetre: number): PlanBounds | null {
-  if (walls.length === 0) return null;
-
-  let minX = Infinity,
-    maxX = -Infinity,
-    minZ = Infinity,
-    maxZ = -Infinity;
-  for (const wall of walls) {
-    minX = Math.min(minX, wall.startPoint.x, wall.endPoint.x);
-    maxX = Math.max(maxX, wall.startPoint.x, wall.endPoint.x);
-    minZ = Math.min(minZ, wall.startPoint.y, wall.endPoint.y);
-    maxZ = Math.max(maxZ, wall.startPoint.y, wall.endPoint.y);
+  const door = floorPlan.doors.find((d) => d.id === hoveredElementId);
+  if (door) {
+    const hostWall = floorPlan.walls.find((w) => w.id === door.wallId);
+    return hostWall ? getDoorMetrics(door, hostWall) : null;
   }
 
-  const width = (maxX - minX) / pixelsPerMetre;
-  const depth = (maxZ - minZ) / pixelsPerMetre;
-  return {
-    minX,
-    maxX,
-    minZ,
-    maxZ,
-    centerX: (minX + maxX) / 2 / pixelsPerMetre,
-    centerZ: (minZ + maxZ) / 2 / pixelsPerMetre,
-    width,
-    depth,
-    diagonal: Math.hypot(width, depth),
-  };
-}
+  const win = floorPlan.windows.find((w) => w.id === hoveredElementId);
+  if (win) return getWindowMetrics(win);
 
-/** Exact "fit to frustum" camera pose for a room's bounding box, at a fixed
- * three-quarter azimuth/elevation (matching this viewer's previous static
- * [14, 11, 14] position, just no longer blind to room size). For every
- * corner of the room's box (footprint x/z, floor-to-wall-top y), computes
- * the minimum camera distance along the view direction that keeps that
- * corner inside the FOV frustum, accounting for aspect ratio, then takes
- * the max across all 8 corners -- so the whole room fits in frame at any
- * size, not just the original hardcoded room this scene was tuned for.
- * Adapted (single-box, no site/item framing) from the corner-fit technique
- * in pascal/packages/viewer/src/lib/hero-pose.ts's heroCameraPose(). */
-function fitCameraToRoom(
-  bounds: PlanBounds,
-  wallHeightM: number,
-  aspect: number,
-  {
-    fovDeg = 45,
-    azimuthRad = Math.PI / 4,
-    elevationRad = Math.atan2(11, Math.hypot(14, 14)),
-    padding = 1.15,
-    minDistance = 4,
-  }: { fovDeg?: number; azimuthRad?: number; elevationRad?: number; padding?: number; minDistance?: number } = {},
-): { position: [number, number, number]; target: [number, number, number] } {
-  const tanVertical = Math.tan(((fovDeg / 2) * Math.PI) / 180);
-  const tanHorizontal = tanVertical * aspect;
-
-  const dir = new THREE.Vector3(
-    Math.sin(azimuthRad) * Math.cos(elevationRad),
-    Math.sin(elevationRad),
-    Math.cos(azimuthRad) * Math.cos(elevationRad),
-  );
-  const forward = dir.clone().negate();
-  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-  const up = new THREE.Vector3().crossVectors(right, forward);
-
-  const target = new THREE.Vector3(bounds.centerX, wallHeightM / 2, bounds.centerZ);
-  const halfW = bounds.width / 2;
-  const halfD = bounds.depth / 2;
-  const halfH = wallHeightM / 2;
-
-  let distance = minDistance;
-  const offset = new THREE.Vector3();
-  for (const x of [-halfW, halfW]) {
-    for (const y of [-halfH, halfH]) {
-      for (const z of [-halfD, halfD]) {
-        offset.set(x, y, z);
-        const lateral = offset.dot(right);
-        const vertical = offset.dot(up);
-        const depth = offset.dot(forward);
-        distance = Math.max(
-          distance,
-          (Math.abs(lateral) / tanHorizontal - depth) * padding,
-          (Math.abs(vertical) / tanVertical - depth) * padding,
-        );
-      }
-    }
+  const object = (floorPlan.objects ?? []).find((o) => o.id === hoveredElementId);
+  if (object) {
+    const asset = OBJECT_CATALOG_BY_ID[object.assetId];
+    return asset ? getObjectMetrics(object, asset) : null;
   }
 
-  return {
-    position: [target.x + dir.x * distance, target.y + dir.y * distance, target.z + dir.z * distance],
-    target: [target.x, target.y, target.z],
-  };
-}
-
-function WallMesh({
-  wall,
-  footprint,
-  pixelsPerMetre,
-  doors = EMPTY_DOORS,
-  windows = EMPTY_WINDOWS,
-  selected = false,
-  theme,
-  onSelect,
-}: {
-  wall: Wall;
-  footprint: WallFootprint;
-  pixelsPerMetre: number;
-  doors?: Door[];
-  windows?: Window[];
-  selected?: boolean;
-  theme: 'light' | 'dark';
-  onSelect?: () => void;
-}) {
-  const height = Math.max(1.2, wall.height / 1000);
-  const wallThicknessMm = wall.thickness;
-  const baseColor = wall.type === 'loadBearing' ? materials[theme].loadBearing : materials[theme].partition;
-  const color = selected ? '#2563eb' : baseColor;
-
-  const geometry = useMemo(() => {
-    try {
-      const wallBrush = createWallBrush(
-        { x: wall.startPoint.x / pixelsPerMetre, y: wall.startPoint.y / pixelsPerMetre },
-        { x: wall.endPoint.x / pixelsPerMetre, y: wall.endPoint.y / pixelsPerMetre },
-        wallThicknessMm / 1000,
-        height,
-        footprint.map((pt) => ({ x: pt.x / pixelsPerMetre, y: pt.y / pixelsPerMetre })),
-      );
-
-      const openingBrushes = computeOpeningBrushes(
-        { x: wall.startPoint.x / pixelsPerMetre, y: wall.startPoint.y / pixelsPerMetre },
-        { x: wall.endPoint.x / pixelsPerMetre, y: wall.endPoint.y / pixelsPerMetre },
-        wallThicknessMm / 1000,
-        height,
-        doors.map((d) => ({ position: { x: d.position.x / pixelsPerMetre }, width: d.width / 1000 })),
-        windows.map((w) => ({
-          position: { x: w.position.x / pixelsPerMetre },
-          width: w.width / 1000,
-          height: w.height / 1000,
-          sillHeight: w.sillHeight / 1000,
-        })),
-      );
-
-      if (openingBrushes.length > 0) {
-        const csgGeometry = evaluateWallWithOpenings(wallBrush, openingBrushes);
-        if (csgGeometry) return csgGeometry;
-      }
-
-      return wallBrush.geometry as THREE.BufferGeometry;
-    } catch (e) {
-      // Fall-back path only: builds a flat 2D (X,Y) shape extruded along Z,
-      // then bakes the same X-axis rotation the main CSG path above is
-      // already oriented for directly (createWallBrush puts extrusion on Y
-      // and the footprint's other axis on Z -- already final Y-up world
-      // orientation, no outer rotation needed), so both paths end up in the
-      // same coordinate convention without the <mesh> itself rotating.
-      const shape = new THREE.Shape();
-      shape.moveTo(footprint[0].x / pixelsPerMetre, -footprint[0].y / pixelsPerMetre);
-      for (let i = 1; i < footprint.length; i += 1) {
-        shape.lineTo(footprint[i].x / pixelsPerMetre, -footprint[i].y / pixelsPerMetre);
-      }
-      shape.closePath();
-      const fallbackGeometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
-      fallbackGeometry.rotateX(-Math.PI / 2);
-      return fallbackGeometry;
-    }
-  }, [footprint, height, pixelsPerMetre, wall.startPoint, wall.endPoint, wallThicknessMm, doors, windows]);
-
-  return (
-    <mesh
-      geometry={geometry}
-      castShadow
-      receiveShadow
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect?.();
-      }}
-    >
-      <meshStandardMaterial color={color} roughness={0.85} metalness={0.02} />
-    </mesh>
-  );
-}
-
-function DoorMesh({
-  door,
-  wall,
-  pixelsPerMetre,
-  selected = false,
-  theme,
-  onSelect,
-}: {
-  door: Door;
-  wall: Wall;
-  pixelsPerMetre: number;
-  selected?: boolean;
-  theme: 'light' | 'dark';
-  onSelect?: () => void;
-}) {
-  const doorWidth = Math.max(0.6, door.width / 1000);
-  const doorHeight = Math.min(wall.height / 1000, 2.1);
-
-  const dx = wall.endPoint.x - wall.startPoint.x;
-  const dy = wall.endPoint.y - wall.startPoint.y;
-  const wallLength = Math.sqrt(dx * dx + dy * dy);
-  const t = door.position.x / wallLength;
-
-  const doorX = (wall.startPoint.x + (wall.endPoint.x - wall.startPoint.x) * t) / pixelsPerMetre;
-  const doorZ = (wall.startPoint.y + (wall.endPoint.y - wall.startPoint.y) * t) / pixelsPerMetre;
-  const angle = Math.atan2(dy, dx);
-
-  const doorColor = selected ? '#2563eb' : door.type === 'entry' ? materials[theme].doorEntry : materials[theme].doorInternal;
-
-  return (
-    <mesh
-      position={[doorX, doorHeight / 2, doorZ]}
-      rotation={[0, -angle, 0]}
-      castShadow
-      receiveShadow
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect?.();
-      }}
-    >
-      <boxGeometry args={[doorWidth, doorHeight, 0.05]} />
-      <meshStandardMaterial color={doorColor} roughness={0.55} metalness={0.05} />
-    </mesh>
-  );
-}
-
-function WindowMesh({
-  window: win,
-  wall,
-  pixelsPerMetre,
-  selected = false,
-  theme,
-  onSelect,
-}: {
-  window: Window;
-  wall: Wall;
-  pixelsPerMetre: number;
-  selected?: boolean;
-  theme: 'light' | 'dark';
-  onSelect?: () => void;
-}) {
-  const winWidth = Math.max(0.8, win.width / 1000);
-  const winHeight = Math.max(0.6, win.height / 1000);
-
-  const dx = wall.endPoint.x - wall.startPoint.x;
-  const dy = wall.endPoint.y - wall.startPoint.y;
-  const wallLength = Math.sqrt(dx * dx + dy * dy);
-  const t = win.position.x / wallLength;
-
-  const winX = (wall.startPoint.x + (wall.endPoint.x - wall.startPoint.x) * t) / pixelsPerMetre;
-  const winZ = (wall.startPoint.y + (wall.endPoint.y - wall.startPoint.y) * t) / pixelsPerMetre;
-  const angle = Math.atan2(dy, dx);
-  const windowSillHeight = win.sillHeight / 1000;
-  const color = selected ? '#2563eb' : materials[theme].windowGlass;
-
-  return (
-    <mesh
-      position={[winX, windowSillHeight + winHeight / 2, winZ]}
-      rotation={[0, -angle, 0]}
-      castShadow
-      receiveShadow
-      onClick={(e) => {
-        e.stopPropagation();
-        onSelect?.();
-      }}
-    >
-      <boxGeometry args={[winWidth, winHeight, 0.04]} />
-      <meshStandardMaterial color={color} roughness={0.15} metalness={0.4} transparent opacity={0.55} />
-    </mesh>
-  );
-}
-
-/**
- * A draggable handle constrained to one axis, used for 3D architecture edits
- * (wall height, door/window position along their host wall). Committing writes
- * back through the same store action the 2D editor uses, once per drag (not on
- * every intermediate frame) — 2D stays the single source of truth either way.
- */
-function AxisDragHandle({
-  position,
-  rotationY = 0,
-  axis,
-  space = 'world',
-  onCommit,
-}: {
-  position: [number, number, number];
-  rotationY?: number;
-  axis: 'x' | 'y';
-  space?: 'world' | 'local';
-  onCommit: (handle: THREE.Object3D) => void;
-}) {
-  const handleRef = useRef<THREE.Group>(null);
-
-  return (
-    <>
-      <group ref={handleRef} position={position} rotation={[0, rotationY, 0]}>
-        <mesh>
-          <sphereGeometry args={[0.08, 12, 12]} />
-          <meshStandardMaterial color="#2563eb" depthTest={false} />
-        </mesh>
-      </group>
-      <TransformControls
-        object={handleRef as unknown as React.RefObject<THREE.Object3D>}
-        mode="translate"
-        space={space}
-        showX={axis === 'x'}
-        showY={axis === 'y'}
-        showZ={false}
-        size={0.75}
-        onMouseUp={() => {
-          const handle = handleRef.current;
-          if (!handle) return;
-          onCommit(handle);
-        }}
-      />
-    </>
-  );
-}
-
-/** Drag a door/window along its host wall. Rotated into the wall's local frame so the
- *  single visible axis points along the wall, whatever angle it's drawn at. */
-function OpeningAxisHandle({
-  wall,
-  offsetPx,
-  heightM,
-  pixelsPerMetre,
-  onCommit,
-}: {
-  wall: Wall;
-  offsetPx: number;
-  heightM: number;
-  pixelsPerMetre: number;
-  onCommit: (offsetPx: number) => void;
-}) {
-  const dx = wall.endPoint.x - wall.startPoint.x;
-  const dy = wall.endPoint.y - wall.startPoint.y;
-  const wallLength = Math.hypot(dx, dy);
-  if (wallLength < 1) return null;
-
-  const t = offsetPx / wallLength;
-  const worldX = (wall.startPoint.x + dx * t) / pixelsPerMetre;
-  const worldZ = (wall.startPoint.y + dy * t) / pixelsPerMetre;
-  const angle = Math.atan2(dy, dx);
-
-  return (
-    <AxisDragHandle
-      axis="x"
-      space="local"
-      position={[worldX, heightM, worldZ]}
-      rotationY={-angle}
-      onCommit={(handle) => {
-        const point = { x: handle.position.x * pixelsPerMetre, y: handle.position.z * pixelsPerMetre };
-        onCommit(projectOffsetOntoWall(wall, point));
-      }}
-    />
-  );
-}
-
-function Roof({
-  walls,
-  wallHeight,
-  theme,
-  pixelsPerMetre,
-}: {
-  walls: Wall[];
-  wallHeight: number;
-  theme: 'light' | 'dark';
-  pixelsPerMetre: number;
-}) {
-  const bounds = getPlanBounds(walls, pixelsPerMetre);
-  if (!bounds || bounds.width < 0.1 || bounds.depth < 0.1) return null;
-
-  const wallHeightM = Math.max(1.2, wallHeight / 1000);
-  const roofColor = theme === 'dark' ? '#3a3a3a' : '#c0c0c0';
-
-  return (
-    <mesh
-      position={[bounds.centerX, wallHeightM + 0.15, bounds.centerZ]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      castShadow
-      receiveShadow
-    >
-      <planeGeometry args={[bounds.width + 1, bounds.depth + 1]} />
-      <meshStandardMaterial color={roofColor} roughness={0.7} metalness={0.05} />
-    </mesh>
-  );
-}
-
-// ============================================================================
-// FURNITURE LAYER: Objects that sit on the floor
-// The positioning group lives at the SceneContent level so the fallback
-// placeholder (when the GLB model is missing or loading) renders at the
-// correct world position rather than the origin.
-// ============================================================================
-
-/** Fallback box rendered when the GLB model is unavailable. */
-function ObjectPlaceholder({ asset }: { asset: ObjectAsset }) {
-  return (
-    <mesh>
-      <boxGeometry args={asset.dimensions} />
-      <meshStandardMaterial color={asset.color} roughness={0.8} transparent opacity={0.45} />
-    </mesh>
-  );
-}
-
-class ObjectAssetBoundary extends Component<
-  { asset: ObjectAsset; children: ReactNode },
-  { failed: boolean }
-> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  render() {
-    return this.state.failed ? <ObjectPlaceholder asset={this.props.asset} /> : this.props.children;
-  }
-}
-
-function ObjectMesh({
-  asset,
-  selected,
-}: {
-  asset: ObjectAsset;
-  selected: boolean;
-}) {
-  const { scene } = useGLTF(asset.modelUrl);
-  const clone = useMemo(() => scene.clone(true), [scene]);
-
-  useEffect(() => {
-    clone.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-  }, [clone]);
-
-  return (
-    <>
-      <primitive
-        object={clone}
-        position={[asset.offset[0], asset.offset[1], asset.offset[2]]}
-        rotation={asset.modelRotation}
-        scale={asset.modelScale}
-      />
-      {selected && (
-        <mesh>
-          <boxGeometry args={asset.dimensions} />
-          <meshBasicMaterial color="#2563eb" wireframe transparent opacity={0.8} />
-        </mesh>
-      )}
-    </>
-  );
-}
-
-/**
- * One placed furniture object, with a Blender-style move/rotate/scale gizmo when
- * selected and a transform mode is active. Position/rotation move freely; scale
- * is kept uniform (DesignObject has a single `scale` factor, not per-axis) by
- * only exposing one scale handle and writing its value back to all three axes.
- */
-function ObjectInstance({
-  object,
-  asset,
-  selected,
-  transformMode,
-  worldPosition,
-  pixelsPerMetre,
-  onSelect,
-  onCommitTransform,
-}: {
-  object: { rotation: number; scale: number };
-  asset: ObjectAsset;
-  selected: boolean;
-  transformMode: ObjectTransformMode;
-  worldPosition: [number, number, number];
-  pixelsPerMetre: number;
-  onSelect: () => void;
-  onCommitTransform: (updates: { position?: { x: number; y: number }; rotation?: number; scale?: number }) => void;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-
-  return (
-    <>
-      <group
-        ref={groupRef}
-        position={worldPosition}
-        rotation={[0, -object.rotation, 0]}
-        scale={object.scale}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect();
-        }}
-      >
-        <ObjectAssetBoundary asset={asset}>
-          <Suspense fallback={<ObjectPlaceholder asset={asset} />}>
-            <ObjectMesh asset={asset} selected={selected} />
-          </Suspense>
-        </ObjectAssetBoundary>
-      </group>
-      {selected && transformMode && (
-        <TransformControls
-          object={groupRef as unknown as React.RefObject<THREE.Object3D>}
-          mode={transformMode}
-          // translate: floor plane only (X/Z). rotate: vertical axis only (Y).
-          // scale: a single handle, since DesignObject.scale is one uniform factor.
-          showX={transformMode !== 'rotate'}
-          showY={transformMode === 'rotate'}
-          showZ={transformMode === 'translate'}
-          onMouseUp={() => {
-            const group = groupRef.current;
-            if (!group) return;
-            if (transformMode === 'translate') {
-              onCommitTransform({
-                position: { x: group.position.x * pixelsPerMetre, y: group.position.z * pixelsPerMetre },
-              });
-            } else if (transformMode === 'rotate') {
-              onCommitTransform({ rotation: -group.rotation.y });
-            } else {
-              // Uniform scale only: take the axis the user actually dragged and
-              // snap the other two to match, both visually and in the committed value.
-              const factor = Math.max(0.1, group.scale.x);
-              group.scale.set(factor, factor, factor);
-              onCommitTransform({ scale: factor });
-            }
-          }}
-        />
-      )}
-    </>
-  );
+  return null;
 }
 
 // ============================================================================
 // SCENE SETUP
 // ============================================================================
 
-function Floor({ width, height, theme }: { width: number; height: number; theme: 'light' | 'dark' }) {
-  const w = Math.max(12, width / 1000);
-  const h = Math.max(9, height / 1000);
-
-  return (
-    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <planeGeometry args={[w, h]} />
-      <meshStandardMaterial color={environments[theme].floor} roughness={0.95} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; transformMode: ObjectTransformMode }) {
+function SceneContent({
+  theme,
+  transformMode,
+  colorPreset,
+  shading,
+  showEdges,
+}: {
+  theme: ViewerTheme;
+  transformMode: ObjectTransformMode;
+  colorPreset: ColorPreset;
+  shading: Shading;
+  showEdges: boolean;
+}) {
   const {
     floorPlan,
     selectedElementId,
@@ -659,6 +79,8 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
     updateDoor,
     updateWindow,
     updateObject,
+    setHoveredElement,
+    clearHoveredElement,
   } = useDesignStore();
   const walls = floorPlan?.walls;
   const planPixelsPerMeter = pixelsPerMeter(floorPlan?.scale);
@@ -757,7 +179,7 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
       </GizmoHelper>
 
       {/* Architecture layer: floor, walls, openings, roof */}
-      <Floor width={floorPlan.width} height={floorPlan.height} theme={theme} />
+      <Floor width={floorPlan.width} height={floorPlan.height} theme={theme} shading={shading} />
 
       {floorPlan.walls.map((wall) => {
         const footprint = footprints.get(wall.id);
@@ -772,7 +194,13 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
               windows={openingsByWall.windows.get(wall.id)}
               selected={isSelected}
               theme={theme}
+              colorPreset={colorPreset}
+              shading={shading}
+              showEdges={showEdges}
+              edgeColor={environment.edgeColor}
               onSelect={() => setSelectedElement(wall.id)}
+              onHoverStart={() => setHoveredElement(wall.id)}
+              onHoverEnd={() => clearHoveredElement(wall.id)}
             />
             {isSelected && (
               <AxisDragHandle
@@ -804,7 +232,13 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
               pixelsPerMetre={planPixelsPerMeter}
               selected={isSelected}
               theme={theme}
+              colorPreset={colorPreset}
+              shading={shading}
+              showEdges={showEdges}
+              edgeColor={environment.edgeColor}
               onSelect={() => setSelectedElement(door.id)}
+              onHoverStart={() => setHoveredElement(door.id)}
+              onHoverEnd={() => clearHoveredElement(door.id)}
             />
             {isSelected && (
               <OpeningAxisHandle
@@ -831,7 +265,13 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
               pixelsPerMetre={planPixelsPerMeter}
               selected={isSelected}
               theme={theme}
+              colorPreset={colorPreset}
+              shading={shading}
+              showEdges={showEdges}
+              edgeColor={environment.edgeColor}
               onSelect={() => setSelectedElement(win.id)}
+              onHoverStart={() => setHoveredElement(win.id)}
+              onHoverEnd={() => clearHoveredElement(win.id)}
             />
             {isSelected && (
               <OpeningAxisHandle
@@ -851,6 +291,9 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
         wallHeight={floorPlan.walls[0]?.height ?? 3000}
         theme={theme}
         pixelsPerMetre={planPixelsPerMeter}
+        shading={shading}
+        showEdges={showEdges}
+        edgeColor={environment.edgeColor}
       />
 
       {/* Furniture layer: objects on floor */}
@@ -873,6 +316,8 @@ function SceneContent({ theme, transformMode }: { theme: 'light' | 'dark'; trans
             pixelsPerMetre={planPixelsPerMeter}
             onSelect={() => setSelectedElement(object.id)}
             onCommitTransform={(updates) => updateObject(object.id, updates)}
+            onHoverStart={() => setHoveredElement(object.id)}
+            onHoverEnd={() => clearHoveredElement(object.id)}
           />
         );
       })}
@@ -891,10 +336,38 @@ const TRANSFORM_MODE_LABELS: Record<Exclude<ObjectTransformMode, null>, string> 
   scale: 'Scale',
 };
 
-export function Canvas3DContainer({ theme }: { theme: 'light' | 'dark' }) {
-  const { floorPlan, selectedElementId } = useDesignStore();
+export function Canvas3DContainer({ theme, lengthUnit = 'm' }: { theme: ViewerTheme; lengthUnit?: LengthUnit }) {
+  const { floorPlan, selectedElementId, hoveredElementId, colorPreset, setColorPreset } = useDesignStore();
   const [transformMode, setTransformMode] = useState<ObjectTransformMode>(null);
+  const [shading, setShading] = useState<Shading>('rendered');
+  const [showEdges, setShowEdges] = useState(false);
   const selectedIsObject = (floorPlan?.objects ?? []).some((o) => o.id === selectedElementId);
+
+  // colorPreset lives in the shared store (2D reads it too, for validation-
+  // view parity); this component only owns its localStorage persistence.
+  useEffect(() => {
+    const saved = window.localStorage.getItem('corbel-viewer-color-preset');
+    if (saved === 'standard' || saved === 'validation') setColorPreset(saved);
+
+    const savedShading = window.localStorage.getItem('corbel-viewer-shading');
+    if (savedShading === 'solid' || savedShading === 'rendered') setShading(savedShading);
+
+    const savedEdges = window.localStorage.getItem('corbel-viewer-edges');
+    if (savedEdges === 'true' || savedEdges === 'false') setShowEdges(savedEdges === 'true');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('corbel-viewer-color-preset', colorPreset);
+  }, [colorPreset]);
+
+  useEffect(() => {
+    window.localStorage.setItem('corbel-viewer-edges', String(showEdges));
+  }, [showEdges]);
+
+  useEffect(() => {
+    window.localStorage.setItem('corbel-viewer-shading', shading);
+  }, [shading]);
 
   // Only furniture gets a move/rotate/scale mode; walls/doors/windows use their
   // own always-on drag handle instead. Drop a stale mode when selection changes.
@@ -924,6 +397,8 @@ export function Canvas3DContainer({ theme }: { theme: 'light' | 'dark' }) {
   }
 
   const openingCount = floorPlan.doors.length + floorPlan.windows.length;
+  const planPixelsPerMeter = pixelsPerMeter(floorPlan.scale);
+  const hoveredMetrics = resolveHoveredMetrics(floorPlan, hoveredElementId, planPixelsPerMeter);
 
   return (
     <div
@@ -937,8 +412,52 @@ export function Canvas3DContainer({ theme }: { theme: 'light' | 'dark' }) {
       }. Drag to orbit the camera; the 2D view and the Outline panel are the reliable way to select and edit elements without a mouse.`}
     >
       <Canvas shadows dpr={[1, 2]}>
-        <SceneContent theme={theme} transformMode={transformMode} />
+        <SceneContent theme={theme} transformMode={transformMode} colorPreset={colorPreset} shading={shading} showEdges={showEdges} />
       </Canvas>
+
+      <HoverMetricsHud metrics={hoveredMetrics} lengthUnit={lengthUnit} />
+
+      <button
+        type="button"
+        onClick={() => setShowEdges((current) => !current)}
+        title="Toggle a hard-edge line overlay for a blueprint-style look"
+        className={cn(
+          'editor-island absolute bottom-24 right-4 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+          showEdges
+            ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
+            : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
+        )}
+      >
+        {showEdges ? 'Edges on' : 'Edges off'}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setShading((current) => (current === 'solid' ? 'rendered' : 'solid'))}
+        title="Toggle a cheaper, flat-shaded view (no PBR specular)"
+        className={cn(
+          'editor-island absolute bottom-14 right-4 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+          shading === 'solid'
+            ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
+            : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
+        )}
+      >
+        {shading === 'solid' ? 'Solid shading' : 'Rendered shading'}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setColorPreset(colorPreset === 'validation' ? 'standard' : 'validation')}
+        title="Toggle a colour view that flags low-confidence AI-extracted elements"
+        className={cn(
+          'editor-island absolute bottom-4 right-4 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+          colorPreset === 'validation'
+            ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
+            : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
+        )}
+      >
+        {colorPreset === 'validation' ? 'Validation view' : 'Standard view'}
+      </button>
 
       {selectedIsObject && (
         // bottom-20, not bottom-4: the app-wide tool dock (EditorWithCanvas.tsx)
