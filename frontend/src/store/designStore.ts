@@ -1,10 +1,25 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { DesignObject, ElementGroup, FloorPlan, Point, Wall, Room, Door, Window, ValidationResult, TraceCalibration } from '@/types/design';
+import type { BuildingModel, DesignObject, ElementGroup, FloorPlan, Point, Wall, Room, Door, Window, ValidationResult, TraceCalibration } from '@/types/design';
 import { pixelsPerMeter } from '@/lib/geometry/scale';
-import { insertWallWithIntersections, rehostWallOpening } from '@/lib/geometry/wall-intersections';
+import { insertWallWithIntersections, preserveOpeningOnHostChange, propagateWallJunctions, rehostWallOpening } from '@/lib/geometry/wall-intersections';
 import { cloneFloorPlan, createRedesignPlan } from '@/lib/redesign';
 import { getAllSelectableIds } from '@/lib/geometry/groups';
+import type { PlanChatOperation } from '@/lib/plan-chat/types';
+import { applyPlanOperationsToFloorPlan } from '@/lib/plan-chat/apply';
+import { buildingModelFor, enforceWallConstraint, isElementLocked } from '@/lib/building/model';
+
+export type SnapMode = 'grid' | 'lines' | 'angles' | 'off';
+export const SNAP_MODES: SnapMode[] = ['grid', 'lines', 'angles', 'off'];
+
+/**
+ * `standard` shows each element's ordinary colour. `validation` blends it
+ * toward a warning tone as AI-extraction confidence drops (see
+ * `lib/geometry/confidence-tint.ts`), so uncertain reconstructions are
+ * visible in both the 2D and 3D views, not just one. Lives in the store
+ * (rather than a viewer-specific module) because both views read it.
+ */
+export type ColorPreset = 'standard' | 'validation';
 
 export interface TraceImageReference {
   url: string;
@@ -17,6 +32,7 @@ export interface TraceImageReference {
 interface DesignState {
   // Current floor plan
   floorPlan: FloorPlan | null;
+  aiPreviewFloorPlan: FloorPlan | null;
   validationResults: ValidationResult[];
 
   // Ghost underlay (original import for Trace-to-Learn compare)
@@ -36,10 +52,16 @@ interface DesignState {
   /** Full multi-selection. `selectedElementId` mirrors its first entry for single-select consumers. */
   selectedElementIds: string[];
   currentTool: 'select' | 'wall' | 'object' | 'room' | 'door' | 'window' | 'delete' | 'scale';
+  snapMode: SnapMode;
   viewMode: '2d' | '3d' | 'split';
+  /** Pointer-hover target in the 3D viewer, for the read-only metrics HUD.
+   * Transient -- never persisted or tracked in undo history. */
+  hoveredElementId: string | null;
+  colorPreset: ColorPreset;
 
   // Actions
   setFloorPlan: (floorPlan: FloorPlan) => void;
+  setAiPreviewFloorPlan: (floorPlan: FloorPlan | null) => void;
   clearDesign: () => void;
   applyImportedFloorPlan: (floorPlan: FloorPlan) => void;
   beginImportedEdit: (floorPlan: FloorPlan) => void;
@@ -54,7 +76,15 @@ interface DesignState {
   setValidationResults: (results: ValidationResult[]) => void;
   setSelectedElement: (id: string | null) => void;
   setCurrentTool: (tool: DesignState['currentTool']) => void;
+  setSnapMode: (mode: SnapMode) => void;
+  cycleSnapMode: () => void;
   setViewMode: (mode: DesignState['viewMode']) => void;
+  setHoveredElement: (id: string | null) => void;
+  /** Clears the hover only if `id` is still the current one -- guards
+   * against a stale pointer-leave clearing a fresher pointer-enter when
+   * the browser fires them out of order across adjacent meshes. */
+  clearHoveredElement: (id: string) => void;
+  setColorPreset: (preset: ColorPreset) => void;
 
   // Multi-selection
   setSelection: (ids: string[]) => void;
@@ -62,6 +92,7 @@ interface DesignState {
   selectAll: () => void;
   clearSelection: () => void;
   deleteSelection: () => void;
+  duplicateSelection: () => void;
 
   // Grouping ("join elements together as one object")
   groupElements: (ids: string[]) => void;
@@ -95,11 +126,15 @@ interface DesignState {
 
   // Metadata
   setFloorPlanName: (name: string) => void;
+  setBuildingModel: (updates: Partial<BuildingModel>) => void;
+  assignElementsToLayer: (ids: string[], layerId: string) => void;
+  applyPlanOperations: (operations: PlanChatOperation[]) => void;
 }
 
 export const useDesignStore = create<DesignState>(
   temporal((set: any) => ({
       floorPlan: null,
+      aiPreviewFloorPlan: null,
       validationResults: [],
       ghostFloorPlan: null,
       ghostOpacity: 0.25,
@@ -107,10 +142,14 @@ export const useDesignStore = create<DesignState>(
       selectedElementId: null,
       selectedElementIds: [],
       currentTool: 'select',
+      snapMode: 'grid',
       viewMode: '2d',
       lastImportJobId: null,
+      hoveredElementId: null,
+      colorPreset: 'standard',
 
       setFloorPlan: (floorPlan: FloorPlan) => set({ floorPlan }),
+      setAiPreviewFloorPlan: (floorPlan: FloorPlan | null) => set({ aiPreviewFloorPlan: floorPlan }),
       setLastImportJobId: (jobId: string | null) => set({ lastImportJobId: jobId }),
       clearDesign: () =>
         set((state: DesignState) => {
@@ -125,6 +164,7 @@ export const useDesignStore = create<DesignState>(
               objects: [],
               updatedAt: new Date(),
             },
+            aiPreviewFloorPlan: null,
             ghostFloorPlan: null,
             ghostOpacity: 0.25,
             traceImage: null,
@@ -138,6 +178,7 @@ export const useDesignStore = create<DesignState>(
       applyImportedFloorPlan: (floorPlan: FloorPlan) =>
         set({
           floorPlan,
+          aiPreviewFloorPlan: null,
           ghostFloorPlan: null,
           traceImage: null,
           selectedElementId: null,
@@ -154,6 +195,7 @@ export const useDesignStore = create<DesignState>(
         editable.updatedAt = new Date();
         set({
           floorPlan: editable,
+          aiPreviewFloorPlan: null,
           ghostFloorPlan: baseline,
           ghostOpacity: 0.18,
           traceImage: null,
@@ -169,6 +211,7 @@ export const useDesignStore = create<DesignState>(
         const original = cloneFloorPlan(floorPlan);
         set({
           ghostFloorPlan: original,
+          aiPreviewFloorPlan: null,
           ghostOpacity: 0.25,
           traceImage: null,
           floorPlan: createRedesignPlan(original),
@@ -197,6 +240,7 @@ export const useDesignStore = create<DesignState>(
             createdAt: now,
             updatedAt: now,
           },
+          aiPreviewFloorPlan: null,
           ghostFloorPlan: null,
           ghostOpacity: 0.25,
           traceImage: { url: imageUrl, scale: 0.7, opacity: 0.58, blur: 2 },
@@ -263,7 +307,13 @@ export const useDesignStore = create<DesignState>(
       setSelectedElement: (id: string | null) =>
         set({ selectedElementId: id, selectedElementIds: id ? [id] : [] }),
       setCurrentTool: (tool: DesignState['currentTool']) => set({ currentTool: tool }),
+      setSnapMode: (snapMode: SnapMode) => set({ snapMode }),
+      cycleSnapMode: () => set((state: DesignState) => ({ snapMode: SNAP_MODES[(SNAP_MODES.indexOf(state.snapMode) + 1) % SNAP_MODES.length] ?? 'grid' })),
       setViewMode: (mode: DesignState['viewMode']) => set({ viewMode: mode }),
+      setHoveredElement: (id: string | null) => set({ hoveredElementId: id }),
+      clearHoveredElement: (id: string) =>
+        set((state: DesignState) => (state.hoveredElementId === id ? { hoveredElementId: null } : {})),
+      setColorPreset: (preset: ColorPreset) => set({ colorPreset: preset }),
 
       setSelection: (ids: string[]) =>
         set({ selectedElementIds: ids, selectedElementId: ids[0] ?? null }),
@@ -289,7 +339,8 @@ export const useDesignStore = create<DesignState>(
       deleteSelection: () =>
         set((state: DesignState) => {
           if (!state.floorPlan || state.selectedElementIds.length === 0) return state;
-          const idSet = new Set(state.selectedElementIds);
+          const idSet = new Set(state.selectedElementIds.filter((id) => !isElementLocked(state.floorPlan, id)));
+          if (idSet.size === 0) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -302,6 +353,54 @@ export const useDesignStore = create<DesignState>(
             },
             selectedElementIds: [],
             selectedElementId: null,
+          };
+        }),
+
+      duplicateSelection: () =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || state.selectedElementIds.length === 0) return state;
+          const selected = new Set(state.selectedElementIds.filter((id) => !isElementLocked(state.floorPlan, id)));
+          if (selected.size === 0) return state;
+          const offset = { x: 200, y: 200 };
+          const newId = (prefix: string) => prefix + '-' + crypto.randomUUID();
+          const wallIdMap = new Map<string, string>();
+          const walls = state.floorPlan.walls
+            .filter((wall) => selected.has(wall.id))
+            .map((wall) => {
+              const id = newId('wall');
+              wallIdMap.set(wall.id, id);
+              return {
+                ...wall,
+                id,
+                startPoint: { x: wall.startPoint.x + offset.x, y: wall.startPoint.y + offset.y },
+                endPoint: { x: wall.endPoint.x + offset.x, y: wall.endPoint.y + offset.y },
+              };
+            });
+          const rooms = state.floorPlan.rooms
+            .filter((room) => selected.has(room.id))
+            .map((room) => ({ ...room, id: newId('room'), name: room.name + ' copy', vertices: room.vertices.map((point) => ({ x: point.x + offset.x, y: point.y + offset.y })) }));
+          const objects = (state.floorPlan.objects ?? [])
+            .filter((object) => selected.has(object.id))
+            .map((object) => ({ ...object, id: newId('object'), position: { x: object.position.x + offset.x, y: object.position.y + offset.y } }));
+          const doors = state.floorPlan.doors
+            .filter((door) => wallIdMap.has(door.wallId))
+            .map((door) => ({ ...door, id: newId('door'), wallId: wallIdMap.get(door.wallId)! }));
+          const windows = state.floorPlan.windows
+            .filter((window) => wallIdMap.has(window.wallId))
+            .map((window) => ({ ...window, id: newId('window'), wallId: wallIdMap.get(window.wallId)! }));
+          const duplicatedIds = [...walls, ...rooms, ...objects, ...doors, ...windows].map((item) => item.id);
+          if (duplicatedIds.length === 0) return state;
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              walls: [...state.floorPlan.walls, ...walls],
+              rooms: [...state.floorPlan.rooms, ...rooms],
+              doors: [...state.floorPlan.doors, ...doors],
+              windows: [...state.floorPlan.windows, ...windows],
+              objects: [...(state.floorPlan.objects ?? []), ...objects],
+            },
+            selectedElementIds: duplicatedIds,
+            selectedElementId: duplicatedIds[0] ?? null,
           };
         }),
 
@@ -332,7 +431,8 @@ export const useDesignStore = create<DesignState>(
       translateElements: (ids: string[], dx: number, dy: number) =>
         set((state: DesignState) => {
           if (!state.floorPlan || ids.length === 0 || (dx === 0 && dy === 0)) return state;
-          const idSet = new Set(ids);
+          const idSet = new Set(ids.filter((id) => !isElementLocked(state.floorPlan, id)));
+          if (idSet.size === 0) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -362,7 +462,8 @@ export const useDesignStore = create<DesignState>(
       scaleElements: (ids: string[], factor: number, pivot: Point) =>
         set((state: DesignState) => {
           if (!state.floorPlan || ids.length === 0 || !Number.isFinite(factor) || factor <= 0) return state;
-          const idSet = new Set(ids);
+          const idSet = new Set(ids.filter((id) => !isElementLocked(state.floorPlan, id)));
+          if (idSet.size === 0) return state;
           const scalePoint = (p: Point): Point => ({
             x: pivot.x + (p.x - pivot.x) * factor,
             y: pivot.y + (p.y - pivot.y) * factor,
@@ -415,18 +516,34 @@ export const useDesignStore = create<DesignState>(
 
       updateWall: (id: string, updates: Partial<Wall>) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
+          const previousWall = state.floorPlan.walls.find((wall) => wall.id === id);
+          const nextWall = previousWall ? enforceWallConstraint(state.floorPlan, id, { ...previousWall, ...updates }) : null;
+          const nextWalls = previousWall && nextWall
+            ? propagateWallJunctions(state.floorPlan.walls, id, previousWall, nextWall)
+            : state.floorPlan.walls;
+          const previousWallsById = new Map(state.floorPlan.walls.map((wall) => [wall.id, wall]));
           return {
             floorPlan: {
               ...state.floorPlan,
-              walls: state.floorPlan.walls.map((w) => (w.id === id ? { ...w, ...updates } : w)),
+              walls: nextWalls,
+              doors: state.floorPlan.doors.map((door) => {
+                const previousHost = previousWallsById.get(door.wallId);
+                const nextHost = nextWalls.find((wall) => wall.id === door.wallId);
+                return previousHost && nextHost ? preserveOpeningOnHostChange(door, previousHost, nextHost) : door;
+              }),
+              windows: state.floorPlan.windows.map((window) => {
+                const previousHost = previousWallsById.get(window.wallId);
+                const nextHost = nextWalls.find((wall) => wall.id === window.wallId);
+                return previousHost && nextHost ? preserveOpeningOnHostChange(window, previousHost, nextHost) : window;
+              }),
             },
           };
         }),
 
       deleteWall: (id: string) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -461,7 +578,7 @@ export const useDesignStore = create<DesignState>(
 
       updateRoom: (id: string, updates: Partial<Room>) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -472,7 +589,7 @@ export const useDesignStore = create<DesignState>(
 
       deleteRoom: (id: string) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -494,7 +611,7 @@ export const useDesignStore = create<DesignState>(
 
       updateDoor: (id: string, updates: Partial<Door>) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -505,7 +622,7 @@ export const useDesignStore = create<DesignState>(
 
       deleteDoor: (id: string) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -527,7 +644,7 @@ export const useDesignStore = create<DesignState>(
 
       updateWindow: (id: string, updates: Partial<Window>) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -540,7 +657,7 @@ export const useDesignStore = create<DesignState>(
 
       deleteWindow: (id: string) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -562,7 +679,7 @@ export const useDesignStore = create<DesignState>(
 
       updateObject: (id: string, updates: Partial<DesignObject>) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -575,7 +692,7 @@ export const useDesignStore = create<DesignState>(
 
       deleteObject: (id: string) =>
         set((state: DesignState) => {
-          if (!state.floorPlan) return state;
+          if (!state.floorPlan || isElementLocked(state.floorPlan, id)) return state;
           return {
             floorPlan: {
               ...state.floorPlan,
@@ -594,6 +711,62 @@ export const useDesignStore = create<DesignState>(
             },
           };
         }),
+
+      setBuildingModel: (updates: Partial<BuildingModel>) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan) return state;
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              building: { ...buildingModelFor(state.floorPlan), ...updates },
+            },
+          };
+        }),
+
+      assignElementsToLayer: (ids: string[], layerId: string) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || ids.length === 0) return state;
+          const building = buildingModelFor(state.floorPlan);
+          if (!building.layers.some((layer) => layer.id === layerId)) return state;
+          const idSet = new Set(ids);
+          return {
+            floorPlan: {
+              ...state.floorPlan,
+              building: {
+                ...building,
+                layers: building.layers.map((layer) => ({
+                  ...layer,
+                  elementIds: layer.id === layerId
+                    ? [...new Set([...layer.elementIds.filter((id) => !idSet.has(id)), ...ids])]
+                    : layer.elementIds.filter((id) => !idSet.has(id)),
+                })),
+              },
+            },
+          };
+        }),
+
+      applyPlanOperations: (operations: PlanChatOperation[]) =>
+        set((state: DesignState) => {
+          if (!state.floorPlan || operations.length === 0) return state;
+          const next = applyPlanOperationsToFloorPlan(state.floorPlan, operations);
+
+          const deletedIds = new Set([
+            ...state.selectedElementIds.filter((id) =>
+              !next.walls.some((wall) => wall.id === id)
+              && !next.rooms.some((room) => room.id === id)
+              && !next.doors.some((door) => door.id === id)
+              && !next.windows.some((window) => window.id === id)
+              && !next.objects.some((object) => object.id === id)
+            ),
+          ]);
+          const selectedElementIds = state.selectedElementIds.filter((id) => !deletedIds.has(id));
+          return {
+            floorPlan: next,
+            selectedElementIds,
+            selectedElementId: selectedElementIds[0] ?? null,
+            validationResults: [],
+          };
+        }),
     }),
     {
       limit: 30,
@@ -610,13 +783,9 @@ export const useDesignStore = create<DesignState>(
         // (e.g., Konva drag events firing 60x per second).
         if (!past?.floorPlan || !current?.floorPlan) return past?.floorPlan === current?.floorPlan;
 
-        // Quick structural checks first
+        // Compare the editable plan payload while ignoring timestamps. The
+        // previous length-only comparison dropped field edits from undo history.
         if (
-          past.floorPlan.walls.length !== current.floorPlan.walls.length ||
-          past.floorPlan.doors.length !== current.floorPlan.doors.length ||
-          past.floorPlan.windows.length !== current.floorPlan.windows.length ||
-          past.floorPlan.rooms.length !== current.floorPlan.rooms.length ||
-          (past.floorPlan.groups?.length ?? 0) !== (current.floorPlan.groups?.length ?? 0) ||
           past.selectedElementId !== current.selectedElementId ||
           (past.selectedElementIds?.join(',') ?? '') !== (current.selectedElementIds?.join(',') ?? '') ||
           past.currentTool !== current.currentTool ||
@@ -625,8 +794,11 @@ export const useDesignStore = create<DesignState>(
           return false;
         }
 
-        // If structures match, treat as equivalent for undo purposes
-        return true;
+        const comparablePlan = (plan: any) => {
+          const { createdAt: _createdAt, updatedAt: _updatedAt, ...editable } = plan;
+          return editable;
+        };
+        return JSON.stringify(comparablePlan(past.floorPlan)) === JSON.stringify(comparablePlan(current.floorPlan));
       },
     } as const
   ) as any

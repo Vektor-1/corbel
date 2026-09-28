@@ -64,6 +64,21 @@ describe('multi-selection', () => {
     expect(plan.groups).toEqual([]); // group referenced the deleted wall
     expect(useDesignStore.getState().selectedElementIds).toEqual([]);
   });
+
+  it('duplicates a selected wall with its hosted openings and selects the copies', () => {
+    useDesignStore.getState().setSelection(['w1']);
+    useDesignStore.getState().duplicateSelection();
+    const plan = useDesignStore.getState().floorPlan!;
+    const duplicateWall = plan.walls.find((wall) => wall.id !== 'w1' && wall.id !== 'w2')!;
+    const duplicateDoor = plan.doors.find((door) => door.id !== 'd1')!;
+    const duplicateWindow = plan.windows.find((window) => window.id !== 'win1')!;
+
+    expect(duplicateWall.startPoint).toEqual({ x: 200, y: 200 });
+    expect(duplicateWall.endPoint).toEqual({ x: 600, y: 200 });
+    expect(duplicateDoor.wallId).toBe(duplicateWall.id);
+    expect(duplicateWindow.wallId).toBe(duplicateWall.id);
+    expect(useDesignStore.getState().selectedElementIds).toEqual(expect.arrayContaining([duplicateWall.id, duplicateDoor.id, duplicateWindow.id]));
+  });
 });
 
 describe('grouping', () => {
@@ -130,5 +145,44 @@ describe('scaleElements', () => {
     const plan = useDesignStore.getState().floorPlan!;
     expect(plan.doors[0].position.x).toBe(100); // hosted on w1, untouched
     expect(plan.windows[0].position.x).toBe(300);
+  });
+});
+
+describe('hosted opening relationships', () => {
+  it('keeps hosted openings at the same relative wall position after a wall resize', () => {
+    useDesignStore.getState().updateWall('w1', { endPoint: { x: 800, y: 0 } });
+    const plan = useDesignStore.getState().floorPlan!;
+    expect(plan.doors[0].position.x).toBe(200);
+    expect(plan.windows[0].position.x).toBe(600);
+  });
+
+  it('moves walls sharing an edited endpoint and preserves their hosted openings', () => {
+    useDesignStore.getState().setFloorPlan(basePlan({
+      walls: [
+        { id: 'w1', startPoint: { x: 0, y: 0 }, endPoint: { x: 400, y: 0 }, thickness: 225, material: 'sandcrete', type: 'loadBearing', height: 2700 },
+        { id: 'w2', startPoint: { x: 400, y: 0 }, endPoint: { x: 400, y: 400 }, thickness: 225, material: 'sandcrete', type: 'loadBearing', height: 2700 },
+      ],
+      doors: [{ id: 'd2', wallId: 'w2', position: { x: 200, y: 0 }, width: 900, type: 'internal', swing: 'left' }],
+      windows: [],
+    }));
+
+    useDesignStore.getState().updateWall('w1', { endPoint: { x: 600, y: 0 } });
+    const plan = useDesignStore.getState().floorPlan!;
+    const joinedWall = plan.walls.find((wall) => wall.id === 'w2')!;
+
+    expect(joinedWall.startPoint).toEqual({ x: 600, y: 0 });
+    expect(joinedWall.endPoint).toEqual({ x: 400, y: 400 });
+    expect(plan.doors[0].position.x).toBeCloseTo(Math.hypot(-200, 400) / 2);
+  });
+
+  it('does not edit an element assigned to a locked layer', () => {
+    useDesignStore.getState().setBuildingModel({
+      layers: [
+        { id: 'layer-model', name: 'Model', visible: true, locked: false, elementIds: [] },
+        { id: 'layer-locked', name: 'Locked', visible: true, locked: true, elementIds: ['w1'] },
+      ],
+    });
+    useDesignStore.getState().updateWall('w1', { thickness: 300 });
+    expect(useDesignStore.getState().floorPlan!.walls.find((wall) => wall.id === 'w1')!.thickness).toBe(225);
   });
 });

@@ -82,6 +82,77 @@ export interface ElementGroup {
   memberIds: string[];
 }
 
+/** Lightweight building-document metadata. Optional so legacy plans remain valid. */
+export interface BuildingStory {
+  id: string;
+  name: string;
+  elevation: number; // mm relative to project datum
+  height: number; // mm floor-to-floor
+}
+
+export interface BuildingGrid {
+  id: string;
+  label: string;
+  axis: 'horizontal' | 'vertical';
+  position: number; // plan units
+}
+
+export interface PlanLayer {
+  id: string;
+  name: string;
+  visible: boolean;
+  locked: boolean;
+  elementIds: string[];
+}
+
+export interface NamedPlanView {
+  id: string;
+  name: string;
+  position: Point;
+  zoom: number;
+}
+
+export interface BuildingSection {
+  id: string;
+  label: string;
+  startPoint: Point;
+  endPoint: Point;
+}
+
+export interface PlanSheet {
+  id: string;
+  name: string;
+  size: 'A4' | 'A3' | 'A2' | 'A1';
+  viewId?: string;
+  scaleLabel: string;
+}
+
+export interface WallConstraint {
+  id: string;
+  kind: 'parallel' | 'perpendicular';
+  wallId: string;
+  referenceWallId: string;
+}
+
+export interface PersistentDimension {
+  id: string;
+  wallId: string;
+  kind: 'length' | 'angle';
+  offset: number;
+}
+
+export interface BuildingModel {
+  stories: BuildingStory[];
+  activeStoryId: string;
+  grids: BuildingGrid[];
+  layers: PlanLayer[];
+  namedViews: NamedPlanView[];
+  sections: BuildingSection[];
+  constraints: WallConstraint[];
+  dimensions: PersistentDimension[];
+  sheets: PlanSheet[];
+}
+
 export interface FloorPlan {
   id: string;
   name: string;
@@ -95,6 +166,8 @@ export interface FloorPlan {
   objects: DesignObject[];
   /** Optional — absent on plans created before grouping existed. */
   groups?: ElementGroup[];
+  /** Optional document structure introduced after the original single-plan model. */
+  building?: BuildingModel;
   createdAt: Date;
   updatedAt: Date;
   ghostImageBase64?: string; // base64 data:image URL for AI-extracted plans

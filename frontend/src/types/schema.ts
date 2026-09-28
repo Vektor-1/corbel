@@ -36,7 +36,7 @@ export type Source = (typeof Source)[keyof typeof Source];
 
 // ============================================================================
 // DRAFT TIER: Loose, confidence-tagged, minimal topology
-// Output from YOLOv8 + Gemini OCR + refinement heuristics
+// Output from YOLOv8 + hosted-provider OCR + refinement heuristics
 // Input to canonical lift algorithm
 // ============================================================================
 

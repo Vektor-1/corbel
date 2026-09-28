@@ -38,4 +38,19 @@ describe('beginImportedEdit', () => {
     expect(restored.floorPlan?.walls[0].thickness).toBe(225);
     expect(restored.ghostFloorPlan?.walls[0].thickness).toBe(225);
   });
+
+  it('applies a confirmed AI operation as one undoable store change', () => {
+    useDesignStore.getState().setFloorPlan(importedPlan());
+    useDesignStore.getState().setSelection(['wall-1']);
+    useDesignStore.getState().applyPlanOperations([
+      { type: 'update-wall', id: 'wall-1', updates: { thickness: 300, type: 'partition' } },
+      { type: 'rename-plan', name: 'AI adjusted plan' },
+    ]);
+
+    const changed = useDesignStore.getState().floorPlan!;
+    expect(changed.name).toBe('AI adjusted plan');
+    expect(changed.walls[0].thickness).toBe(300);
+    expect(changed.walls[0].type).toBe('partition');
+    expect(useDesignStore.getState().selectedElementIds).toEqual(['wall-1']);
+  });
 });
