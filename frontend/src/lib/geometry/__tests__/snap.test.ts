@@ -62,4 +62,12 @@ describe('grid snapping and geometry utilities', () => {
       )
     ).toEqual({ point: { x: 140, y: 100 }, kind: 'axis' });
   });
+
+  it('honours contextual grid, magnetic, angle, and free snap modes', () => {
+    const wall = { id: 'w1', startPoint: { x: 100, y: 100 }, endPoint: { x: 200, y: 100 } };
+    expect(snapPlanPoint({ x: 108, y: 102 }, { gridSize: 20, walls: [wall], endpointTolerance: 16, gridEnabled: true, magneticEnabled: false })).toEqual({ point: { x: 100, y: 100 }, kind: 'grid' });
+    expect(snapPlanPoint({ x: 108, y: 102 }, { gridSize: 20, walls: [wall], endpointTolerance: 16, gridEnabled: false, magneticEnabled: true })).toEqual({ point: { x: 100, y: 100 }, kind: 'endpoint' });
+    expect(snapPlanPoint({ x: 140, y: 120 }, { gridSize: 20, axisOrigin: { x: 100, y: 100 }, gridEnabled: false, magneticEnabled: false, angleEnabled: true })).toMatchObject({ kind: 'angle' });
+    expect(snapPlanPoint({ x: 109, y: 206 }, { gridSize: 20, gridEnabled: false, magneticEnabled: false })).toEqual({ point: { x: 109, y: 206 }, kind: 'free' });
+  });
 });

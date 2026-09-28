@@ -149,6 +149,48 @@ export function projectOffsetOntoWall(wall: Wall, point: Point): number {
   return Math.max(0, Math.min(length, t * length));
 }
 
+/** Keep an opening at the same relative position when its host wall is resized or rotated. */
+export function preserveOpeningOnHostChange<T extends Door | Window>(opening: T, previousWall: Wall, nextWall: Wall): T {
+  const previousLength = Math.hypot(previousWall.endPoint.x - previousWall.startPoint.x, previousWall.endPoint.y - previousWall.startPoint.y);
+  const nextLength = Math.hypot(nextWall.endPoint.x - nextWall.startPoint.x, nextWall.endPoint.y - nextWall.startPoint.y);
+  if (previousLength < EPSILON || nextLength < EPSILON) return opening;
+  const relativeOffset = Math.max(0, Math.min(1, opening.position.x / previousLength));
+  return { ...opening, position: { ...opening.position, x: relativeOffset * nextLength } };
+}
+
+function samePoint(first: Point, second: Point, tolerance = EPSILON): boolean {
+  return Math.abs(first.x - second.x) <= tolerance && Math.abs(first.y - second.y) <= tolerance;
+}
+
+/**
+ * Move every wall endpoint that was joined to an edited wall endpoint. This
+ * keeps the wall graph watertight while leaving unrelated intersections alone.
+ */
+export function propagateWallJunctions(
+  walls: Wall[],
+  wallId: string,
+  previousWall: Wall,
+  nextWall: Wall
+): Wall[] {
+  const movedEndpoints = [
+    { from: previousWall.startPoint, to: nextWall.startPoint },
+    { from: previousWall.endPoint, to: nextWall.endPoint },
+  ];
+
+  return walls.map((wall) => {
+    if (wall.id === wallId) return nextWall;
+    let startPoint = wall.startPoint;
+    let endPoint = wall.endPoint;
+    for (const endpoint of movedEndpoints) {
+      if (samePoint(startPoint, endpoint.from)) startPoint = endpoint.to;
+      if (samePoint(endPoint, endpoint.from)) endPoint = endpoint.to;
+    }
+    return startPoint === wall.startPoint && endPoint === wall.endPoint
+      ? wall
+      : { ...wall, startPoint, endPoint };
+  });
+}
+
 export function rehostWallOpening<T extends Door | Window>(
   opening: T,
   previousWalls: Wall[],
