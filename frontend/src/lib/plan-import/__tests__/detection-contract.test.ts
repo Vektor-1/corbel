@@ -2,13 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { stage2_walls, type ImageMeta } from '../pipeline';
 import { parseImportSource, parseReconstructionResult } from '../validate';
 
-const { generateContent } = vi.hoisted(() => ({ generateContent: vi.fn() }));
-vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: class {
-    getGenerativeModel() { return { generateContent }; }
-  },
-}));
-
 const meta: ImageMeta = {
   widthPx: 1200, heightPx: 800, orientation: 'landscape', rotationNeeded: 90,
   hasScaleBar: false, hasDimensions: true, quality: 'clear', notes: '',
@@ -44,17 +37,6 @@ describe('wall detection contract', () => {
     expect(await ask('Detect', 'svg')).toBe('<svg />');
   });
 
-  it('uses Gemini text output for SVG and JSON output for the other stages', async () => {
-    vi.stubEnv('GOOGLE_GENERATIVE_AI_API_KEY', 'test');
-    generateContent.mockResolvedValueOnce({ response: { text: () => '<svg />' } })
-      .mockResolvedValueOnce({ response: { text: () => '{"quality":"clear"}' } });
-    const { makeAsk } = await import('../gemini');
-    const ask = makeAsk({ inlineData: { mimeType: 'image/png', data: 'fixture' } });
-    expect(await ask('Detect', 'svg')).toBe('<svg />');
-    expect(generateContent.mock.calls[0][0].generationConfig.responseMimeType).toBe('text/plain');
-    expect(await ask('Analyse')).toEqual({ quality: 'clear' });
-    expect(generateContent.mock.calls[1][0].generationConfig.responseMimeType).toBe('application/json');
-  });
 });
 
 describe('source and scale contract', () => {

@@ -43,14 +43,12 @@ describe('AI Providers', () => {
       }
     });
 
-    it('should support both GPT and Gemini models', async () => {
+    it('should support the configured Rodium model', async () => {
       const { makeAsk } = await import('../rodium-ai');
 
       const askGpt = makeAsk('https://example.com/test.png', 'gpt-5.6-luna');
-      const askGemini = makeAsk('https://example.com/test.png', 'gemini-3.1');
 
       expect(typeof askGpt).toBe('function');
-      expect(typeof askGemini).toBe('function');
     });
   });
 
@@ -98,7 +96,7 @@ describe('AI Providers', () => {
       const askImage = makeAskImageAnalysis('https://example.com/test.png');
       expect(typeof askImage).toBe('function');
 
-      // OCR prefers Gemini
+      // OCR prefers the configured Agent Router model
       const askOcr = makeAskOcr('https://example.com/test.png');
       expect(typeof askOcr).toBe('function');
     });
@@ -152,7 +150,7 @@ describe('AI Providers', () => {
       const url = 'https://example.com/test.png';
 
       const ask1 = makeAsk(url, 'gpt-5.6-luna');
-      const ask2 = makeAsk(url, 'gemini-3.1');
+      const ask2 = makeAsk(url, 'gpt-5.6-luna');
 
       // Both functions should be created (internal caching happens at call time)
       expect(typeof ask1).toBe('function');
