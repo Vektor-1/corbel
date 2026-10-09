@@ -32,42 +32,27 @@ export function createWallBrush(
     throw new Error('Wall footprint must have at least 3 points');
   }
 
-  // Create a geometry from the footprint extruded vertically.
-  const geometry = new THREE.BufferGeometry();
-  const vertices: number[] = [];
-  const indices: number[] = [];
-
-  // Add bottom vertices (at z=0, which corresponds to floor level)
-  for (const pt of footprint) {
-    vertices.push(pt.x, 0, pt.y);
+  // Built via THREE.Shape + ExtrudeGeometry, ported from Pascal's
+  // wall-system.tsx (buildWallGeometry). A hand-rolled fan triangulation here
+  // previously assumed one fixed footprint winding direction; wall-joints.ts's
+  // mitered footprint isn't guaranteed to wind that way, and the reversed case
+  // silently produced a wall brush whose CSG subtraction looked successful
+  // (vertex count went up) but didn't actually open a hole -- confirmed by
+  // raycasting through the result. ExtrudeGeometry's earcut triangulation is
+  // wound consistently regardless of input point order, which three-bvh-csg
+  // needs for a real cut.
+  const shape = new THREE.Shape();
+  shape.moveTo(footprint[0].x, -footprint[0].y);
+  for (let i = 1; i < footprint.length; i++) {
+    shape.lineTo(footprint[i].x, -footprint[i].y);
   }
-  const bottomCount = footprint.length;
+  shape.closePath();
 
-  // Add top vertices (at z=height, which corresponds to ceiling level)
-  for (const pt of footprint) {
-    vertices.push(pt.x, height, pt.y);
-  }
-
-  // Create triangles for bottom face
-  for (let i = 0; i < bottomCount - 2; i++) {
-    indices.push(0, i + 2, i + 1);
-  }
-
-  // Create triangles for top face (reversed winding)
-  for (let i = 0; i < bottomCount - 2; i++) {
-    indices.push(bottomCount, i + 1 + bottomCount, i + 2 + bottomCount);
-  }
-
-  // Create side faces
-  for (let i = 0; i < bottomCount; i++) {
-    const next = (i + 1) % bottomCount;
-    // Bottom to top quad: two triangles
-    indices.push(i, next, next + bottomCount);
-    indices.push(i, next + bottomCount, i + bottomCount);
-  }
-
-  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+  // Shape lives in (x, -footprintY); extrude runs along local Z. Rotating -90°
+  // about X maps (x, y, z) -> (x, z, -y), i.e. (x, heightAlongZ, footprintY) --
+  // same X/Y=height/Z=footprint convention the rest of this module expects.
+  geometry.rotateX(-Math.PI / 2);
   geometry.computeVertexNormals();
 
   const brush = new Brush(geometry);
@@ -109,8 +94,13 @@ export function createDoorBrush(
   // Door quad: width follows the wall; depth spans the wall thickness.
   // The previous perpendicular-width construction placed a horizontal-wall
   // door across the wall instead of through it, leaving the CSG cut rotated.
+  // Depth is a full wallThickness beyond each face (Pascal's
+  // collectCutoutBrushes: "Extend beyond wall to ensure clean cut") rather
+  // than flush with the wall surface -- a cutter brush whose faces sit
+  // exactly coplanar with the wall's own faces is the other failure mode
+  // that made subtraction silently fail to open a hole.
   const halfWidth = doorWidth / 2;
-  const halfThickness = wallThickness / 2;
+  const halfThickness = wallThickness;
   const doorCorners = [
     {
       x: centerX - halfWidth * normalizedDx - halfThickness * perpDx,
@@ -166,9 +156,10 @@ export function createWindowBrush(
   const centerX = wallStartPoint.x + normalizedDx * wallPositionAlongLength;
   const centerY = wallStartPoint.y + normalizedDy * wallPositionAlongLength;
 
-  // Window quad: width follows the wall; depth spans its thickness.
+  // Window quad: width follows the wall; depth extends a full wallThickness
+  // beyond each face, same reasoning as createDoorBrush above.
   const halfWidth = windowWidth / 2;
-  const halfThickness = wallThickness / 2;
+  const halfThickness = wallThickness;
   const windowCorners = [
     {
       x: centerX - halfWidth * normalizedDx - halfThickness * perpDx,
@@ -209,37 +200,18 @@ export function createWindowBrush(
  * Private helper: creates a rectangular prism from a 2D quad extruded in Z.
  */
 function createBoxBrush(quad: Array<{ x: number; y: number }>, height: number): Brush {
-  const geometry = new THREE.BufferGeometry();
-  const vertices: number[] = [];
-  const indices: number[] = [];
-
-  // Bottom quad vertices (z=0)
-  for (const pt of quad) {
-    vertices.push(pt.x, 0, pt.y);
+  // Same Shape + ExtrudeGeometry construction as createWallBrush, for the same
+  // reason: a hand-rolled fixed-winding triangulation here doesn't track
+  // whichever direction quad's corners happen to wind.
+  const shape = new THREE.Shape();
+  shape.moveTo(quad[0].x, -quad[0].y);
+  for (let i = 1; i < quad.length; i++) {
+    shape.lineTo(quad[i].x, -quad[i].y);
   }
+  shape.closePath();
 
-  // Top quad vertices (z=height)
-  for (const pt of quad) {
-    vertices.push(pt.x, height, pt.y);
-  }
-
-  // Bottom face (CCW from above)
-  indices.push(0, 2, 1);
-  indices.push(1, 2, 3);
-
-  // Top face (CCW from above)
-  indices.push(4, 5, 6);
-  indices.push(5, 7, 6);
-
-  // Side faces
-  for (let i = 0; i < 4; i++) {
-    const next = (i + 1) % 4;
-    indices.push(i, next, next + 4);
-    indices.push(i, next + 4, i + 4);
-  }
-
-  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-  geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+  geometry.rotateX(-Math.PI / 2);
   geometry.computeVertexNormals();
 
   return new Brush(geometry);
@@ -255,16 +227,41 @@ export function evaluateWallWithOpenings(
   openingBrushes: Brush[],
 ): THREE.BufferGeometry | null {
   const evaluator = new Evaluator();
+  // three-bvh-csg's Evaluator defaults to ['position', 'uv', 'normal'], but
+  // createWallBrush/createDoorBrush/createWindowBrush only ever set
+  // position + computed normal -- no uv. Left at the default, the evaluator
+  // tries to read a uv attribute that doesn't exist and throws ("Cannot read
+  // properties of undefined (reading 'array')"), which this function's own
+  // per-opening catch then swallowed silently. Restricting it to the
+  // attributes these brushes actually have fixes the root cause instead of
+  // just catching the crash it was causing.
+  evaluator.attributes = ['position', 'normal'];
   let result = wallBrush;
+  let failed = 0;
+  // One failing opening must not cost every opening after it in the array —
+  // each subtraction is independent, so skip just the one that failed and
+  // keep cutting the rest, the same resilience Pascal's wall-system.tsx uses
+  // (mergeWallCutoutBrushes' fallbackBrushes loop) instead of bailing out of
+  // the whole wall on the first CSG failure.
   for (const opening of openingBrushes) {
     try {
       const evaluated = evaluator.evaluate(result, opening, SUBTRACTION);
-      if (!evaluated) return null;
+      if (!evaluated) {
+        failed += 1;
+        continue;
+      }
       result = evaluated;
     } catch (e) {
-      // Silently fail and return original geometry
-      return result.geometry as THREE.BufferGeometry;
+      failed += 1;
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.warn('[wall-openings] Failed to cut one door/window opening out of a wall; that one opening will render as solid wall instead of a hole.', e);
+      }
     }
+  }
+  if (failed > 0 && process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(`[wall-openings] ${failed} of ${openingBrushes.length} opening cutout(s) could not be subtracted from this wall.`);
   }
 
   return result.geometry as THREE.BufferGeometry;
@@ -278,8 +275,7 @@ export function computeOpeningBrushes(
   wallStartPoint: { x: number; y: number },
   wallEndPoint: { x: number; y: number },
   wallThickness: number,
-  wallHeight: number,
-  doors: Array<{ position: { x: number }; width: number }>,
+  doors: Array<{ position: { x: number }; width: number; height: number }>,
   windows: Array<{ position: { x: number }; width: number; height: number; sillHeight: number }>,
 ): Brush[] {
   const brushes: Brush[] = [];
@@ -288,7 +284,7 @@ export function computeOpeningBrushes(
   for (const door of doors) {
     try {
       brushes.push(
-        createDoorBrush(door.position.x, wallStartPoint, wallEndPoint, wallThickness, door.width, wallHeight),
+        createDoorBrush(door.position.x, wallStartPoint, wallEndPoint, wallThickness, door.width, door.height),
       );
     } catch (e) {
       // Silently skip invalid openings (e.g., zero-length walls)

@@ -24,6 +24,7 @@ export const materials = {
     doorEntry: '#6f4e33',
     doorInternal: '#8a6a4b',
     windowGlass: '#9fb6bd',
+    windowFrame: '#efece4',
   },
   dark: {
     loadBearing: '#5c5647',
@@ -31,6 +32,7 @@ export const materials = {
     doorEntry: '#3a2b1d',
     doorInternal: '#4a3826',
     windowGlass: '#5c7079',
+    windowFrame: '#2b2924',
   },
 } as const;
 

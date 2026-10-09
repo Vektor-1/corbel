@@ -67,8 +67,14 @@ export function WallMesh({
         { x: wall.startPoint.x / pixelsPerMetre, y: wall.startPoint.y / pixelsPerMetre },
         { x: wall.endPoint.x / pixelsPerMetre, y: wall.endPoint.y / pixelsPerMetre },
         wallThicknessMm / 1000,
-        height,
-        doors.map((d) => ({ position: { x: d.position.x / pixelsPerMetre }, width: d.width / 1000 })),
+        // Doors have no per-door height field -- DoorMesh.tsx uses the same
+        // standard-door-height convention (capped at wall height) for its
+        // visible leaf, so the cutout matches what's actually rendered.
+        doors.map((d) => ({
+          position: { x: d.position.x / pixelsPerMetre },
+          width: d.width / 1000,
+          height: Math.min(height, 2.1),
+        })),
         windows.map((w) => ({
           position: { x: w.position.x / pixelsPerMetre },
           width: w.width / 1000,
@@ -84,6 +90,10 @@ export function WallMesh({
 
       return wallBrush.geometry as THREE.BufferGeometry;
     } catch (e) {
+      if (process.env.NODE_ENV !== 'production') {
+        // eslint-disable-next-line no-console
+        console.warn(`[WallMesh] Wall ${wall.id} failed to build CSG geometry; rendering solid with NO door/window cutouts for this wall.`, e);
+      }
       // Fall-back path only: builds a flat 2D (X,Y) shape extruded along Z,
       // then bakes the same X-axis rotation the main CSG path above is
       // already oriented for directly (createWallBrush puts extrusion on Y
