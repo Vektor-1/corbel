@@ -53,6 +53,8 @@ function operationLabel(operation: PlanChatOperation) {
     case 'add-wall': return 'Add wall ' + operation.wall.id;
     case 'add-door': return 'Add door ' + operation.door.id;
     case 'add-window': return 'Add window ' + operation.window.id;
+    case 'add-object': return 'Add ' + operation.object.assetId + ' ' + operation.object.id;
+    case 'update-object': return 'Update object ' + operation.id;
     case 'set-scale': return 'Set scale to ' + operation.scale;
     case 'rename-plan': return 'Rename plan to “' + operation.name + '”';
     case 'delete-element': return 'Delete ' + operation.element + ' ' + operation.id;
@@ -138,19 +140,28 @@ function operationTargetsExistingPlan(operations: PlanChatOperation[], plan: Flo
     ...plan.rooms.map((item) => item.id),
     ...plan.doors.map((item) => item.id),
     ...plan.windows.map((item) => item.id),
+    ...plan.objects.map((item) => item.id),
   ]);
+  // Walls created earlier in this same operations array are valid hosts for a
+  // door/window later in the array, even though they don't exist in `plan`
+  // yet — this is how a single turn builds a brand-new room from scratch.
+  const wallIds = new Set(plan.walls.map((item) => item.id));
   return operations.every((operation) => {
     switch (operation.type) {
       case 'update-wall':
       case 'update-door':
       case 'update-window':
       case 'update-room':
+      case 'update-object':
       case 'delete-element':
         return ids.has(operation.id);
+      case 'add-wall':
+        wallIds.add(operation.wall.id);
+        return true;
       case 'add-door':
-        return plan.walls.some((wall) => wall.id === operation.door.wallId);
+        return wallIds.has(operation.door.wallId);
       case 'add-window':
-        return plan.walls.some((wall) => wall.id === operation.window.wallId);
+        return wallIds.has(operation.window.wallId);
       default:
         return true;
     }
@@ -170,7 +181,16 @@ function progressTodos(status: string): PlanChatTodo[] {
   }));
 }
 
-export function PlanChatPanel({ getCanvasSnapshot }: { getCanvasSnapshot?: () => string | undefined }) {
+export function PlanChatPanel({
+  getCanvasSnapshot,
+  onOpenChange,
+}: {
+  getCanvasSnapshot?: () => string | undefined;
+  /** Lets the editor shell reserve clearance in the left inspector column
+   * while this panel is open, instead of the two floating islands silently
+   * overlapping at the shared bottom-left corner. */
+  onOpenChange?: (open: boolean) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -216,6 +236,13 @@ export function PlanChatPanel({ getCanvasSnapshot }: { getCanvasSnapshot?: () =>
 
   useEffect(() => {
     if (open) textareaRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    onOpenChange?.(open);
+    // onOpenChange identity isn't expected to be stable across renders in
+    // every caller; only the boolean itself should re-fire this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {

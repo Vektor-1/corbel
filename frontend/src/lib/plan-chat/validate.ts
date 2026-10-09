@@ -1,9 +1,11 @@
-import type { Door, FloorPlan, Room, Wall, Window } from '@/types/design';
+import type { DesignObject, Door, FloorPlan, Room, Wall, Window } from '@/types/design';
 import type { PlanChatOperation, PlanChatResponse, PlanChatTodo } from './types';
 import { point } from './types';
+import { OBJECT_CATALOG } from '@/lib/objects/catalog';
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const VALID_ASSET_IDS = new Set(OBJECT_CATALOG.map((asset) => asset.id));
 
 function validWall(value: unknown): value is Wall {
   return record(value) && typeof value.id === 'string' && point(value.startPoint) && point(value.endPoint)
@@ -21,16 +23,23 @@ function validWindow(value: unknown): value is Window {
     && finite(value.width) && finite(value.height) && finite(value.sillHeight);
 }
 
+function validObject(value: unknown): value is DesignObject {
+  return record(value) && typeof value.id === 'string' && typeof value.assetId === 'string' && VALID_ASSET_IDS.has(value.assetId)
+    && point(value.position) && finite(value.rotation) && finite(value.scale) && value.scale > 0;
+}
+
 function validUpdates(value: unknown): boolean {
   if (!record(value)) return false;
   return Object.entries(value).every(([key, item]) => {
     if (['startPoint', 'endPoint', 'position'].includes(key)) return point(item);
     if (key === 'vertices') return Array.isArray(item) && item.length >= 3 && item.every(point);
     if (['thickness', 'height', 'width', 'sillHeight', 'scale'].includes(key)) return finite(item) && item > 0;
+    if (key === 'rotation') return finite(item);
     if (key === 'material') return ['sandcrete', 'laterite', 'concrete', 'timber'].includes(String(item));
     if (key === 'type') return ['loadBearing', 'partition', 'entry', 'internal', 'bedroom', 'kitchen', 'bathroom', 'living', 'dining', 'other'].includes(String(item));
     if (key === 'swing') return item === 'left' || item === 'right';
     if (key === 'openDirection') return item === 'in' || item === 'out';
+    if (key === 'assetId') return typeof item === 'string' && VALID_ASSET_IDS.has(item);
     if (['name', 'wallId'].includes(key)) return typeof item === 'string' && item.length <= 120;
     return false;
   });
@@ -57,6 +66,7 @@ export function parsePlanChatResponse(value: unknown): PlanChatResponse {
       case 'update-door':
       case 'update-window':
       case 'update-room':
+      case 'update-object':
         if (typeof operation.id !== 'string' || !validUpdates(operation.updates)) throw new Error('Invalid update operation.');
         return operation as PlanChatOperation;
       case 'add-wall':
@@ -68,6 +78,9 @@ export function parsePlanChatResponse(value: unknown): PlanChatResponse {
       case 'add-window':
         if (!validWindow(operation.window)) throw new Error('Invalid add-window operation.');
         return operation as PlanChatOperation;
+      case 'add-object':
+        if (!validObject(operation.object)) throw new Error('Invalid add-object operation.');
+        return operation as PlanChatOperation;
       case 'set-scale':
         if (!finite(operation.scale) || operation.scale < 20 || operation.scale > 2_000) throw new Error('Invalid scale operation.');
         return operation as PlanChatOperation;
@@ -75,7 +88,7 @@ export function parsePlanChatResponse(value: unknown): PlanChatResponse {
         if (typeof operation.name !== 'string' || operation.name.trim().length < 1 || operation.name.length > 120) throw new Error('Invalid rename operation.');
         return operation as PlanChatOperation;
       case 'delete-element':
-        if (typeof operation.id !== 'string' || typeof operation.element !== 'string' || !['wall', 'door', 'window', 'room'].includes(operation.element)) throw new Error('Invalid delete operation.');
+        if (typeof operation.id !== 'string' || typeof operation.element !== 'string' || !['wall', 'door', 'window', 'room', 'object'].includes(operation.element)) throw new Error('Invalid delete operation.');
         return operation as PlanChatOperation;
       default:
         throw new Error('Unsupported AI plan operation.');

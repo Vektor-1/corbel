@@ -1,4 +1,4 @@
-import type { Door, FloorPlan, Point, Room, ValidationResult, Wall, Window } from '@/types/design';
+import type { DesignObject, Door, FloorPlan, Point, Room, ValidationResult, Wall, Window } from '@/types/design';
 
 export type PlanChatIntent = 'create' | 'edit' | 'configure' | 'analyze';
 
@@ -22,12 +22,14 @@ export type PlanChatOperation =
   | { type: 'update-door'; id: string; updates: Partial<Pick<Door, 'position' | 'wallId' | 'width' | 'type' | 'swing' | 'openDirection'>> }
   | { type: 'update-window'; id: string; updates: Partial<Pick<Window, 'position' | 'wallId' | 'width' | 'height' | 'sillHeight'>> }
   | { type: 'update-room'; id: string; updates: Partial<Pick<Room, 'name' | 'type' | 'vertices'>> }
+  | { type: 'update-object'; id: string; updates: Partial<Pick<DesignObject, 'assetId' | 'position' | 'rotation' | 'scale'>> }
   | { type: 'add-wall'; wall: Wall }
   | { type: 'add-door'; door: Door }
   | { type: 'add-window'; window: Window }
+  | { type: 'add-object'; object: DesignObject }
   | { type: 'set-scale'; scale: number }
   | { type: 'rename-plan'; name: string }
-  | { type: 'delete-element'; id: string; element: 'wall' | 'door' | 'window' | 'room' };
+  | { type: 'delete-element'; id: string; element: 'wall' | 'door' | 'window' | 'room' | 'object' };
 
 export interface PlanChatResponse {
   intent: PlanChatIntent;

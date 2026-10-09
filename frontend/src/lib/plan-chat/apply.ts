@@ -27,6 +27,9 @@ export function applyPlanOperationsToFloorPlan(plan: FloorPlan, operations: Plan
       case 'update-room':
         next.rooms = next.rooms.map((room) => room.id === operation.id ? { ...room, ...operation.updates } : room);
         break;
+      case 'update-object':
+        next.objects = next.objects.map((item) => item.id === operation.id ? { ...item, ...operation.updates } : item);
+        break;
       case 'add-wall':
         if (!next.walls.some((wall) => wall.id === operation.wall.id)) next.walls.push({ ...operation.wall, source: 'user' });
         break;
@@ -39,6 +42,9 @@ export function applyPlanOperationsToFloorPlan(plan: FloorPlan, operations: Plan
         if (!next.windows.some((window) => window.id === operation.window.id) && next.walls.some((wall) => wall.id === operation.window.wallId)) {
           next.windows.push({ ...operation.window, source: 'user' });
         }
+        break;
+      case 'add-object':
+        if (!next.objects.some((item) => item.id === operation.object.id)) next.objects.push({ ...operation.object });
         break;
       case 'set-scale':
         next.scale = operation.scale;
@@ -55,6 +61,8 @@ export function applyPlanOperationsToFloorPlan(plan: FloorPlan, operations: Plan
           next.doors = next.doors.filter((door) => door.id !== operation.id);
         } else if (operation.element === 'window') {
           next.windows = next.windows.filter((window) => window.id !== operation.id);
+        } else if (operation.element === 'object') {
+          next.objects = next.objects.filter((item) => item.id !== operation.id);
         } else {
           next.rooms = next.rooms.filter((room) => room.id !== operation.id);
         }
