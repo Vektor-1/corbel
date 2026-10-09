@@ -58,6 +58,11 @@ interface DesignState {
    * Transient -- never persisted or tracked in undo history. */
   hoveredElementId: string | null;
   colorPreset: ColorPreset;
+  /** True while the 3D walkthrough (pointer-lock first-person camera) is
+   * active, so the editor shell can hide inspector chrome that would
+   * otherwise clutter an immersive view. Transient UI state, like
+   * `hoveredElementId` -- never persisted or tracked in undo history. */
+  firstPersonActive: boolean;
 
   // Actions
   setFloorPlan: (floorPlan: FloorPlan) => void;
@@ -85,6 +90,7 @@ interface DesignState {
    * the browser fires them out of order across adjacent meshes. */
   clearHoveredElement: (id: string) => void;
   setColorPreset: (preset: ColorPreset) => void;
+  setFirstPersonActive: (active: boolean) => void;
 
   // Multi-selection
   setSelection: (ids: string[]) => void;
@@ -147,6 +153,7 @@ export const useDesignStore = create<DesignState>(
       lastImportJobId: null,
       hoveredElementId: null,
       colorPreset: 'standard',
+      firstPersonActive: false,
 
       setFloorPlan: (floorPlan: FloorPlan) => set({ floorPlan }),
       setAiPreviewFloorPlan: (floorPlan: FloorPlan | null) => set({ aiPreviewFloorPlan: floorPlan }),
@@ -314,6 +321,7 @@ export const useDesignStore = create<DesignState>(
       clearHoveredElement: (id: string) =>
         set((state: DesignState) => (state.hoveredElementId === id ? { hoveredElementId: null } : {})),
       setColorPreset: (preset: ColorPreset) => set({ colorPreset: preset }),
+      setFirstPersonActive: (active: boolean) => set({ firstPersonActive: active }),
 
       setSelection: (ids: string[]) =>
         set({ selectedElementIds: ids, selectedElementId: ids[0] ?? null }),
@@ -500,6 +508,10 @@ export const useDesignStore = create<DesignState>(
       addWall: (wall: Wall) =>
         set((state: DesignState) => {
           if (!state.floorPlan) return state;
+          // Wall ids are the join key for openings (`wallId`). Two walls sharing an id
+          // make a window resolve to different walls in validation (first match) and
+          // in the 3D viewer (last match), so a duplicate id is rejected outright.
+          if (state.floorPlan.walls.some((existing) => existing.id === wall.id)) return state;
           const previousWalls = state.floorPlan.walls;
           const nextWalls = insertWallWithIntersections(previousWalls, wall);
           return {

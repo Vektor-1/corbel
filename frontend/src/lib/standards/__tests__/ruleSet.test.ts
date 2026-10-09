@@ -77,6 +77,41 @@ describe('validateFloorPlan via rule sets', () => {
     );
   });
 
+  it('flags two openings that overlap each other on the same wall, even though each individually fits the host wall', () => {
+    const results = validateFloorPlan(
+      plan({
+        walls: [thinWall],
+        doors: [
+          { id: 'door-1', wallId: 'wall-1', position: { x: 1000, y: 0 }, width: 900, type: 'internal', swing: 'left', openDirection: 'in' },
+        ],
+        windows: [
+          { id: 'win-1', wallId: 'wall-1', position: { x: 1040, y: 0 }, width: 900, height: 1200, sillHeight: 900 },
+        ],
+      })
+    );
+
+    expect(results).not.toContainEqual(expect.objectContaining({ rule: 'opening-host-fit' }));
+    expect(results).toContainEqual(
+      expect.objectContaining({ rule: 'opening-overlap', targetId: 'win-1' })
+    );
+  });
+
+  it('does not flag two openings on the same wall that do not overlap', () => {
+    const results = validateFloorPlan(
+      plan({
+        walls: [thinWall],
+        doors: [
+          { id: 'door-1', wallId: 'wall-1', position: { x: 500, y: 0 }, width: 900, type: 'internal', swing: 'left', openDirection: 'in' },
+        ],
+        windows: [
+          { id: 'win-1', wallId: 'wall-1', position: { x: 2500, y: 0 }, width: 900, height: 1200, sillHeight: 900 },
+        ],
+      })
+    );
+
+    expect(results.map((r) => r.rule)).not.toContain('opening-overlap');
+  });
+
   it('reports an opening on a missing wall rather than silently skipping it', () => {
     const results = validateFloorPlan(
       plan({
@@ -96,6 +131,45 @@ describe('validateFloorPlan via rule sets', () => {
     expect(results).toContainEqual(
       expect.objectContaining({ rule: 'opening-host-fit', targetId: 'win-1' })
     );
+  });
+
+  it('flags a window whose top edge rises above the host wall height', () => {
+    const results = validateFloorPlan(
+      plan({
+        walls: [thinWall],
+        windows: [
+          { id: 'win-1', wallId: 'wall-1', position: { x: 2000, y: 0 }, width: 900, height: 1200, sillHeight: 2000 },
+        ],
+      })
+    );
+
+    expect(results).toContainEqual(
+      expect.objectContaining({ rule: 'opening-host-fit', targetId: 'win-1' })
+    );
+  });
+
+  it('measures opening width against the plan scale, not a fixed 100 px/m', () => {
+    // At 200 px/m a 1200mm window is 120px either side of its centre, so a centre
+    // 60px from the wall end overhangs it. A fixed conversion would miss this.
+    const overhang = validateFloorPlan(
+      plan({
+        scale: 200,
+        walls: [thinWall],
+        windows: [{ id: 'win-1', wallId: 'wall-1', position: { x: 60, y: 0 }, width: 1200, height: 1200, sillHeight: 900 }],
+      })
+    );
+    expect(overhang).toContainEqual(expect.objectContaining({ rule: 'opening-host-fit', targetId: 'win-1' }));
+
+    // At 50 px/m a 900mm window is 22.5px either side, so a centre 40px in fits.
+    // A fixed conversion would wrongly flag it.
+    const fits = validateFloorPlan(
+      plan({
+        scale: 50,
+        walls: [thinWall],
+        windows: [{ id: 'win-2', wallId: 'wall-1', position: { x: 40, y: 0 }, width: 900, height: 1200, sillHeight: 900 }],
+      })
+    );
+    expect(fits).not.toContainEqual(expect.objectContaining({ rule: 'opening-host-fit' }));
   });
 
   it('threads storey count into thickness rules instead of assuming one storey', () => {
@@ -176,7 +250,7 @@ describe('rule-set citations keep the no-fabrication promise', () => {
   });
 
   it('leaves Corbel review thresholds uncited rather than inventing a code section', () => {
-    for (const rule of ['span-thickness-ratio-high', 'opening-oversized', 'room-area-small']) {
+    for (const rule of ['span-thickness-ratio-high', 'opening-oversized', 'room-area-small', 'opening-overlap']) {
       expect(citationForRuleIn(ghanaBuildingCode, rule)).toBeUndefined();
     }
   });
