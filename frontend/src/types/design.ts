@@ -3,7 +3,7 @@
 export type WallType = 'loadBearing' | 'partition';
 export type MaterialType = 'sandcrete' | 'laterite' | 'concrete' | 'timber';
 export type ObjectAssetId = string;
-export type ObjectCategory = 'furniture' | 'appliance' | 'bathroom' | 'kitchen' | 'outdoor';
+export type ObjectCategory = 'furniture' | 'appliance' | 'bathroom' | 'kitchen' | 'outdoor' | 'structure';
 
 export interface ObjectAsset {
   id: ObjectAssetId;
@@ -17,6 +17,8 @@ export interface ObjectAsset {
   modelRotation: [number, number, number];
   modelScale: [number, number, number];
   color: string;
+  /** Rendered as a built-in primitive instead of loading `modelUrl` as a GLB -- no model file exists for it. */
+  procedural?: 'gable-roof';
 }
 
 export interface Point {

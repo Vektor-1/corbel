@@ -3,6 +3,45 @@ import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 
 import { TransformControls, useGLTF } from '@react-three/drei';
 import type { ObjectAsset } from '@/types/design';
 
+/**
+ * Simple gable roof: a triangular cross-section (eave, eave, ridge) extruded
+ * along the depth axis -- same Shape+ExtrudeGeometry construction used for
+ * wall/opening CSG brushes (lib/geometry/wall-openings.ts), which produces
+ * consistently-wound geometry regardless of point order. Pascal's own roof
+ * system (packages/viewer/src/systems/roof) is a full parametric multi-segment
+ * model (hip/gable/conical, dormers, wall attachment); this is a scaled-down
+ * placeable primitive in the same spirit, sized via the object's own
+ * dimensions rather than fitted to a building footprint.
+ */
+function GableRoofMesh({ asset }: { asset: ObjectAsset }) {
+  const [width, ridgeHeight, depth] = asset.dimensions;
+
+  const geometry = useMemo(() => {
+    const halfWidth = width / 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(-halfWidth, 0);
+    shape.lineTo(halfWidth, 0);
+    shape.lineTo(0, ridgeHeight);
+    shape.closePath();
+
+    const geom = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    geom.translate(0, 0, -depth / 2);
+    geom.computeVertexNormals();
+    return geom;
+  }, [width, ridgeHeight, depth]);
+
+  return (
+    <mesh
+      geometry={geometry}
+      position={[asset.offset[0], asset.offset[1], asset.offset[2]]}
+      castShadow
+      receiveShadow
+    >
+      <meshStandardMaterial color={asset.color} roughness={0.75} metalness={0.05} />
+    </mesh>
+  );
+}
+
 /** Move/rotate/scale mode for the selected furniture object's 3D gizmo (Blender-style G/R/S). */
 export type ObjectTransformMode = 'translate' | 'rotate' | 'scale' | null;
 
@@ -31,7 +70,21 @@ class ObjectAssetBoundary extends Component<
   }
 }
 
-export function ObjectMesh({
+function ProceduralObjectMesh({ asset, selected }: { asset: ObjectAsset; selected: boolean }) {
+  return (
+    <>
+      {asset.procedural === 'gable-roof' && <GableRoofMesh asset={asset} />}
+      {selected && (
+        <mesh>
+          <boxGeometry args={asset.dimensions} />
+          <meshBasicMaterial color="#2563eb" wireframe transparent opacity={0.8} />
+        </mesh>
+      )}
+    </>
+  );
+}
+
+function GltfObjectMesh({
   asset,
   selected,
 }: {
@@ -65,6 +118,14 @@ export function ObjectMesh({
         </mesh>
       )}
     </>
+  );
+}
+
+export function ObjectMesh({ asset, selected }: { asset: ObjectAsset; selected: boolean }) {
+  return asset.procedural ? (
+    <ProceduralObjectMesh asset={asset} selected={selected} />
+  ) : (
+    <GltfObjectMesh asset={asset} selected={selected} />
   );
 }
 

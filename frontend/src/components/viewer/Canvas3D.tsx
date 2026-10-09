@@ -1,20 +1,22 @@
 'use client';
 
+import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
 import { GizmoHelper, GizmoViewport, OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FirstPersonControls } from './FirstPersonControls';
 import { useDesignStore } from '@/store/designStore';
 import type { ColorPreset } from '@/store/designStore';
 import { computeWallFootprints } from '@/lib/geometry/wall-joints';
 import { pixelsPerMeter } from '@/lib/geometry/scale';
 import { getPlanBounds } from '@/lib/viewer/plan-bounds';
+import { computeRoofBaseHeightM } from '@/lib/viewer/roof-height';
 import { fitCameraToRoom } from '@/lib/viewer/camera-framing';
 import { environments } from '@/lib/viewer/theme';
 import type { Shading, ViewerTheme } from '@/lib/viewer/theme';
 import { WallMesh } from './renderers/WallMesh';
 import { DoorMesh } from './renderers/DoorMesh';
 import { WindowMesh } from './renderers/WindowMesh';
-import { Roof } from './renderers/Roof';
 import { Floor } from './renderers/Floor';
 import { AxisDragHandle, OpeningAxisHandle } from './renderers/AxisDragHandle';
 import { ObjectInstance, type ObjectTransformMode } from './renderers/FurnitureObject';
@@ -64,12 +66,18 @@ function SceneContent({
   colorPreset,
   shading,
   showEdges,
+  firstPerson,
+  onExitFirstPerson,
+  onLockedChange,
 }: {
   theme: ViewerTheme;
   transformMode: ObjectTransformMode;
   colorPreset: ColorPreset;
   shading: Shading;
   showEdges: boolean;
+  firstPerson: boolean;
+  onExitFirstPerson: () => void;
+  onLockedChange: (locked: boolean) => void;
 }) {
   const {
     floorPlan,
@@ -85,6 +93,7 @@ function SceneContent({
   const walls = floorPlan?.walls;
   const planPixelsPerMeter = pixelsPerMeter(floorPlan?.scale);
   const footprints = useMemo(() => computeWallFootprints(walls ?? [], planPixelsPerMeter), [walls, planPixelsPerMeter]);
+  const wallsGroupRef = useRef<THREE.Group>(null);
 
   // Room bounds drive the shadow-camera frustum and orbit zoom limits below --
   // both should stay responsive as the plan grows/shrinks, unlike the camera
@@ -161,26 +170,46 @@ function SceneContent({
       />
       <pointLight position={[-8, 12, 6]} intensity={environment.pointIntensity} color={environment.pointColor} />
 
-      <PerspectiveCamera makeDefault position={cameraPose.position} fov={45} />
-      <OrbitControls
-        makeDefault
-        enableDamping
-        dampingFactor={0.08}
-        target={cameraPose.target}
-        maxPolarAngle={Math.PI * 0.495}
-        minDistance={1.5}
-        maxDistance={maxZoomDistance}
-      />
-      <GizmoHelper alignment="top-right" margin={[340, 90]}>
-        <GizmoViewport
-          axisColors={['#e0776d', '#82c46c', '#5b9bd5']}
-          labelColor="#2a2a2a"
+      {/* Keyed by mode so switching in or out of walk mode remounts the
+          camera at cameraPose.position -- otherwise the declarative
+          `position` prop never re-applies (same array reference), and
+          FirstPersonControls' per-frame imperative mutation of
+          camera.position would leave orbit mode starting from wherever the
+          student last stood instead of the framed orbit shot. */}
+      <PerspectiveCamera key={firstPerson ? 'fp-camera' : 'orbit-camera'} makeDefault position={cameraPose.position} fov={firstPerson ? 70 : 45} />
+      {firstPerson ? (
+        <FirstPersonControls
+          wallsGroupRef={wallsGroupRef}
+          walls={floorPlan.walls}
+          spawn={{ x: bounds?.centerX ?? 0, z: bounds?.centerZ ?? 0 }}
+          floorHalfExtents={{ x: Math.max(12, floorPlan.width / 1000) / 2, z: Math.max(9, floorPlan.height / 1000) / 2 }}
+          onExit={onExitFirstPerson}
+          onLockedChange={onLockedChange}
         />
-      </GizmoHelper>
+      ) : (
+        <>
+          <OrbitControls
+            makeDefault
+            enableDamping
+            dampingFactor={0.08}
+            target={cameraPose.target}
+            maxPolarAngle={Math.PI * 0.495}
+            minDistance={1.5}
+            maxDistance={maxZoomDistance}
+          />
+          <GizmoHelper alignment="top-right" margin={[340, 90]}>
+            <GizmoViewport
+              axisColors={['#e0776d', '#82c46c', '#5b9bd5']}
+              labelColor="#2a2a2a"
+            />
+          </GizmoHelper>
+        </>
+      )}
 
       {/* Architecture layer: floor, walls, openings, roof */}
       <Floor width={floorPlan.width} height={floorPlan.height} theme={theme} shading={shading} />
 
+      <group ref={wallsGroupRef}>
       {floorPlan.walls.map((wall) => {
         const footprint = footprints.get(wall.id);
         const isSelected = selectedElementId === wall.id;
@@ -219,6 +248,7 @@ function SceneContent({
           </group>
         ) : null;
       })}
+      </group>
 
       {floorPlan.doors.map((door) => {
         const wall = wallMap.get(door.wallId);
@@ -286,16 +316,6 @@ function SceneContent({
         );
       })}
 
-      <Roof
-        walls={floorPlan.walls}
-        wallHeight={floorPlan.walls[0]?.height ?? 3000}
-        theme={theme}
-        pixelsPerMetre={planPixelsPerMeter}
-        shading={shading}
-        showEdges={showEdges}
-        edgeColor={environment.edgeColor}
-      />
-
       {/* Furniture layer: objects on floor */}
       {(floorPlan.objects ?? []).map((object) => {
         const asset = OBJECT_CATALOG_BY_ID[object.assetId];
@@ -303,7 +323,20 @@ function SceneContent({
 
         const worldX = object.position.x / planPixelsPerMeter;
         const worldZ = object.position.y / planPixelsPerMeter;
-        const worldY = asset.dimensions[1] / 2;
+        // A roof has no stored host-wall reference, so its base height tracks
+        // whichever walls are actually underneath it at render time, rather
+        // than assuming a fixed wall height -- see computeRoofBaseHeightM.
+        const worldY =
+          asset.procedural === 'gable-roof'
+            ? computeRoofBaseHeightM(
+                floorPlan.walls,
+                worldX,
+                worldZ,
+                asset.dimensions[0] * object.scale,
+                asset.dimensions[2] * object.scale,
+                planPixelsPerMeter,
+              )
+            : asset.dimensions[1] / 2;
 
         return (
           <ObjectInstance
@@ -337,10 +370,19 @@ const TRANSFORM_MODE_LABELS: Record<Exclude<ObjectTransformMode, null>, string> 
 };
 
 export function Canvas3DContainer({ theme, lengthUnit = 'm' }: { theme: ViewerTheme; lengthUnit?: LengthUnit }) {
-  const { floorPlan, selectedElementId, hoveredElementId, colorPreset, setColorPreset } = useDesignStore();
+  const {
+    floorPlan,
+    selectedElementId,
+    hoveredElementId,
+    colorPreset,
+    setColorPreset,
+    firstPersonActive: firstPerson,
+    setFirstPersonActive: setFirstPerson,
+  } = useDesignStore();
   const [transformMode, setTransformMode] = useState<ObjectTransformMode>(null);
   const [shading, setShading] = useState<Shading>('rendered');
   const [showEdges, setShowEdges] = useState(false);
+  const [walkLocked, setWalkLocked] = useState(false);
   const selectedIsObject = (floorPlan?.objects ?? []).some((o) => o.id === selectedElementId);
 
   // colorPreset lives in the shared store (2D reads it too, for validation-
@@ -409,61 +451,120 @@ export function Canvas3DContainer({ theme, lengthUnit = 'm' }: { theme: ViewerTh
         floorPlan.walls.length === 1 ? 'wall' : 'walls'
       }, ${floorPlan.rooms.length} ${floorPlan.rooms.length === 1 ? 'room' : 'rooms'}, ${openingCount} ${
         openingCount === 1 ? 'opening' : 'openings'
-      }. Drag to orbit the camera; the 2D view and the Outline panel are the reliable way to select and edit elements without a mouse.`}
+      }. ${
+        firstPerson
+          ? 'Walkthrough mode: click to look around, WASD to move, Escape to exit.'
+          : 'Drag to orbit the camera; the 2D view and the Outline panel are the reliable way to select and edit elements without a mouse.'
+      }`}
     >
       <Canvas shadows dpr={[1, 2]}>
-        <SceneContent theme={theme} transformMode={transformMode} colorPreset={colorPreset} shading={shading} showEdges={showEdges} />
+        <SceneContent
+          theme={theme}
+          transformMode={transformMode}
+          colorPreset={colorPreset}
+          shading={shading}
+          showEdges={showEdges}
+          firstPerson={firstPerson}
+          onExitFirstPerson={() => {
+            setFirstPerson(false);
+            setWalkLocked(false);
+          }}
+          onLockedChange={setWalkLocked}
+        />
       </Canvas>
 
-      <HoverMetricsHud metrics={hoveredMetrics} lengthUnit={lengthUnit} />
+      {!firstPerson && <HoverMetricsHud metrics={hoveredMetrics} lengthUnit={lengthUnit} />}
 
-      <button
-        type="button"
-        onClick={() => setShowEdges((current) => !current)}
-        title="Toggle a hard-edge line overlay for a blueprint-style look"
-        className={cn(
-          'editor-island absolute bottom-24 right-4 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
-          showEdges
-            ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
-            : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
-        )}
-      >
-        {showEdges ? 'Edges on' : 'Edges off'}
-      </button>
+      {firstPerson && (
+        <>
+          {/* Crosshair: plain centred dot, not tied to any interactable since
+              Corbel's walkthrough is look-around-only, no in-world clicking. */}
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow-[0_0_0_1px_rgba(0,0,0,0.4)]" />
 
-      <button
-        type="button"
-        onClick={() => setShading((current) => (current === 'solid' ? 'rendered' : 'solid'))}
-        title="Toggle a cheaper, flat-shaded view (no PBR specular)"
-        className={cn(
-          'editor-island absolute bottom-14 right-4 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
-          shading === 'solid'
-            ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
-            : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
-        )}
-      >
-        {shading === 'solid' ? 'Solid shading' : 'Rendered shading'}
-      </button>
+          {!walkLocked && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+              <div className="editor-island rounded-xl px-4 py-2.5 text-sm font-medium">Click to start walking</div>
+            </div>
+          )}
 
-      <button
-        type="button"
-        onClick={() => setColorPreset(colorPreset === 'validation' ? 'standard' : 'validation')}
-        title="Toggle a colour view that flags low-confidence AI-extracted elements"
-        className={cn(
-          'editor-island absolute bottom-4 right-4 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
-          colorPreset === 'validation'
-            ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
-            : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
-        )}
-      >
-        {colorPreset === 'validation' ? 'Validation view' : 'Standard view'}
-      </button>
+          <div className="editor-island pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-full px-3.5 py-1.5 text-[11px] text-[var(--editor-text-subtle)]">
+            WASD to move · Mouse to look · Esc to exit
+          </div>
 
-      {selectedIsObject && (
+          <button
+            type="button"
+            onClick={() => {
+              setFirstPerson(false);
+              setWalkLocked(false);
+              if (document.pointerLockElement) document.exitPointerLock();
+            }}
+            className="editor-island absolute right-4 top-4 z-30 rounded-xl px-3 py-1.5 text-xs font-medium text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]"
+          >
+            Exit walkthrough
+          </button>
+        </>
+      )}
+
+      {!firstPerson && (
+        <>
+          <button
+            type="button"
+            onClick={() => setFirstPerson(true)}
+            title="Walk through the design at eye level, collision-checked against the walls"
+            className="editor-island absolute bottom-34 right-4 z-30 rounded-xl px-3 py-1.5 text-xs font-medium text-[var(--editor-text-subtle)] transition-colors hover:text-[var(--editor-text)]"
+          >
+            Walk mode
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowEdges((current) => !current)}
+            title="Toggle a hard-edge line overlay for a blueprint-style look"
+            className={cn(
+              'editor-island absolute bottom-24 right-4 z-30 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+              showEdges
+                ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
+                : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
+            )}
+          >
+            {showEdges ? 'Edges on' : 'Edges off'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShading((current) => (current === 'solid' ? 'rendered' : 'solid'))}
+            title="Toggle a cheaper, flat-shaded view (no PBR specular)"
+            className={cn(
+              'editor-island absolute bottom-14 right-4 z-30 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+              shading === 'solid'
+                ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
+                : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
+            )}
+          >
+            {shading === 'solid' ? 'Solid shading' : 'Rendered shading'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setColorPreset(colorPreset === 'validation' ? 'standard' : 'validation')}
+            title="Toggle a colour view that flags low-confidence AI-extracted elements"
+            className={cn(
+              'editor-island absolute bottom-4 right-4 z-30 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors',
+              colorPreset === 'validation'
+                ? 'bg-[var(--editor-accent-soft)] text-[var(--editor-accent-text)]'
+                : 'text-[var(--editor-text-subtle)] hover:text-[var(--editor-text)]'
+            )}
+          >
+            {colorPreset === 'validation' ? 'Validation view' : 'Standard view'}
+          </button>
+        </>
+      )}
+
+      {!firstPerson && selectedIsObject && (
         // bottom-20, not bottom-4: the app-wide tool dock (EditorWithCanvas.tsx)
         // now also sits bottom-center, so this toolbar floats just above it
         // instead of overlapping in full-width 3D view.
-        <div className="editor-island absolute bottom-20 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-xl p-1.5">
+        <div className="editor-island absolute bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 rounded-xl p-1.5">
           {(Object.keys(TRANSFORM_MODE_LABELS) as Array<Exclude<ObjectTransformMode, null>>).map((mode) => (
             <button
               key={mode}

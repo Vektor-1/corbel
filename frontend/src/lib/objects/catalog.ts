@@ -2,7 +2,36 @@ import type { ObjectAsset } from '@/types/design';
 
 // Pascal-derived, locally served floor/free-placement catalog. Wall and ceiling
 // attached fixtures remain excluded until Corbel supports host-surface placement.
+const ROOF_COLOR = '#a6502d';
+// Inline SVG thumbnail -- no model/thumbnail file exists for this entry since
+// it renders as a built-in primitive (see `procedural` below), not a GLB.
+const ROOF_THUMBNAIL =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#f1ede6"/><polygon points="6,46 32,14 58,46" fill="${ROOF_COLOR}"/><rect x="6" y="46" width="52" height="4" fill="#7a3a20"/></svg>`
+  );
+
 export const OBJECT_CATALOG: ObjectAsset[] = [
+  {
+    id: "roof",
+    name: "Roof",
+    category: "structure",
+    tags: ["roof", "gable", "pitched", "ridge", "structure", "architecture", "exterior"],
+    modelUrl: "",
+    thumbnailUrl: ROOF_THUMBNAIL,
+    // width, ridge height, depth -- a simple gable prism, scaled/rotated/moved
+    // through the same object gizmo as every other catalog entry.
+    dimensions: [4, 1.4, 4],
+    // Vertical placement is computed dynamically in Canvas3D.tsx from the
+    // walls actually underneath this instance (computeRoofBaseHeightM), not
+    // from a fixed offset -- the eave (local y=0) is placed directly at that
+    // height, so no static Y offset belongs here.
+    offset: [0, 0, 0],
+    modelRotation: [0, 0, 0],
+    modelScale: [1, 1, 1],
+    color: ROOF_COLOR,
+    procedural: "gable-roof",
+  },
   {
     id: "cactus",
     name: "Cactus",
@@ -1077,6 +1106,7 @@ export const OBJECT_CATALOG_BY_ID = Object.fromEntries(
 
 export const OBJECT_CATEGORIES = [
   { id: 'all', label: 'All' },
+  { id: 'structure', label: 'Structure' },
   { id: 'furniture', label: 'Furniture' },
   { id: 'appliance', label: 'Appliances' },
   { id: 'bathroom', label: 'Bathroom' },
