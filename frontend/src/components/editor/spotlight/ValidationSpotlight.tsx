@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  Sparkles,
   X,
 } from 'lucide-react';
 
@@ -39,6 +40,8 @@ export interface ValidationSpotlightProps {
   onPrev: () => void;
   onDismiss: () => void;
   onReview: (issue: ValidationResult) => void;
+  /** Opens the AI chat panel pre-filled with a prompt scoped to this specific issue. */
+  onAskAI?: (issue: ValidationResult) => void;
 }
 
 interface ScreenRect {
@@ -81,6 +84,8 @@ function issueTitle(issue: ValidationResult): string {
       return 'Wall is too thin';
     case 'opening-host-fit':
       return 'Opening does not fit its wall';
+    case 'opening-overlap':
+      return 'Openings overlap on the same wall';
     case 'material-unknown':
       return 'Material not mapped to standards';
     case 'span-thickness-ratio-high':
@@ -92,7 +97,7 @@ function issueTitle(issue: ValidationResult): string {
     case 'check-drawing-scale':
       return 'Retrace scale may be incorrect';
     case 'complete-traced-room':
-      return 'Traced walls do not close a room';
+      return 'Walls do not close a room';
     case 'review-duplicate-wall':
       return 'Possible duplicate wall';
     default:
@@ -123,6 +128,7 @@ export function ValidationSpotlight({
   onPrev,
   onDismiss,
   onReview,
+  onAskAI,
 }: ValidationSpotlightProps) {
   const [viewport, setViewport] = useState(() => ({
     width: typeof window === 'undefined' ? 0 : window.innerWidth,
@@ -469,13 +475,24 @@ export function ValidationSpotlight({
               Editing… auto-rechecks
             </span>
           ) : (
-            <button
-              onClick={() => onReview(issue)}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
-              style={{ background: 'var(--editor-accent)' }}
-            >
-              Fix it
-            </button>
+            <div className="flex items-center gap-1.5">
+              {onAskAI && (
+                <button
+                  onClick={() => onAskAI(issue)}
+                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+                  style={{ background: 'var(--editor-accent-soft)', color: 'var(--editor-accent-text)' }}
+                >
+                  <Sparkles className="h-3 w-3" /> Ask AI
+                </button>
+              )}
+              <button
+                onClick={() => onReview(issue)}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+                style={{ background: 'var(--editor-accent)' }}
+              >
+                Fix it
+              </button>
+            </div>
           )}
         </div>
       </motion.div>

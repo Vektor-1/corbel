@@ -171,6 +171,10 @@ export function EditorWithCanvas() {
   const [objectCategory, setObjectCategory] = useState<'all' | ObjectCategory>('all');
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [shouldFocusInspectorToggle, setShouldFocusInspectorToggle] = useState(false);
+  // The AI chat panel and the left inspector column both anchor to the
+  // bottom-left corner; without this, an opened chat panel silently
+  // overlapped the inspector's lower content.
+  const [chatOpen, setChatOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [diffMode, setDiffMode] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
@@ -231,6 +235,7 @@ export function EditorWithCanvas() {
     validationResults,
     setBuildingModel,
     assignElementsToLayer,
+    firstPersonActive,
   } = useDesignStore();
 
   const exportSheet = (sheetId: string) => {
@@ -511,6 +516,7 @@ export function EditorWithCanvas() {
     confidence: adaptiveLearning.active.mode === 'repeat-pattern' ? 'high' as const : 'moderate' as const,
     status: interventionStatus,
     retryLabel: 'Focus the affected element',
+    retryInstruction: adaptiveLearning.active.definition.microtask.retryInstruction,
   } : null;
 
   const exportLearningRecord = () => {
@@ -564,7 +570,7 @@ export function EditorWithCanvas() {
           context for every absolutely-positioned island inside it. */}
       <main
         id="main-content"
-        className="corbel-editor relative h-screen w-screen overflow-hidden bg-[var(--editor-canvas)] text-[var(--editor-text)]"
+        className="corbel-editor relative h-dvh w-screen overflow-hidden bg-[var(--editor-canvas)] text-[var(--editor-text)]"
         data-theme={theme}
       >
         <button
@@ -894,8 +900,16 @@ export function EditorWithCanvas() {
         {/* ── Side panels: left = selection config (contextual), right = Outline/Library/Feedback islands ── */}
         <div className="editor-panels-group">
           {/* ── Left · selection config panel (appears once something is selected) ── */}
-          {inspectorOpen && hasSelection && (
-            <div className="editor-side-panel editor-left-panel editor-island absolute bottom-14 left-4 top-[4.75rem] flex w-72 flex-col overflow-hidden rounded-xl">
+          {!firstPersonActive && inspectorOpen && hasSelection && (
+            <div
+              className={cn(
+                'editor-side-panel editor-left-panel editor-island absolute left-4 top-[4.75rem] flex w-72 flex-col overflow-hidden rounded-xl transition-[bottom] duration-200',
+                // Reserve the AI chat panel's own worst-case height (header +
+                // capped message list + input) instead of letting the two
+                // bottom-left islands silently overlap when chat is open.
+                chatOpen ? 'bottom-[34rem]' : 'bottom-14'
+              )}
+            >
               <ScrollArea className="min-h-0 flex-1">
                 <div className="divide-y divide-[var(--editor-border)]">
                   {showSelectionPanel ? (
@@ -991,6 +1005,7 @@ export function EditorWithCanvas() {
           )}
 
           {/* ── Right · Trace controls / Outline / Library / Feedback islands ── */}
+          {!firstPersonActive && (
           <div className="editor-right-panels absolute bottom-14 right-4 top-[4.75rem] flex w-72 flex-col gap-3">
             {inspectorOpen && traceImage && (
               <div className="editor-side-panel editor-trace-controls-panel editor-island flex max-h-72 flex-none flex-col overflow-hidden rounded-xl">
@@ -1321,10 +1336,21 @@ export function EditorWithCanvas() {
                   <div className="divide-y divide-[var(--editor-border)]">
                     {!hasSelection && validationEnabled && (
                       <ValidationPanel
-                        results={validationResults}
+                        results={
+                          adaptiveLearning.active
+                            ? validationResults.filter(
+                                (result) =>
+                                  !(result.rule === adaptiveLearning.active!.rule && result.targetId === adaptiveLearning.active!.targetId)
+                              )
+                            : validationResults
+                        }
                         hasGeometry={hasGeometry}
                         title="Feedback"
-                        subtitle="Select an item to inspect and improve it."
+                        subtitle={
+                          adaptiveLearning.active
+                            ? 'Select an item to inspect and improve it. The flagged issue has a guided task below.'
+                            : 'Select an item to inspect and improve it.'
+                        }
                         onSelectElement={focusIssueTarget}
                       />
                     )}
@@ -1352,6 +1378,12 @@ export function EditorWithCanvas() {
                         }
                       }}
                       onExportRecord={exportLearningRecord}
+                      onAskTutor={() => {
+                        const active = adaptiveLearning.active;
+                        if (!active) return;
+                        const prompt = `I'm stuck on "${active.definition.title}": ${active.evidence} Explain the concept behind this misconception, and what specifically to change on the highlighted element to fix it. Do not apply changes.`;
+                        window.dispatchEvent(new CustomEvent('corbel:chat-intent', { detail: prompt }));
+                      }}
                     />}
                     {hasGeometry && <Statistics floorPlan={floorPlan} />}
                     {traceToLearnEnabled && <ComparisonPanel original={ghostFloorPlan} redesign={floorPlan} />}
@@ -1360,10 +1392,11 @@ export function EditorWithCanvas() {
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* ── Bottom left · AI chat panel ── */}
-        <PlanChatPanel getCanvasSnapshot={getCanvasSnapshot} />
+        {!firstPersonActive && <PlanChatPanel getCanvasSnapshot={getCanvasSnapshot} onOpenChange={setChatOpen} />}
 
         {/* ── Bottom left · status hint ── */}
         <div className="editor-status-hint editor-island absolute bottom-4 left-4 flex h-8 max-w-[min(32rem,calc(50vw-11rem))] items-center rounded-full px-3.5 text-[11px] text-[var(--editor-text-subtle)]">
@@ -1405,6 +1438,13 @@ export function EditorWithCanvas() {
           onPrev={spotlight.prev}
           onDismiss={spotlight.dismiss}
           onReview={spotlight.review}
+          onAskAI={(issue) => {
+            const prompt = `I'm looking at this issue: "${issue.message}"${issue.evidence ? ` (${issue.evidence})` : ''} Explain why this happens and what specifically to change on the highlighted element to fix it. Do not apply changes.`;
+            window.dispatchEvent(new CustomEvent('corbel:chat-intent', { detail: prompt }));
+            // Hand focus to the chat panel: the coach-mark card would otherwise stay
+            // stacked over the sidebar. The issue remains listed (Issues pill reopens it).
+            spotlight.dismiss();
+          }}
         />
       </main>
     </TooltipProvider>

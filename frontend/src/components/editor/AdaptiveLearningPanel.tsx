@@ -30,6 +30,8 @@ export type AdaptiveIntervention = {
   confidence?: 'low' | 'moderate' | 'high';
   status?: 'active' | 'task-complete' | 'retry-ready' | 'verified';
   retryLabel?: string;
+  /** The specific fix for this misconception, e.g. "place it fully on its host wall". */
+  retryInstruction?: string;
 };
 
 export type AdaptiveLearningPanelProps = {
@@ -206,7 +208,9 @@ export function AdaptiveLearningPanel({
               </p>
             )}
             <p className="text-[10px] leading-4 text-[var(--editor-text-subtle)]">
-              {canRetry ? 'Return to the drawing, make one focused correction, then check it.' : 'Complete the short task before starting the guided retry.'}
+              {canRetry
+                ? intervention.retryInstruction ?? 'Return to the drawing, make one focused correction, then check it.'
+                : 'Complete the short task before starting the guided retry.'}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
