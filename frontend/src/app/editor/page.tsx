@@ -97,16 +97,26 @@ export default function EditorPage() {
   }, [floorPlan, setFloorPlan]);
 
   useEffect(() => {
-    const startedAt = performance.now();
-    const results = [
-      ...validateFloorPlan(floorPlan),
-      ...validateTraceFeedback(floorPlan, traceImage?.calibration, traceImage !== null),
-    ];
-    setValidationResults(results);
-    recordEditorMetric('editor.validation.completed', {
-      results: results.length,
-      walls: floorPlan?.walls.length ?? 0,
-    }, performance.now() - startedAt);
+    // Debounced: floorPlan updates continuously during an active drag (e.g.
+    // resizing a wall), and a wall can pass through a transiently-invalid
+    // state mid-gesture. Running validation on every intermediate frame was
+    // re-triggering the spotlight coach-mark (and the panel/microtask) to
+    // flicker open/closed within a single drag. Settling for a beat before
+    // validating means the student sees feedback on the result they landed
+    // on, not on every frame they passed through.
+    const timeout = window.setTimeout(() => {
+      const startedAt = performance.now();
+      const results = [
+        ...validateFloorPlan(floorPlan),
+        ...validateTraceFeedback(floorPlan, traceImage?.calibration, traceImage !== null),
+      ];
+      setValidationResults(results);
+      recordEditorMetric('editor.validation.completed', {
+        results: results.length,
+        walls: floorPlan?.walls.length ?? 0,
+      }, performance.now() - startedAt);
+    }, 300);
+    return () => window.clearTimeout(timeout);
   }, [floorPlan, traceImage?.calibration, setValidationResults]);
 
   useEffect(() => {

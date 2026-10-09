@@ -220,7 +220,7 @@ export default function Home() {
       <section className="py-8 border-b-2 overflow-hidden" style={{ borderColor: INK, backgroundColor: GOLD }}>
         <div className="mx-auto max-w-6xl px-4 sm:px-6 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-2 text-center">
           {[
-            ['GS 1207:2018', 'Code-Referenced Checks'],
+            ['GS 1207:2018', 'Standard Referenced'],
             ['100%', 'Free & Open Source'],
             ['0', 'Installs Required'],
             ['MIT', 'Licensed, Forkable'],
