@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  Sparkles,
   X,
 } from 'lucide-react';
 
@@ -39,6 +40,8 @@ export interface ValidationSpotlightProps {
   onPrev: () => void;
   onDismiss: () => void;
   onReview: (issue: ValidationResult) => void;
+  /** Opens the AI chat panel pre-filled with a prompt scoped to this specific issue. */
+  onAskAI?: (issue: ValidationResult) => void;
 }
 
 interface ScreenRect {
@@ -81,6 +84,8 @@ function issueTitle(issue: ValidationResult): string {
       return 'Wall is too thin';
     case 'opening-host-fit':
       return 'Opening does not fit its wall';
+    case 'opening-overlap':
+      return 'Openings overlap on the same wall';
     case 'material-unknown':
       return 'Material not mapped to standards';
     case 'span-thickness-ratio-high':
@@ -92,7 +97,7 @@ function issueTitle(issue: ValidationResult): string {
     case 'check-drawing-scale':
       return 'Retrace scale may be incorrect';
     case 'complete-traced-room':
-      return 'Traced walls do not close a room';
+      return 'Walls do not close a room';
     case 'review-duplicate-wall':
       return 'Possible duplicate wall';
     default:
@@ -123,6 +128,7 @@ export function ValidationSpotlight({
   onPrev,
   onDismiss,
   onReview,
+  onAskAI,
 }: ValidationSpotlightProps) {
   const [viewport, setViewport] = useState(() => ({
     width: typeof window === 'undefined' ? 0 : window.innerWidth,
@@ -213,6 +219,21 @@ export function ValidationSpotlight({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Focus the card on the rising edge only (spotlight session just opened),
+  // not on every subsequent issue -- Next/Prev/auto-advance-through-similar
+  // navigation happens while the user is already mid-flow (often mid-edit in
+  // "reviewing", where a property input elsewhere may be focused), and
+  // yanking focus back to the card on each of those would fight the fix step
+  // this dialog exists to support. A first appearance, by contrast, is a
+  // genuinely new thing landing on screen that a keyboard/screen-reader user
+  // has had no chance yet to notice.
+  const wasVisible = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (visible && issue && !wasVisible.current) cardRef.current?.focus();
+    wasVisible.current = visible && issue !== null;
+  }, [visible, issue]);
+
   if (!visible || !issue) return null;
 
   const severityColor =
@@ -297,9 +318,23 @@ export function ValidationSpotlight({
         />
       )}
 
-      {/* Tooltip card — keyed by issue so AnimatePresence can slide between issues. */}
+      {/* Tooltip card — keyed by issue so AnimatePresence can slide between issues.
+          Deliberately non-modal: unlike PortraitLockOverlay, this coachmark is
+          meant to stay open WHILE the user edits the spotlit element via the
+          canvas or a property panel elsewhere (the "reviewing" / fix-verify
+          flow below), so there is no aria-modal and no focus trap here -- either
+          would block the very interaction this dialog exists to support. Its
+          Escape/Arrow/Enter handling is intentionally a window-level listener
+          rather than dialog-scoped, for the same reason: it must keep working
+          no matter where focus currently is. tabIndex={-1} + the focus effect
+          above make the card itself a programmatic focus target on first
+          appearance without adding it to the normal Tab order. aria-live
+          announces it (and any later content change within the same card) to
+          screen readers that would otherwise never discover it. */}
       <motion.div
         key={issue.id}
+        ref={cardRef}
+        tabIndex={-1}
         className="pointer-events-auto absolute rounded-2xl border p-4 shadow-2xl"
         initial={{ opacity: 0, y: 10, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -316,6 +351,8 @@ export function ValidationSpotlight({
         }}
         role="dialog"
         aria-label={resolved ? 'Issue resolved' : 'Design issue'}
+        aria-live="polite"
+        aria-atomic="true"
       >
         <div className="flex items-start justify-between gap-2">
           <div
@@ -438,13 +475,24 @@ export function ValidationSpotlight({
               Editing… auto-rechecks
             </span>
           ) : (
-            <button
-              onClick={() => onReview(issue)}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
-              style={{ background: 'var(--editor-accent)' }}
-            >
-              Fix it
-            </button>
+            <div className="flex items-center gap-1.5">
+              {onAskAI && (
+                <button
+                  onClick={() => onAskAI(issue)}
+                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+                  style={{ background: 'var(--editor-accent-soft)', color: 'var(--editor-accent-text)' }}
+                >
+                  <Sparkles className="h-3 w-3" /> Ask AI
+                </button>
+              )}
+              <button
+                onClick={() => onReview(issue)}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+                style={{ background: 'var(--editor-accent)' }}
+              >
+                Fix it
+              </button>
+            </div>
           )}
         </div>
       </motion.div>

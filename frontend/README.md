@@ -1,6 +1,6 @@
 # Corbel: Educational Architecture Design Tool for Ghana
 
-A browser-based 2D/3D architectural design tool built for Ghanaian students, with **real-time validation against Ghana Building Code (GS 1207:2018)**.
+A browser-based 2D/3D architectural design tool built for Ghanaian students, with **real-time design review heuristics** — one directly cited to Ghana Building Code (GS 1207:2018 Part 7, wall thickness), the rest Corbel's own spatial/structural checks pending a full jurisdiction-specific rule set.
 
 ## Quick Start
 
@@ -25,11 +25,11 @@ Open [http://localhost:3000/editor](http://localhost:3000/editor)
 
 ## What is Corbel?
 
-Corbel teaches architectural students to design buildings that comply with **local building standards**:
+Corbel teaches architectural students to design buildings while getting real-time, rule-linked feedback:
 
 - 🎨 **2D Floor Plan Drawing** (Konva.js)
 - 🏗️ **Real-Time 3D Visualization** (React Three Fiber)
-- ✓ **Ghana Building Code Validation** (GS 1207:2018)
+- ✓ **Code-Informed Review Heuristics** (one rule directly cited to GS 1207:2018; a full jurisdiction-specific checker is future work, not current scope)
 - 📍 **Local Materials** (Sandcrete, laterite with real-world data)
 
 ## Tech Stack

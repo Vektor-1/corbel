@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 const controlClass =
-  'h-7 w-full rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-raised)] px-2 text-xs text-[var(--editor-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] outline-none transition-colors placeholder:text-[var(--editor-text-subtle)] hover:border-[var(--editor-border-strong)] focus:border-[var(--editor-accent)] focus:ring-2 focus:ring-[var(--editor-accent)]/20';
+  'h-7 w-full rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-raised)] px-2 text-xs text-[var(--editor-text)] shadow-[inset_0_1px_0_rgba(255,255,255,0.32)] outline-none transition-colors placeholder:text-[var(--editor-text-subtle)] hover:border-[var(--editor-border-strong)] focus:border-[var(--editor-accent)] focus:ring-2 focus:ring-[var(--editor-accent)]/20 aria-invalid:border-[var(--editor-danger)] aria-invalid:ring-2 aria-invalid:ring-[var(--editor-danger)]/20';
 
 export function FieldLabel({ label, unit, children }: { label: string; unit?: string; children: ReactNode }) {
   return (

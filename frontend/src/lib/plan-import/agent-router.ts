@@ -19,7 +19,7 @@ interface AgentRouterRequest {
   task: 'image-analysis' | 'ocr' | 'scale-calibration';
   image_url: string;
   prompt: string;
-  preferred_models?: string[]; // ['gpt-5.6-luna', 'gemini-3.1']
+  preferred_models?: string[]; // ['gpt-5.6-luna']
   timeout_ms?: number;
   fallback_enabled?: boolean;
 }
@@ -67,7 +67,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 // ── Stage 1: Image analysis (P1) ──────────────────────────────────────────────
-// Route to GPT 5.6 Luna primarily (detailed analysis), fallback to Gemini 3.1
+// Route image analysis through the configured Agent Router model.
 
 export function makeAskImageAnalysis(imageUrl: string): AskFn {
   return async (prompt, format = 'json') => {
@@ -75,8 +75,8 @@ export function makeAskImageAnalysis(imageUrl: string): AskFn {
       task: 'image-analysis',
       image_url: imageUrl,
       prompt,
-      preferred_models: ['gpt-5.6-luna', 'gemini-3.1'],
-      fallback_enabled: true,
+      preferred_models: ['gpt-5.6-luna'],
+      fallback_enabled: false,
     });
 
     if (!response.success) {
@@ -88,7 +88,7 @@ export function makeAskImageAnalysis(imageUrl: string): AskFn {
 }
 
 // ── Stage 4: OCR (P4) ─────────────────────────────────────────────────────────
-// Route to Gemini 3.1 primarily (excellent OCR), fallback to GPT
+// Route OCR through the configured Agent Router model.
 
 export function makeAskOcr(imageUrl: string): AskFn {
   return async (prompt: string) => {
@@ -96,8 +96,8 @@ export function makeAskOcr(imageUrl: string): AskFn {
       task: 'ocr',
       image_url: imageUrl,
       prompt,
-      preferred_models: ['gemini-3.1', 'gpt-5.6-luna'],
-      fallback_enabled: true,
+      preferred_models: ['gpt-5.6-luna'],
+      fallback_enabled: false,
     });
 
     if (!response.success) {
@@ -109,7 +109,7 @@ export function makeAskOcr(imageUrl: string): AskFn {
 }
 
 // ── Stage 5: Scale calibration (P5) ───────────────────────────────────────────
-// Route to GPT 5.6 Luna (reasoning), fallback to Gemini
+// Route scale calibration through the configured Agent Router model.
 
 export function makeAskScaleCalibration(imageUrl: string): AskFn {
   return async (prompt: string) => {
@@ -117,8 +117,8 @@ export function makeAskScaleCalibration(imageUrl: string): AskFn {
       task: 'scale-calibration',
       image_url: imageUrl,
       prompt,
-      preferred_models: ['gpt-5.6-luna', 'gemini-3.1'],
-      fallback_enabled: true,
+      preferred_models: ['gpt-5.6-luna'],
+      fallback_enabled: false,
     });
 
     if (!response.success) {
@@ -147,9 +147,9 @@ export function getAgentRouterJob(id: string) {
 // ── OCR + Scale (P4 + P5) ─────────────────────────────────────────────────────
 
 export async function runAgentRouterOcrAndScale(source: ImportSource): Promise<{ labels: RawLabel[]; scale: ScaleResult }> {
-  // P4: OCR with Gemini 3.1 routing
+  // P4: OCR through Agent Router
   const askOcr = makeAskOcr(source.url);
-  // P5: Scale calibration with GPT routing
+  // P5: Scale calibration through Agent Router
   const askScale = makeAskScaleCalibration(source.url);
 
   // Run P4 and P5 in parallel

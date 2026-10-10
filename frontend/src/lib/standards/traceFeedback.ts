@@ -1,16 +1,24 @@
 import type { FloorPlan, TraceCalibration, ValidationResult } from '@/types/design';
 
 /**
- * Feedback that is specific to an image-first trace. It intentionally never
- * infers physical scale from a door or image appearance: a student must first
- * confirm one real-world measurement.
+ * Validation that runs for any floor plan (freehand or image-traced), plus
+ * scale-calibration feedback specific to an image-first trace.
+ *
+ * The closed-boundary and duplicate-wall checks are pure geometry: nothing
+ * about them depends on where the walls came from, so they run regardless of
+ * `isTraceSession`. Scale calibration is trace-only by design: freehand
+ * walls are authored directly in real-world millimetres (see
+ * `src/types/design.ts`), so there is no pixel-to-measurement ambiguity to
+ * calibrate outside of a retrace. It intentionally never infers physical
+ * scale from a door or image appearance: a student must first confirm one
+ * real-world measurement.
  */
 export function validateTraceFeedback(
   floorPlan: FloorPlan | null,
   calibration: TraceCalibration | undefined,
   isTraceSession = true,
 ): ValidationResult[] {
-  if (!floorPlan || !isTraceSession) return [];
+  if (!floorPlan) return [];
 
   const results: ValidationResult[] = [];
   const targetId = floorPlan.walls[0]?.id ?? floorPlan.id;
@@ -20,9 +28,9 @@ export function validateTraceFeedback(
       type: 'warning',
       targetId: floorPlan.walls[floorPlan.walls.length - 1]?.id ?? targetId,
       rule: 'complete-traced-room',
-      message: `${floorPlan.walls.length} traced walls do not yet form a closed room boundary.`,
+      message: `${floorPlan.walls.length} walls do not yet form a closed room boundary.`,
       remediation: 'Zoom in on nearby wall ends and join the final endpoints to close a room.',
-      evidence: 'Corbel found three or more traced walls but could not derive a bounded room from their connected endpoints.',
+      evidence: 'Corbel found three or more walls but could not derive a bounded room from their connected endpoints.',
     });
   }
 
@@ -33,11 +41,13 @@ export function validateTraceFeedback(
       type: 'warning',
       targetId: duplicatePair[1],
       rule: 'review-duplicate-wall',
-      message: 'Two traced walls have the same endpoints and may be an accidental duplicate.',
+      message: 'Two walls have the same endpoints and may be an accidental duplicate.',
       remediation: 'Select each overlapping wall in turn, keep one centreline, and delete the duplicate.',
       evidence: `The endpoints of ${duplicatePair[0]} and ${duplicatePair[1]} are within 12 canvas pixels of one another.`,
     });
   }
+
+  if (!isTraceSession) return results;
 
   if (!calibration) {
     results.push({

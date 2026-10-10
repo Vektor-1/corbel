@@ -58,7 +58,7 @@ export interface Wall {
 }
 
 /** Snap result with extended priority modes. */
-export type PlanSnapKind = 'endpoint' | 'midpoint' | 'crossing' | 'angle' | 'wall' | 'axis' | 'grid';
+export type PlanSnapKind = 'endpoint' | 'midpoint' | 'crossing' | 'angle' | 'wall' | 'axis' | 'grid' | 'free';
 
 export interface PlanSnapOptions {
   /** Grid spacing in the current canvas coordinate system. */
@@ -75,6 +75,10 @@ export interface PlanSnapOptions {
   angleLock?: boolean;
   /** Wall ID to exclude from snap detection (for the current wall being drawn). */
   excludeWallId?: string;
+  /** Contextual snap controls. Omitted values preserve the legacy full-snap behavior. */
+  gridEnabled?: boolean;
+  magneticEnabled?: boolean;
+  angleEnabled?: boolean;
 }
 
 /** Compute the midpoint of a wall. */
@@ -301,22 +305,25 @@ export function snapPlanPoint(
   const tolerance = options.endpointTolerance ?? ENDPOINT_SNAP_DISTANCE;
   const walls = options.walls ?? [];
   const excludeWallId = options.excludeWallId;
+  const magneticEnabled = options.magneticEnabled ?? true;
+  const gridEnabled = options.gridEnabled ?? true;
+  const angleEnabled = options.angleEnabled ?? options.angleLock ?? false;
 
   // Priority 1: Endpoint snap (strongest intent — closing a polygon or attaching to a corner)
   // `endpoints` supports callers that have geometry points but not complete Wall records.
-  const explicitEndpoint = (options.endpoints ?? [])
+  const explicitEndpoint = magneticEnabled ? (options.endpoints ?? [])
     .map((endpoint) => ({ endpoint, distance: distanceToPoint(point, endpoint) }))
     .filter((candidate) => candidate.distance <= tolerance)
-    .sort((a, b) => a.distance - b.distance)[0];
+    .sort((a, b) => a.distance - b.distance)[0] : undefined;
   if (explicitEndpoint) return { point: explicitEndpoint.endpoint, kind: 'endpoint' };
 
-  if (walls.length > 0) {
+  if (magneticEnabled && walls.length > 0) {
     const endpointSnap = findEndpointSnap(point, walls, tolerance, excludeWallId);
     if (endpointSnap) return { point: endpointSnap.point, kind: 'endpoint' };
   }
 
   // Priority 2: Midpoint snap
-  if (walls.length > 0) {
+  if (magneticEnabled && walls.length > 0) {
     const midpointSnap = findMidpointSnap(
       point,
       walls,
@@ -327,7 +334,7 @@ export function snapPlanPoint(
   }
 
   // Priority 3: Crossing snap
-  if (walls.length > 1) {
+  if (magneticEnabled && walls.length > 1) {
     const crossingSnap = findCrossingSnap(
       point,
       walls,
@@ -339,12 +346,12 @@ export function snapPlanPoint(
 
   // Priority 4: Angle lock snap (15° increments from origin)
   const origin = options.axisOrigin;
-  if (options.angleLock && origin) {
+  if (angleEnabled && origin) {
     return { point: snapToAngle(point, origin), kind: 'angle' };
   }
 
   // Priority 5: Wall body snap (magnetic alignment to existing wall geometry)
-  if (walls.length > 0) {
+  if (magneticEnabled && walls.length > 0) {
     const wallBodySnap = findWallBodySnap(
       point,
       walls,
@@ -361,7 +368,7 @@ export function snapPlanPoint(
   };
   const axisTolerance = options.axisTolerance ?? tolerance;
 
-  if (origin) {
+  if (magneticEnabled && origin) {
     const nearVertical = Math.abs(point.x - origin.x) <= axisTolerance;
     const nearHorizontal = Math.abs(point.y - origin.y) <= axisTolerance;
     if (nearVertical || nearHorizontal) {
@@ -376,5 +383,5 @@ export function snapPlanPoint(
   }
 
   // Priority 7: Grid snap
-  return { point: gridPoint, kind: 'grid' };
+  return gridEnabled ? { point: gridPoint, kind: 'grid' } : { point, kind: 'free' };
 }

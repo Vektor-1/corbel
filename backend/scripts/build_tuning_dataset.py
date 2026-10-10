@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from build_benchmark_dataset import build_record  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]  # .../project
+REPO_ROOT = Path(__file__).resolve().parents[3]  # .../project
 DATASET_DIR = REPO_ROOT / "datasets" / "dataset"
 OUTPUT = DATASET_DIR / "tuning_set.jsonl"
 

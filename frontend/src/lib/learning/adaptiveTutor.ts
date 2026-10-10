@@ -82,7 +82,7 @@ export const MISCONCEPTIONS: Record<MisconceptionId, MisconceptionDefinition> = 
     explanation: 'A room needs a continuous wall boundary. A small gap prevents the plan from defining an enclosed space and its area.',
     ruleIds: ['complete-traced-room'],
     microtask: {
-      prompt: 'What must be true before Corbel can treat traced walls as one room?',
+      prompt: 'What must be true before Corbel can treat these walls as one room?',
       choices: [
         { id: 'continuous-loop', label: 'Their endpoints form one continuous closed loop.' },
         { id: 'four-walls', label: 'There are exactly four walls.' },

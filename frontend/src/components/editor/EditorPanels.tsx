@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EditorPanel } from '@/components/ui/editor-panel';
 import { FieldLabel, Input, Select } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { citationForRule } from '@/lib/standards/citations';
+import { millimetresPerPixel } from '@/lib/geometry/scale';
 import type {
   DesignObject,
   Door,
@@ -15,6 +16,7 @@ import type {
   Room,
   ValidationResult,
   Wall,
+  WallConstraint,
   WallType,
   Window,
 } from '@/types/design';
@@ -66,11 +68,22 @@ export function SelectedWallInspector({
   wall,
   results,
   onUpdate,
+  scale,
+  walls,
+  constraints,
+  onSaveConstraint,
+  onAddDimensions,
 }: {
   wall: Wall;
   results: ValidationResult[];
   onUpdate: (updates: Partial<Wall>) => void;
+  scale: number;
+  walls: Wall[];
+  constraints: WallConstraint[];
+  onSaveConstraint: (kind: WallConstraint['kind'], wallId: string, referenceWallId: string) => void;
+  onAddDimensions: (wallId: string) => void;
 }) {
+  const [referenceWallId, setReferenceWallId] = useState('');
   const length = Math.sqrt(
     Math.pow(wall.endPoint.x - wall.startPoint.x, 2) +
       Math.pow(wall.endPoint.y - wall.startPoint.y, 2)
@@ -81,6 +94,41 @@ export function SelectedWallInspector({
     const parsed = Number(value);
     if (Number.isFinite(parsed) && parsed > 0) onUpdate({ [field]: parsed });
   };
+  const updateLength = (value: string) => {
+    const lengthMm = Number(value);
+    if (!Number.isFinite(lengthMm) || lengthMm <= 0) return;
+    const lengthPx = lengthMm / millimetresPerPixel(scale);
+    const direction = length > 0 ? { x: (wall.endPoint.x - wall.startPoint.x) / length, y: (wall.endPoint.y - wall.startPoint.y) / length } : { x: 1, y: 0 };
+    onUpdate({ endPoint: { x: wall.startPoint.x + direction.x * lengthPx, y: wall.startPoint.y + direction.y * lengthPx } });
+  };
+  const updateAngle = (value: string) => {
+    const degrees = Number(value);
+    if (!Number.isFinite(degrees)) return;
+    const radians = degrees * Math.PI / 180;
+    onUpdate({ endPoint: { x: wall.startPoint.x + Math.cos(radians) * length, y: wall.startPoint.y + Math.sin(radians) * length } });
+  };
+  const referenceWall = walls.find((candidate) => candidate.id === referenceWallId);
+  useEffect(() => {
+    if (referenceWallId && !walls.some((candidate) => candidate.id === referenceWallId && candidate.id !== wall.id)) {
+      setReferenceWallId('');
+    }
+  }, [referenceWallId, wall.id, walls]);
+  const constrainToReference = (perpendicular: boolean) => {
+    if (!referenceWall) return;
+    const referenceDx = referenceWall.endPoint.x - referenceWall.startPoint.x;
+    const referenceDy = referenceWall.endPoint.y - referenceWall.startPoint.y;
+    const referenceLength = Math.hypot(referenceDx, referenceDy);
+    if (referenceLength <= 0 || length <= 0) return;
+    const direction = perpendicular
+      ? { x: -referenceDy / referenceLength, y: referenceDx / referenceLength }
+      : { x: referenceDx / referenceLength, y: referenceDy / referenceLength };
+    const currentDx = wall.endPoint.x - wall.startPoint.x;
+    const currentDy = wall.endPoint.y - wall.startPoint.y;
+    const sign = currentDx * direction.x + currentDy * direction.y < 0 ? -1 : 1;
+    onUpdate({ endPoint: { x: wall.startPoint.x + direction.x * length * sign, y: wall.startPoint.y + direction.y * length * sign } });
+    onSaveConstraint(perpendicular ? 'perpendicular' : 'parallel', wall.id, referenceWall.id);
+  };
+  const angle = Math.round(Math.atan2(wall.endPoint.y - wall.startPoint.y, wall.endPoint.x - wall.startPoint.x) * 180 / Math.PI);
 
   return (
     <EditorPanel
@@ -139,7 +187,31 @@ export function SelectedWallInspector({
             onChange={(event) => updateNumber('height', event.target.value)}
           />
         </FieldLabel>
+        <FieldLabel label="Length" unit="mm">
+          <Input type="number" min={1} step={10} value={Math.round(length * millimetresPerPixel(scale))} onChange={(event) => updateLength(event.target.value)} />
+        </FieldLabel>
+        <FieldLabel label="Angle" unit="°">
+          <Input type="number" min={-180} max={180} step={1} value={angle} onChange={(event) => updateAngle(event.target.value)} />
+        </FieldLabel>
       </div>
+
+      {walls.length > 1 && (
+        <div className="mt-3 border-t border-[var(--editor-border)] pt-3">
+          <p className="mb-2 text-[11px] font-medium text-[var(--editor-text-muted)]">Constraint</p>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2">
+            <Select aria-label="Reference wall" value={referenceWallId} onChange={(event) => setReferenceWallId(event.target.value)}>
+              <option value="">Reference wall…</option>
+              {walls.filter((candidate) => candidate.id !== wall.id).map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>{candidate.id}</option>
+              ))}
+            </Select>
+            <Button type="button" size="sm" variant="secondary" disabled={!referenceWall} onClick={() => constrainToReference(false)}>Parallel</Button>
+            <Button type="button" size="sm" variant="secondary" disabled={!referenceWall} onClick={() => constrainToReference(true)}>Perpendicular</Button>
+          </div>
+          <div className="mt-1.5 flex items-center justify-between gap-2"><p className="text-[10px] leading-3 text-[var(--editor-text-subtle)]">Keeps this wall’s start point and length; connected endpoints follow.</p><Button type="button" size="xs" variant="ghost" onClick={() => onAddDimensions(wall.id)}>Pin dimensions</Button></div>
+          {constraints.filter((constraint) => constraint.wallId === wall.id).length > 0 && <p className="mt-1 text-[10px] text-[var(--editor-accent-text)]">{constraints.filter((constraint) => constraint.wallId === wall.id).map((constraint) => constraint.kind).join(' · ')} constraint saved</p>}
+        </div>
+      )}
 
       <p className="mt-3 rounded-md bg-[var(--editor-info-soft)] px-2.5 py-2 text-[11px] leading-4 text-[var(--editor-info)]">
         In Plan view, select this wall and drag either highlighted endpoint to reshape it. Endpoints snap to the drawing grid.

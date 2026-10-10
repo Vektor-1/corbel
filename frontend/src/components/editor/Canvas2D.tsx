@@ -17,6 +17,9 @@ import { OBJECT_CATALOG_BY_ID } from '@/lib/objects/catalog';
 import { compareFloorPlans, type MatchStatus } from '@/lib/comparison';
 import { getCombinedBounds, getElementIdsInRect, type ElementBounds } from '@/lib/geometry/element-bounds';
 import { expandGroupSelection } from '@/lib/geometry/groups';
+import { tintForConfidence } from '@/lib/geometry/confidence-tint';
+import { recordEditorMetric } from '@/lib/observability/editorMetrics';
+import { isElementVisible } from '@/lib/building/model';
 import type { DesignObject, Door, MaterialType, ObjectAssetId, Wall, WallType, Window } from '@/types/design';
 import { formatArea, formatLength, type AreaUnit, type LengthUnit } from '@/lib/units/measurements';
 
@@ -41,6 +44,7 @@ interface Canvas2DProps {
   areaUnit?: AreaUnit;
   /** One-shot placement feedback (door/window blocked at this position). */
   onPlacementViolation?: (violation: { message: string; rule: string; targetId: string }) => void;
+  onReferenceImageSize?: (size: { width: number; height: number } | null) => void;
 }
 
 export const Canvas2D = React.memo(function Canvas2D({
@@ -61,6 +65,7 @@ export const Canvas2D = React.memo(function Canvas2D({
   lengthUnit = 'mm',
   areaUnit = 'm²',
   onPlacementViolation,
+  onReferenceImageSize,
 }: Canvas2DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const internalStageRef = useRef<Konva.Stage>(null);
@@ -75,6 +80,7 @@ export const Canvas2D = React.memo(function Canvas2D({
   const [angleLock, setAngleLock] = useState(false);
   const [spacePressed, setSpacePressed] = useState(false);
   const [middlePanning, setMiddlePanning] = useState(false);
+  const [viewportScale, setViewportScale] = useState(1);
   const isPanning = spacePressed || middlePanning;
   const [marquee, setMarquee] = useState<{ start: Vector2d; end: Vector2d; additive: boolean } | null>(null);
   const transformTargetRef = useRef<Konva.Rect>(null);
@@ -114,7 +120,9 @@ export const Canvas2D = React.memo(function Canvas2D({
 
   const {
     floorPlan,
+    aiPreviewFloorPlan,
     currentTool,
+    snapMode,
     selectedElementId,
     selectedElementIds,
     addWall,
@@ -132,6 +140,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     translateElements,
     scaleElements,
     updateWall,
+    colorPreset,
   } = useDesignStore();
   // The Scale tool shows resize handles for any selection size (its whole purpose);
   // the Select tool reserves single-element clicks for existing per-element interactions
@@ -157,10 +166,13 @@ export const Canvas2D = React.memo(function Canvas2D({
   const planPixelsPerMeter = pixelsPerMeter(floorPlan?.scale);
   const planMillimetresPerPixel = millimetresPerPixel(floorPlan?.scale);
   const drawingGridSize = Math.max(10, Math.round(planPixelsPerMeter / 5)); // 200 mm at the active scale
-  const endpointTolerance = Math.max(12, Math.min(24, drawingGridSize * 0.8));
+  // Keep snap targets close to 16 screen pixels at every zoom level. This
+  // avoids overly-sticky snapping when zoomed out and fussy snapping when zoomed in.
+  const endpointTolerance = Math.max(4, Math.min(drawingGridSize * 0.8, 16 / viewportScale));
   const ghostMillimetresPerPixel = millimetresPerPixel(ghostFloorPlan?.scale);
   const traceToLearnEnabled = useFeatureFlag('traceToLearn');
   const walls = floorPlan?.walls;
+  const visible = (elementId: string) => isElementVisible(floorPlan, elementId);
   const footprints = useMemo(() => computeWallFootprints(walls ?? [], planPixelsPerMeter), [walls, planPixelsPerMeter]);
 
   const ghostWalls = ghostFloorPlan?.walls;
@@ -186,6 +198,29 @@ export const Canvas2D = React.memo(function Canvas2D({
     const status = diffStatus?.get(elementId);
     if (status === 'removed' || status === 'moved' || status === 'resized') return diffColors[status];
     return fallback;
+  };
+
+  const aiDiff = useMemo(() => {
+    if (!aiPreviewFloorPlan || !floorPlan) return null;
+    const report = compareFloorPlans(floorPlan, aiPreviewFloorPlan);
+    const original = new Map<string, MatchStatus>();
+    const proposed = new Map<string, MatchStatus>();
+    for (const match of [...report.walls, ...report.rooms, ...report.openings]) {
+      if (match.originalId) original.set(match.originalId, match.status);
+      if (match.redesignId) proposed.set(match.redesignId, match.status);
+    }
+    return { original, proposed };
+  }, [aiPreviewFloorPlan, floorPlan]);
+
+  const aiPreviewFootprints = useMemo(
+    () => computeWallFootprints(aiPreviewFloorPlan?.walls ?? [], planPixelsPerMeter),
+    [aiPreviewFloorPlan?.walls, planPixelsPerMeter]
+  );
+
+  const aiPreviewColor = (status: MatchStatus | undefined) => {
+    if (status === 'removed') return theme === 'dark' ? '#ef8a80' : '#b42318';
+    if (status === 'moved' || status === 'resized') return theme === 'dark' ? '#f2c879' : '#a15c00';
+    return theme === 'dark' ? '#8ed6a1' : '#16803c';
   };
 
   useEffect(() => {
@@ -232,17 +267,29 @@ export const Canvas2D = React.memo(function Canvas2D({
       return;
     }
     const image = new window.Image();
-    image.onload = () => setReferenceImage(image);
-    image.onerror = () => setReferenceImage(null);
+    image.onload = () => {
+      setReferenceImage(image);
+      onReferenceImageSize?.({ width: image.width, height: image.height });
+    };
+    image.onerror = () => {
+      setReferenceImage(null);
+      onReferenceImageSize?.(null);
+    };
     image.src = traceImage.url;
     return () => {
       image.onload = null;
       image.onerror = null;
     };
-  }, [traceImage?.url]);
+  }, [onReferenceImageSize, traceImage?.url]);
+
+  const snapOptions = {
+    gridEnabled: snapMode === 'grid',
+    magneticEnabled: snapMode === 'lines',
+    angleEnabled: snapMode === 'angles',
+  };
 
   const snapToGrid = (pos: Vector2d): Vector2d =>
-    snapPlanPoint(pos, { gridSize: drawingGridSize }).point;
+    snapPlanPoint(pos, { gridSize: drawingGridSize, ...snapOptions }).point;
 
   const snapDrawingPoint = (
     point: Vector2d,
@@ -256,6 +303,7 @@ export const Canvas2D = React.memo(function Canvas2D({
       axisOrigin,
       axisTolerance: endpointTolerance,
       angleLock,
+      ...snapOptions,
       excludeWallId,
     });
     return result;
@@ -272,8 +320,8 @@ export const Canvas2D = React.memo(function Canvas2D({
     const pointer = stage.getPointerPosition();
     if (!pointer) return null;
     return {
-      x: pointer.x - (stage.x() ?? 0),
-      y: pointer.y - (stage.y() ?? 0),
+      x: (pointer.x - (stage.x() ?? 0)) / stage.scaleX(),
+      y: (pointer.y - (stage.y() ?? 0)) / stage.scaleY(),
     };
   };
 
@@ -295,6 +343,13 @@ export const Canvas2D = React.memo(function Canvas2D({
     if (e.key === ' ' && document.activeElement?.tagName !== 'INPUT') {
       e.preventDefault();
       setSpacePressed(true);
+    }
+    if (e.key === 'Escape') {
+      setDrawing(false);
+      setStartPos(null);
+      setWallPreview(null);
+      setSnapIndicator(null);
+      setMarquee(null);
     }
   };
 
@@ -400,6 +455,23 @@ export const Canvas2D = React.memo(function Canvas2D({
     e.evt.preventDefault();
     const stage = stageRef.current;
     if (!stage) return;
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+      const oldScale = stage.scaleX();
+      const factor = e.evt.deltaY > 0 ? 0.9 : 1.1;
+      const nextScale = Math.max(0.35, Math.min(3, oldScale * factor));
+      const point = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
+      stage.scale({ x: nextScale, y: nextScale });
+      stage.position({ x: pointer.x - point.x * nextScale, y: pointer.y - point.y * nextScale });
+      setViewportScale(nextScale);
+      stage.batchDraw();
+      recordEditorMetric('editor.canvas.zoomed', { scale: nextScale });
+      return;
+    }
     stage.position({ x: stage.x() - e.evt.deltaX, y: stage.y() - e.evt.deltaY });
     stage.batchDraw();
   };
@@ -460,6 +532,7 @@ export const Canvas2D = React.memo(function Canvas2D({
       // splitting both the new wall and existing walls at their intersections
       addWall(newWall);
       setSelectedElement(newWall.id);
+      recordEditorMetric('editor.wall.created', { type: newWall.type });
     }
 
     setDrawing(false);
@@ -502,6 +575,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         const errors = violations.filter((v) => v.severity === 'error');
         if (errors.length > 0) {
           onPlacementViolation?.({ message: errors[0].message, rule: errors[0].rule, targetId: wall.id });
+          recordEditorMetric('editor.opening.blocked', { kind: 'door', rule: errors[0].rule });
           return;
         }
 
@@ -532,6 +606,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         const errors = violations.filter((v) => v.severity === 'error');
         if (errors.length > 0) {
           onPlacementViolation?.({ message: errors[0].message, rule: errors[0].rule, targetId: wall.id });
+          recordEditorMetric('editor.opening.blocked', { kind: 'window', rule: errors[0].rule });
           return;
         }
 
@@ -615,7 +690,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     );
   }
 
-  const roomElements = (floorPlan?.rooms ?? []).map((room) => {
+  const roomElements = (floorPlan?.rooms ?? []).filter((room) => visible(room.id)).map((room) => {
     const centroid = polygonCentroid(room.vertices);
     const isSelected = selectedElementIds.includes(room.id);
 
@@ -668,7 +743,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     );
   });
 
-  const objectElements = (floorPlan?.objects ?? []).map((object) => {
+  const objectElements = (floorPlan?.objects ?? []).filter((object) => visible(object.id)).map((object) => {
     const asset = OBJECT_CATALOG_BY_ID[object.assetId];
     if (!asset) return null;
 
@@ -718,7 +793,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     );
   });
 
-  const wallElements = floorPlan?.walls.map((wall) => {
+  const wallElements = floorPlan?.walls.filter((wall) => visible(wall.id)).map((wall) => {
     const isSelected = selectedElementIds.includes(wall.id);
     const canEditEndpoints = isSelected && currentTool === 'select';
     const footprint = footprints.get(wall.id);
@@ -730,13 +805,15 @@ export const Canvas2D = React.memo(function Canvas2D({
     const wallLengthMm = Math.round(
       Math.hypot(wall.endPoint.x - wall.startPoint.x, wall.endPoint.y - wall.startPoint.y) * planMillimetresPerPixel
     );
+    const wallBaseColor = wall.type === 'loadBearing' ? palette.wall : palette.partition;
+    const wallFillColor = colorPreset === 'validation' ? tintForConfidence(wallBaseColor, wall.confidence) : wallBaseColor;
 
     return (
       <Group key={wall.id}>
         <Line
           points={outline}
           closed
-          fill={wall.type === 'loadBearing' ? palette.wall : palette.partition}
+          fill={wallFillColor}
           stroke={isSelected ? palette.selection : undefined}
           strokeWidth={isSelected ? 1.5 : 0}
           shadowColor={isSelected ? palette.selection : undefined}
@@ -795,7 +872,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     );
   });
 
-  const doorElements = (floorPlan?.doors ?? []).map((door) => {
+  const doorElements = (floorPlan?.doors ?? []).filter((door) => visible(door.id) && visible(door.wallId)).map((door) => {
     const wall = floorPlan?.walls.find((candidate) => candidate.id === door.wallId);
     if (!wall) return null;
 
@@ -829,6 +906,8 @@ export const Canvas2D = React.memo(function Canvas2D({
       y: hinge.y + Math.sin(openAngle) * width,
     };
     const isSelected = selectedElementIds.includes(door.id);
+    const doorBaseColor = colorPreset === 'validation' ? tintForConfidence(palette.door, door.confidence) : palette.door;
+    const doorColor = isSelected ? palette.selection : doorBaseColor;
 
     return (
       <Group
@@ -850,7 +929,7 @@ export const Canvas2D = React.memo(function Canvas2D({
         />
         <Line
           points={[hinge.x, hinge.y, leafEnd.x, leafEnd.y]}
-          stroke={isSelected ? palette.selection : palette.door}
+          stroke={doorColor}
           strokeWidth={2}
         />
         <Arc
@@ -861,7 +940,7 @@ export const Canvas2D = React.memo(function Canvas2D({
           angle={90}
           rotation={(arcRotation * 180) / Math.PI}
           clockwise={false}
-          fill={isSelected ? palette.selection : palette.door}
+          fill={doorColor}
           opacity={0.75}
         />
         <Line
@@ -873,7 +952,7 @@ export const Canvas2D = React.memo(function Canvas2D({
     );
   });
 
-  const windowElements = (floorPlan?.windows ?? []).map((window) => {
+  const windowElements = (floorPlan?.windows ?? []).filter((window) => visible(window.id) && visible(window.wallId)).map((window) => {
     const wall = floorPlan?.walls.find((candidate) => candidate.id === window.wallId);
     if (!wall) return null;
 
@@ -884,7 +963,8 @@ export const Canvas2D = React.memo(function Canvas2D({
     const direction = { x: Math.cos(angle), y: Math.sin(angle) };
     const normal = { x: -direction.y, y: direction.x };
     const isSelected = selectedElementIds.includes(window.id);
-    const color = isSelected ? palette.selection : palette.window;
+    const windowBaseColor = colorPreset === 'validation' ? tintForConfidence(palette.window, window.confidence) : palette.window;
+    const color = isSelected ? palette.selection : windowBaseColor;
     const endpoints = (normalOffset: number) => [
       center.x - direction.x * halfWidth + normal.x * normalOffset,
       center.y - direction.y * halfWidth + normal.y * normalOffset,
@@ -912,6 +992,53 @@ export const Canvas2D = React.memo(function Canvas2D({
       </Group>
     );
   });
+
+  const aiDiffElements = aiPreviewFloorPlan && aiDiff ? (
+    <Group listening={false}>
+      {(floorPlan?.walls ?? []).filter((wall) => visible(wall.id)).map((wall) => {
+        if (aiDiff.original.get(wall.id) !== 'removed') return null;
+        const footprint = footprints.get(wall.id);
+        if (!footprint) return null;
+        return (
+          <Line
+            key={'ai-removed-wall-' + wall.id}
+            points={footprint.flatMap((corner) => [corner.x, corner.y])}
+            closed
+            stroke={aiPreviewColor('removed')}
+            strokeWidth={3}
+            dash={[10, 6]}
+            opacity={0.9}
+          />
+        );
+      })}
+      {(aiPreviewFloorPlan.rooms ?? []).map((room) => (
+        <Line
+          key={'ai-proposed-room-' + room.id}
+          points={room.vertices.flatMap((point) => [point.x, point.y])}
+          closed
+          fill={aiPreviewColor(aiDiff.proposed.get(room.id)) + '18'}
+          stroke={aiPreviewColor(aiDiff.proposed.get(room.id))}
+          strokeWidth={2}
+          dash={[8, 5]}
+        />
+      ))}
+      {(aiPreviewFloorPlan.walls ?? []).map((wall) => {
+        const footprint = aiPreviewFootprints.get(wall.id);
+        if (!footprint) return null;
+        return (
+          <Line
+            key={'ai-proposed-wall-' + wall.id}
+            points={footprint.flatMap((corner) => [corner.x, corner.y])}
+            closed
+            fill={aiPreviewColor(aiDiff.proposed.get(wall.id)) + '20'}
+            stroke={aiPreviewColor(aiDiff.proposed.get(wall.id))}
+            strokeWidth={2}
+            dash={[10, 6]}
+          />
+        );
+      })}
+    </Group>
+  ) : null;
 
   const getSnapIndicatorStyle = (kind: import('@/lib/geometry/snap').PlanSnapKind) => {
     const baseSize = 8;
@@ -941,48 +1068,43 @@ export const Canvas2D = React.memo(function Canvas2D({
     const { size, color, shape } = getSnapIndicatorStyle(snapIndicator.kind);
     const { x, y } = snapIndicator.pos;
 
+    const kind = snapIndicator.kind;
+    const label = <Text x={x + size} y={y - size - 8} text={kind === 'free' ? 'Free' : kind.charAt(0).toUpperCase() + kind.slice(1)} fontSize={9} fill={color} listening={false} />;
     switch (shape) {
       case 'square':
-        return <Rect x={x - size / 2} y={y - size / 2} width={size} height={size} stroke={color} strokeWidth={1.5} />;
+        return <>{label}<Rect x={x - size / 2} y={y - size / 2} width={size} height={size} stroke={color} strokeWidth={1.5} /></>;
       case 'triangle':
-        return (
-          <Line
+        return (<>{label}<Line
             points={[x, y - size / 2, x + size / 2, y + size / 2, x - size / 2, y + size / 2, x, y - size / 2]}
             stroke={color}
             strokeWidth={1.5}
-          />
-        );
+          /></>);
       case 'x':
-        return (
-          <>
+        return (<>
+            {label}
             <Line points={[x - size / 2, y - size / 2, x + size / 2, y + size / 2]} stroke={color} strokeWidth={1.5} />
             <Line points={[x - size / 2, y + size / 2, x + size / 2, y - size / 2]} stroke={color} strokeWidth={1.5} />
-          </>
-        );
+          </>);
       case 'tick':
-        return (
-          <>
+        return (<>
+            {label}
             <Line points={[x - size / 2, y, x, y + size / 2]} stroke={color} strokeWidth={1.5} />
             <Line points={[x, y + size / 2, x + size / 2, y - size / 4]} stroke={color} strokeWidth={1.5} />
-          </>
-        );
+          </>);
       case 'diamond':
-        return (
-          <Line
+        return (<>{label}<Line
             points={[x, y - size / 2, x + size / 2, y, x, y + size / 2, x - size / 2, y, x, y - size / 2]}
             stroke={color}
             strokeWidth={1.5}
-          />
-        );
+          /></>);
       case 'plus':
-        return (
-          <>
+        return (<>
+            {label}
             <Line points={[x - size / 2, y, x + size / 2, y]} stroke={color} strokeWidth={1.5} />
             <Line points={[x, y - size / 2, x, y + size / 2]} stroke={color} strokeWidth={1.5} />
-          </>
-        );
+          </>);
       default: // dot
-        return <Circle x={x} y={y} radius={size / 2} stroke={color} strokeWidth={1} />;
+        return <>{label}<Circle x={x} y={y} radius={size / 2} stroke={color} strokeWidth={1} /></>;
     }
   })() : null;
 
@@ -1045,6 +1167,8 @@ export const Canvas2D = React.memo(function Canvas2D({
         ref={stageRef}
         width={canvasSize.width}
         height={canvasSize.height}
+        scaleX={viewportScale}
+        scaleY={viewportScale}
         draggable={isPanning}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -1055,17 +1179,10 @@ export const Canvas2D = React.memo(function Canvas2D({
         <Layer>
           <Rect x={gridLeft} y={gridTop} width={gridWidth} height={gridHeight} fill={palette.canvas} listening={false} />
           {traceImage && referenceImage && traceImage.opacity > 0 && (
-            <KonvaImage
-              image={referenceImage}
-              x={-referenceWidth / 2}
-              y={-referenceHeight / 2}
-              width={referenceWidth}
-              height={referenceHeight}
-              opacity={traceImage.opacity}
-              filters={traceImage.blur > 0 ? [Konva.Filters.Blur] : undefined}
-              blurRadius={traceImage.blur}
-              listening={false}
-            />
+            <>
+              <KonvaImage image={referenceImage} x={-referenceWidth / 2} y={-referenceHeight / 2} width={referenceWidth} height={referenceHeight} opacity={traceImage.opacity} filters={traceImage.blur > 0 ? [Konva.Filters.Blur] : undefined} blurRadius={traceImage.blur} listening={false} />
+              <Rect x={-referenceWidth / 2} y={-referenceHeight / 2} width={referenceWidth} height={referenceHeight} stroke={palette.selection} strokeWidth={1} dash={[8, 5]} opacity={0.55} listening={false} />
+            </>
           )}
           {calibrationWall && calibrationLabel && (
             <>
@@ -1091,6 +1208,33 @@ export const Canvas2D = React.memo(function Canvas2D({
             </>
           )}
           {showGrid && gridLines}
+          {(floorPlan?.building?.grids ?? []).map((grid) => (
+            <Group key={grid.id} listening={false}>
+              <Line
+                points={grid.axis === 'vertical' ? [grid.position, gridTop, grid.position, gridBottom] : [gridLeft, grid.position, gridRight, grid.position]}
+                stroke={palette.selection}
+                strokeWidth={1}
+                dash={[8, 5]}
+                opacity={0.65}
+              />
+              <Text
+                x={grid.axis === 'vertical' ? grid.position - 12 : gridLeft + 4}
+                y={grid.axis === 'vertical' ? gridTop + 4 : grid.position - 14}
+                width={24}
+                align="center"
+                text={grid.label}
+                fontSize={10}
+                fontStyle="bold"
+                fill={palette.selection}
+              />
+            </Group>
+          ))}
+          {(floorPlan?.building?.sections ?? []).map((section) => (
+            <Group key={section.id} listening={false}>
+              <Line points={[section.startPoint.x, section.startPoint.y, section.endPoint.x, section.endPoint.y]} stroke={palette.selection} strokeWidth={2} dash={[5, 4]} />
+              <Text x={section.startPoint.x} y={section.startPoint.y - 18} text={section.label} fontSize={10} fontStyle="bold" fill={palette.selection} />
+            </Group>
+          ))}
 
           {/* Ghost layer — original imported plan as tracing-paper underlay */}
           {traceToLearnEnabled && ghostFloorPlan && ghostOpacity > 0 && (
@@ -1171,6 +1315,7 @@ export const Canvas2D = React.memo(function Canvas2D({
           {wallElements}
           {doorElements}
           {windowElements}
+          {aiDiffElements}
           {previewWall}
           {snapIndicatorRender}
 
@@ -1248,6 +1393,15 @@ export const Canvas2D = React.memo(function Canvas2D({
           <Text x={8} y={-14} text="0,0" fontSize={10} fontFamily="ui-monospace, monospace" fill={palette.label} opacity={0.8} />
         </Layer>
       </Stage>
+
+      {aiPreviewFloorPlan && (
+        <div className="pointer-events-none absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--editor-border)] bg-[var(--editor-glass)] px-3 py-1.5 text-[10px] text-[var(--editor-text)] shadow-lg">
+          <span className="font-semibold">AI diff preview</span>
+          <span className="text-[var(--editor-success)]">Proposed</span>
+          <span className="text-[var(--editor-warning)]">Changed</span>
+          <span className="text-[var(--editor-danger)]">Removed</span>
+        </div>
+      )}
 
       {!hasGeometry && !ghostFloorPlan && !traceImage && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">

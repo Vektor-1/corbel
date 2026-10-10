@@ -51,8 +51,16 @@ describe('image retrace feedback', () => {
     ]));
   });
 
-  it('stays silent for a freehand plan that never started as an image trace', () => {
+  it('still flags an open boundary on a freehand plan: the geometry check has nothing to do with tracing', () => {
     const freehandOpenBoundary = { ...plan, rooms: [] };
-    expect(validateTraceFeedback(freehandOpenBoundary, undefined, false)).toEqual([]);
+    const result = validateTraceFeedback(freehandOpenBoundary, undefined, false);
+    expect(result).toEqual([
+      expect.objectContaining({ rule: 'complete-traced-room', evidence: expect.stringContaining('bounded room') }),
+    ]);
+  });
+
+  it('stays silent on scale for a freehand plan: freehand walls are already authored in real-world mm', () => {
+    const freehandClosedBoundary = plan; // closed boundary, no open-boundary/duplicate noise
+    expect(validateTraceFeedback(freehandClosedBoundary, undefined, false)).toEqual([]);
   });
 });

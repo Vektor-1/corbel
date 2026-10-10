@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.evaluation import aggregate_scores, score_reconstruction
 from app.inference import run_ensemble
 
-REPO_ROOT = Path(__file__).resolve().parents[2]  # .../project
+REPO_ROOT = Path(__file__).resolve().parents[3]  # .../project
 DEFAULT_DATASET = REPO_ROOT / "datasets" / "dataset" / "tuning_set.jsonl"
 FRAG_PX = 15
 

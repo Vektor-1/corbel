@@ -4,6 +4,7 @@ import { MaterialsScrollShowcase } from '@/components/landing/MaterialsScrollSho
 import { ScrollReveal } from '@/components/landing/ScrollReveal';
 import { TaglineReveal } from '@/components/landing/TaglineReveal';
 import { Box, Ruler, CheckCircle2, ChevronRight, Layers, ArrowUpRight } from 'lucide-react';
+import { GOLD, INK, PAPER } from '@/lib/brand';
 
 /**
  * Layout system measured from https://overflow.sui.io/ (Webflow, TWK Everett,
@@ -26,22 +27,19 @@ import { Box, Ruler, CheckCircle2, ChevronRight, Layers, ArrowUpRight } from 'lu
  *    adaptation, not present in the source, declared here).
  */
 
-const INK = '#000f1d';
-const PAPER = '#f7f7f7';
 const PAPER_MUTED = '#efefef';
-const GOLD = '#c9a96a';
 
 const NAV_TABS = [
   { label: 'Overview', href: '#overview' },
   { label: 'Capabilities', href: '#capabilities' },
   { label: 'Materials', href: '#materials' },
   { label: 'Standards', href: '/standards' },
-  { label: 'Learn', href: '/learn' },
 ];
 
 export default function Home() {
   return (
     <main
+      id="main-content"
       className="min-h-screen font-sans antialiased pb-20 sm:pb-16"
       style={{ backgroundColor: PAPER, color: INK }}
     >
@@ -110,7 +108,6 @@ export default function Home() {
                     <ArrowUpRight className="w-4 h-4" style={{ color: INK }} />
                   </span>
                 </Link>
-                <Link href="/learn" className="inline-flex items-center px-4 py-3.5 text-sm font-semibold underline decoration-2 underline-offset-4 hover:opacity-70" style={{ color: INK }}>Read the tutorials</Link>
               </div>
             </div>
 
@@ -223,7 +220,7 @@ export default function Home() {
       <section className="py-8 border-b-2 overflow-hidden" style={{ borderColor: INK, backgroundColor: GOLD }}>
         <div className="mx-auto max-w-6xl px-4 sm:px-6 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-2 text-center">
           {[
-            ['GS 1207:2018', 'Code-Referenced Checks'],
+            ['GS 1207:2018', 'Standard Referenced'],
             ['100%', 'Free & Open Source'],
             ['0', 'Installs Required'],
             ['MIT', 'Licensed, Forkable'],
@@ -307,7 +304,6 @@ export default function Home() {
           <div className="flex gap-6 text-[10px] font-semibold uppercase tracking-wider">
             <Link href="/about" className="hover:opacity-70 transition-opacity" style={{ color: INK }}>About</Link>
             <Link href="/standards" className="hover:opacity-70 transition-opacity" style={{ color: INK }}>Standards</Link>
-            <Link href="/learn" className="hover:opacity-70 transition-opacity" style={{ color: INK }}>Tutorials</Link>
           </div>
 
           <div className="text-[10px] font-mono">Open Source | MIT License</div>
